@@ -1,4 +1,6 @@
-async function browseCommand(sock, chatId, senderId, message, userMessage) {
+const fetch = require('node-fetch');
+
+async function inspectCommand(sock, chatId, senderId, message, userMessage) {
     try {
         const args = userMessage.split(' ').slice(1);
         const url = args.join(' ').trim();
@@ -59,4 +61,4 @@ async function browseCommand(sock, chatId, senderId, message, userMessage) {
     }
 }
 
-module.exports = browseCommand;
+module.exports = inspectCommand;
