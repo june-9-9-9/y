@@ -59,9 +59,7 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
                 headersText += `${key}: ${value}\n`;
             }
 
-            return await sock.sendMessage(chatId, {
-                text: headersText
-            }, { quoted: message });
+            return await sock.sendMessage(chatId, { text: headersText }, { quoted: message });
         }
 
         if (download && (contentType.includes('audio/') ||
@@ -82,21 +80,13 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
 
             let mediaType;
             if (contentType.includes('audio/')) {
-                await sock.sendMessage(chatId, {
-                    audio: fileBuffer,
-                    mimetype: contentType
-                }, { quoted: message });
+                await sock.sendMessage(chatId, { audio: fileBuffer, mimetype: contentType }, { quoted: message });
                 mediaType = 'Audio';
             } else if (contentType.includes('video/')) {
-                await sock.sendMessage(chatId, {
-                    video: fileBuffer,
-                    mimetype: contentType
-                }, { quoted: message });
+                await sock.sendMessage(chatId, { video: fileBuffer, mimetype: contentType }, { quoted: message });
                 mediaType = 'Video';
             } else if (contentType.includes('image/')) {
-                await sock.sendMessage(chatId, {
-                    image: fileBuffer
-                }, { quoted: message });
+                await sock.sendMessage(chatId, { image: fileBuffer }, { quoted: message });
                 mediaType = 'Image';
             }
 
@@ -106,8 +96,15 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
         }
 
         if (json || contentType.includes('application/json')) {
-            const jsonData = await response.json();
-            const formattedJson = JSON.stringify(jsonData, null, 2);
+            let jsonData;
+            try {
+                jsonData = await response.json();
+            } catch (err) {
+                jsonData = null;
+            }
+
+            // Always stringify safely
+            const formattedJson = jsonData ? JSON.stringify(jsonData, null, 2) : '{}';
 
             let displayJson = formattedJson;
             let truncationNote = '';
@@ -122,9 +119,7 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
             responseText += `*Size:* ${formattedJson.length.toLocaleString()} characters\n\n`;
             responseText += `\`\`\`json\n${displayJson}${truncationNote}\`\`\``;
 
-            return await sock.sendMessage(chatId, {
-                text: responseText
-            }, { quoted: message });
+            return await sock.sendMessage(chatId, { text: responseText }, { quoted: message });
         }
 
         if (contentType.includes('text/')) {
@@ -143,9 +138,7 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
             responseText += `*Size:* ${text.length.toLocaleString()} characters\n\n`;
             responseText += `\`\`\`\n${displayText}${truncationNote}\`\`\``;
 
-            return await sock.sendMessage(chatId, {
-                text: responseText
-            }, { quoted: message });
+            return await sock.sendMessage(chatId, { text: responseText }, { quoted: message });
         }
 
         let infoText = `📦 *RESPONSE DETAILS:*\n\n`;
@@ -163,9 +156,7 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
             }
         }
 
-        await sock.sendMessage(chatId, {
-            text: infoText
-        }, { quoted: message });
+        await sock.sendMessage(chatId, { text: infoText }, { quoted: message });
 
     } catch (error) {
         console.error('Inspect command error:', error);
@@ -185,9 +176,7 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
             errorMessage = '❌ An error occurred while inspecting the URL. Please check the URL and try again.';
         }
 
-        await sock.sendMessage(chatId, {
-            text: errorMessage
-        }, { quoted: message });
+        await sock.sendMessage(chatId, { text: errorMessage }, { quoted: message });
     }
 }
 
