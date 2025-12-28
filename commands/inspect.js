@@ -7,12 +7,12 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
 
         if (!query) {
             return await sock.sendMessage(chatId, {
-                text: `🔍 *INSPECT COMMAND*\n\n*Usage:*\n.inspect <url> - Fetch and inspect data from URL\n.inspect <url> -j - Pretty JSON format\n.inspect <url> -d - Download media\n.inspect <url> -h - Show response headers only\n\n*Examples:*\n.inspect https://api.github.com/users/octocat\n.inspect https://api.github.com/users/octocat -j\n.inspect https://example.com/image.jpg -d\n.inspect https://example.com -h`
+                text: `*INSPECT COMMAND*\n\n*Usage:*\n.inspect <url> - Fetch and inspect data from URL\n.inspect <url> -j - Pretty JSON format\n.inspect <url> -d - Download media\n.inspect <url> -h - Show response headers only\n\n*Examples:*\n.inspect https://api.github.com/users/octocat\n.inspect https://api.github.com/users/octocat -j\n.inspect https://example.com/image.jpg -d\n.inspect https://example.com -h`
             }, { quoted: message });
         }
 
         await sock.sendMessage(chatId, {
-            text: `🔍 Inspecting: ${query}`
+            text: `🔍 Inspecting...`
         }, { quoted: message });
 
         // Parse arguments
@@ -103,7 +103,6 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
                 jsonData = null;
             }
 
-            // Always stringify safely
             const formattedJson = jsonData ? JSON.stringify(jsonData, null, 2) : '{}';
 
             let displayJson = formattedJson;
@@ -113,10 +112,7 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
                 truncationNote = '\n\n... (truncated - too large to display)';
             }
 
-            let responseText = `📊 *JSON RESPONSE:*\n\n`;
-            responseText += `*Status:* ${responseInfo.status}\n`;
-            responseText += `*Content-Type:* ${contentType}\n`;
-            responseText += `*Size:* ${formattedJson.length.toLocaleString()} characters\n\n`;
+            let responseText = `JSON RESPONSE:\n\n`;
             responseText += `\`\`\`json\n${displayJson}${truncationNote}\`\`\``;
 
             return await sock.sendMessage(chatId, { text: responseText }, { quoted: message });
@@ -132,31 +128,16 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
                 truncationNote = '\n\n... (truncated - too large to display)';
             }
 
-            let responseText = `📄 *TEXT RESPONSE:*\n\n`;
-            responseText += `*Status:* ${responseInfo.status}\n`;
-            responseText += `*Content-Type:* ${contentType}\n`;
-            responseText += `*Size:* ${text.length.toLocaleString()} characters\n\n`;
+            let responseText = `*TEXT RESPONSE:*\n\n`;
             responseText += `\`\`\`\n${displayText}${truncationNote}\`\`\``;
 
             return await sock.sendMessage(chatId, { text: responseText }, { quoted: message });
         }
 
-        let infoText = `📦 *RESPONSE DETAILS:*\n\n`;
-        infoText += `*Status:* ${responseInfo.status} ${responseInfo.statusText}\n`;
-        infoText += `*URL:* ${responseInfo.url}\n`;
-        infoText += `*Content-Type:* ${contentType}\n`;
-        infoText += `*Size:* ${response.headers.get('content-length') || 'Unknown'} bytes\n`;
-        infoText += `*Redirected:* ${responseInfo.redirected}\n\n`;
-
-        const importantHeaders = ['server', 'date', 'cache-control', 'content-encoding', 'last-modified'];
-        infoText += `*Important Headers:*\n`;
-        for (const header of importantHeaders) {
-            if (responseInfo.headers[header]) {
-                infoText += `${header}: ${responseInfo.headers[header]}\n`;
-            }
-        }
-
-        await sock.sendMessage(chatId, { text: infoText }, { quoted: message });
+        // Clean fallback: no verbose RESPONSE DETAILS
+        await sock.sendMessage(chatId, {
+            text: `ℹ️ Response received.\n*Status:* ${responseInfo.status} ${responseInfo.statusText}\n*Content-Type:* ${contentType}`
+        }, { quoted: message });
 
     } catch (error) {
         console.error('Inspect command error:', error);
