@@ -15,7 +15,8 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
             return await sock.sendMessage(chatId, { text: '❌ URL must start with http:// or https://' });
         }
 
-        await sock.sendMessage(chatId, { text: `Fetching ...` }, { quoted: message });
+        // React to show progress
+        await sock.sendMessage(chatId, { react: { text: "⏳", key: message.key } });
 
         let response;
         try {
@@ -23,23 +24,24 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
             if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
         } catch (err) {
             console.error('Fetch error:', err);
+            await sock.sendMessage(chatId, { react: { text: "❌", key: message.key } });
             return await sock.sendMessage(chatId, { text: `❌ Failed: ${err.message}` });
         }
 
         const contentType = response.headers.get('content-type') || 'unknown';
         let content = await response.text();
 
-        const maxLen = 1000;
-        if (content.length > maxLen) {
-            content = content.substring(0, maxLen) + '\n... [truncated] ...';
-        }
-
+        // No truncation – full content returned
         let resultMessage = `✅ *Fetched:*\nType: ${contentType}\nStatus: ${response.status}\n\n${content}`;
 
         await sock.sendMessage(chatId, { text: resultMessage }, { quoted: message });
 
+        // Success reaction
+        await sock.sendMessage(chatId, { react: { text: "✅", key: message.key } });
+
     } catch (error) {
         console.error('Command error:', error);
+        await sock.sendMessage(chatId, { react: { text: "❌", key: message.key } });
         await sock.sendMessage(chatId, { text: `❌ Error: ${error.message}` });
     }
 }
