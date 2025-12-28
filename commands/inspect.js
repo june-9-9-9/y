@@ -25,26 +25,51 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
         } catch (err) {
             console.error('Fetch error:', err);
             await sock.sendMessage(chatId, { react: { text: "❌", key: message.key } });
-            return await sock.sendMessage(chatId, { text: `❌ Failed: ${err.message}` });
+            return await sock.sendMessage(chatId, { text: `❌ Fetch failed: ${err.message}` });
         }
 
         const contentType = response.headers.get('content-type') || 'unknown';
+        
+        // Determine if content is JSON
+        const isJson = contentType.includes('application/json');
+        
         let content;
-
         try {
-            if (contentType.includes('application/json')) {
-                const json = await response.json();
-                content = JSON.stringify(json, null, 2); // pretty-print JSON
+            if (isJson) {
+                // Parse JSON properly
+                const jsonData = await response.json();
+                content = JSON.stringify(jsonData, null, 2);
             } else {
                 content = await response.text();
             }
-        } catch (parseErr) {
-            console.error('Parse error:', parseErr);
-            content = `❌ Failed to parse response: ${parseErr.message}`;
+        } catch (err) {
+            console.error('Content reading error:', err);
+            await sock.sendMessage(chatId, { react: { text: "❌", key: message.key } });
+            return await sock.sendMessage(chatId, { 
+                text: `❌ Failed to read response content: ${err.message}` 
+            });
         }
 
-        let resultMessage = `✅ *Fetched:*\nType: ${contentType}\nStatus: ${response.status}\n\n${content}`;
+        // Prepare the response message
+        const maxLength = 4000; // WhatsApp character limit with some buffer
+        
+        let resultMessage = `✅ *Fetched:*\nType: ${contentType}\nStatus: ${response.status}\nURL: ${url}\n\n`;
+        
+        // Add content preview
+        if (content.length > 0) {
+            if (content.length > maxLength - resultMessage.length) {
+                // Content is too large, show preview only
+                const preview = content.substring(0, maxLength - resultMessage.length - 100);
+                resultMessage += `*Preview (${content.length} characters total):*\n\`\`\`\n${preview}\n...\n[Content truncated. Total length: ${content.length} characters]\`\`\``;
+            } else {
+                // Content fits within limits
+                resultMessage += `*Content:*\n\`\`\`\n${content}\n\`\`\``;
+            }
+        } else {
+            resultMessage += `*Content:* Empty response`;
+        }
 
+        // Send the message
         await sock.sendMessage(chatId, { text: resultMessage }, { quoted: message });
 
         // Success reaction
@@ -53,7 +78,7 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
     } catch (error) {
         console.error('Command error:', error);
         await sock.sendMessage(chatId, { react: { text: "❌", key: message.key } });
-        await sock.sendMessage(chatId, { text: `❌ Error: ${error.message}` });
+        await sock.sendMessage(chatId, { text: `❌ Command error: ${error.message}` });
     }
 }
 
