@@ -638,7 +638,7 @@ const fake = createFakeContact(message);
                 await banCommand(sock, chatId, message);
                 break;
                 
-            case userMessage.startsWith(`${prefix}gpt4`):
+            case userMessage.startsWith(`${prefix}ai`):
                 await gpt4Command(sock, chatId, message);
                 break;
        
