@@ -2,32 +2,8 @@ const { downloadContentFromMessage, generateWAMessageContent, generateWAMessageF
 const crypto = require('crypto');
 const ffmpeg = require('fluent-ffmpeg');
 const { PassThrough } = require('stream');
-const fetch = require('node-fetch'); // Add this for API-based conversion
+const fetch = require('node-fetch');
 
-// ================================================
-// OPTION 1: Using sharp (Recommended - fastest, local)
-// ================================================
-// First install: npm install sharp
-/*
-const sharp = require('sharp');
-async function convertStickerToImageSharp(stickerBuffer) {
-    try {
-        return await sharp(stickerBuffer, { animated: true })
-            .png() // Convert to PNG
-            .toBuffer();
-    } catch (error) {
-        console.error('Sharp conversion error:', error);
-        // Fallback: try to convert to JPEG
-        try {
-            return await sharp(stickerBuffer)
-                .jpeg({ quality: 90 })
-                .toBuffer();
-        } catch (fallbackError) {
-            throw new Error('Sticker conversion failed');
-        }
-    }
-}
-*/
 
 // ================================================
 // OPTION 2: Using webp-converter (Pure JS)
@@ -46,7 +22,7 @@ async function convertStickerToImageWebP(stickerBuffer) {
 */
 
 // ================================================
-// OPTION 3: Using API service (No dependencies)
+// OPTION 1: Using API service (No dependencies)
 // ================================================
 async function convertStickerToImageAPI(stickerBuffer) {
     try {
