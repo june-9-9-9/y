@@ -36,7 +36,7 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
         if (contentType.includes('application/json')) {
             try {
                 const jsonData = await response.json();
-                content = JSON.stringify(jsonData, null, 2);
+                content = JSON.stringify(jsonData, null, 2); // pretty JSON
             } catch {
                 content = await response.text();
             }
@@ -44,28 +44,15 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
             content = await response.text();
         }
 
-        const maxLength = 3500;
-        let truncated = false;
-        const originalLength = content.length;
-
-        if (originalLength > maxLength) {
-            content = content.substring(0, maxLength);
-            truncated = true;
-        }
-
         let messageText = '';
         if (contentType.includes('application/json')) {
-            messageText = `📡 *API JSON Response* (${url})\n\n\`\`\`json\n${content}${truncated ? '\n\n... [CONTENT TRUNCATED] ...' : ''}\n\`\`\``;
+            messageText = `📡 *API JSON Response* (${url})\n\n\`\`\`json\n${content}\n\`\`\``;
         } else if (contentType.includes('text/html')) {
-            messageText = `🌐 *HTML Content* (${url})\n\n\`\`\`html\n${content}${truncated ? '\n\n... [CONTENT TRUNCATED] ...' : ''}\n\`\`\``;
+            messageText = `🌐 *HTML Content* (${url})\n\n\`\`\`html\n${content}\n\`\`\``;
         } else if (contentType.includes('text/plain') || contentType.includes('text/')) {
-            messageText = `📝 *Text Content* (${url})\n\n\`\`\`text\n${content}${truncated ? '\n\n... [CONTENT TRUNCATED] ...' : ''}\n\`\`\``;
+            messageText = `📝 *Text Content* (${url})\n\n\`\`\`text\n${content}\n\`\`\``;
         } else {
-            messageText = `📄 *Raw Content* (${url})\nContent-Type: ${contentType}\n\n\`\`\`\n${content}${truncated ? '\n\n... [CONTENT TRUNCATED] ...' : ''}\n\`\`\``;
-        }
-
-        if (truncated) {
-            messageText += `\n\n⚠️ *Note:* Content truncated (original length: ${originalLength} chars)`;
+            messageText = `📄 *Raw Content* (${url})\nContent-Type: ${contentType}\n\n\`\`\`\n${content}\n\`\`\``;
         }
 
         await sock.sendMessage(chatId, { text: messageText }, { quoted: message });
