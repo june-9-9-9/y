@@ -6,12 +6,16 @@ async function gpt4Command(sock, chatId, message) {
                  message.message?.extendedTextMessage?.text || 
                  message.text;
 
-    if (!text) return sendMsg(sock, chatId, message, "Please provide a question after !gpt\n\nExample: !gpt What is quantum computing?");
+    if (!text) {
+      return sendMsg(sock, chatId, message, "Please provide a question after !gpt\n\nExample: !gpt What is quantum computing?");
+    }
     
     const [command, ...rest] = text.split(' ');
     const query = rest.join(' ').trim();
 
-    if (!query) return sendMsg(sock, chatId, message, "❌ Please provide a query.\nExample: !gpt What is quantum computing?");
+    if (!query) {
+      return sendMsg(sock, chatId, message, "❌ Please provide a query.\nExample: !gpt What is quantum computing?");
+    }
     
     await sock.sendMessage(chatId, { react: { text: '🤖', key: message.key } });
     await handleAI(sock, chatId, message, query);
@@ -24,11 +28,24 @@ async function gpt4Command(sock, chatId, message) {
 
 async function handleAI(sock, chatId, message, query) {
   try {
-    const url = `https://iamtkm.vercel.app/ai/copilot?apikey=tkm&text=${encodeURIComponent(query)}`;
-    const { data } = await axios.get(url);
-    const reply = data?.result || "⚠️ No response from AI.";
-    if (reply === "⚠️ No response from AI.") throw new Error('No valid response');
+    const url = "https://api.openai.com/v1/chat/completions"; // ✅ Official endpoint
+    const { data } = await axios.post(
+      url,
+      {
+        model: "gpt-4", // or "gpt-4o-mini" for cheaper/faster
+        messages: [{ role: "user", content: query }],
+      },
+      {
+        headers: {
+          "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`, // ✅ use env variable
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const reply = data.choices?.[0]?.message?.content || "⚠️ No response from AI.";
     await sendMsg(sock, chatId, message, reply);
+
   } catch (err) {
     console.error('API Error:', err);
     const msg = err.response?.status === 429 
