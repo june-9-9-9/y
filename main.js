@@ -268,6 +268,7 @@ const ytsCommand = require('./commands/yts');
 const setGroupStatusCommand = require('./commands/setGroupStatus');
 const handleDevReact = require('./commands/devReact');
 const imageCommand = require('./commands/image');
+const gpt4Command = require('./commands/aiGpt4');
 const inspectCommand = require('./commands/inspect');
 const { ytmp4Command, ytmp3Command }= require('./commands/ytd');
 const { chaneljidCommand }= require('./commands/chanel');
@@ -635,6 +636,10 @@ const fake = createFakeContact(message);
 
             case userMessage.startsWith(`${prefix}ban`):
                 await banCommand(sock, chatId, message);
+                break;
+                
+            case userMessage.startsWith(`${prefix}gpt4`):
+                await gpt4Command(sock, chatId, message);
                 break;
        
             case userMessage.startsWith(`${prefix}unban`):
