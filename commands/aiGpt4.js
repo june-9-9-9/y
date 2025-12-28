@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-async function aiCommand(sock, chatId, message) {
+async function gpt4Command(sock, chatId, message) {
   try {
     const text = message.message?.conversation || 
                  message.message?.extendedTextMessage?.text || 
@@ -42,4 +42,4 @@ async function sendMsg(sock, chatId, message, text) {
   return sock.sendMessage(chatId, { text }, { quoted: message });
 }
 
-module.exports = aiCommand;
+module.exports = gpt4Command;
