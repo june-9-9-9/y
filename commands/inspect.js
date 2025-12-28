@@ -46,13 +46,13 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
 
         let messageText = '';
         if (contentType.includes('application/json')) {
-            messageText = `📡 *API JSON Response* (${url})\n\n\`\`\`json\n${content}\n\`\`\``;
+            messageText = `📡 *API JSON Response*\n\n\`\`\`json\n${content}\n\`\`\``;
         } else if (contentType.includes('text/html')) {
-            messageText = `🌐 *HTML Content* (${url})\n\n\`\`\`html\n${content}\n\`\`\``;
+            messageText = `🌐 *HTML Content*\n\n\`\`\`html\n${content}\n\`\`\``;
         } else if (contentType.includes('text/plain') || contentType.includes('text/')) {
-            messageText = `📝 *Text Content* (${url})\n\n\`\`\`text\n${content}\n\`\`\``;
+            messageText = `📝 *Text Content*\n\n\`\`\`text\n${content}\n\`\`\``;
         } else {
-            messageText = `📄 *Raw Content* (${url})\nContent-Type: ${contentType}\n\n\`\`\`\n${content}\n\`\`\``;
+            messageText = `📄 *Raw Content*\nContent-Type: ${contentType}\n\n\`\`\`\n${content}\n\`\`\``;
         }
 
         await sock.sendMessage(chatId, { text: messageText }, { quoted: message });
