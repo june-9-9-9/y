@@ -105,15 +105,8 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
 
             const formattedJson = jsonData ? JSON.stringify(jsonData, null, 2) : '{}';
 
-            let displayJson = formattedJson;
-            let truncationNote = '';
-            if (formattedJson.length > 2500) {
-                displayJson = formattedJson.substring(0, 2500);
-                truncationNote = '\n\n... (truncated - too large to display)';
-            }
-
             let responseText = `JSON RESPONSE:\n\n`;
-            responseText += `\`\`\`json\n${displayJson}${truncationNote}\`\`\``;
+            responseText += `\`\`\`json\n${formattedJson}\`\`\``;
 
             return await sock.sendMessage(chatId, { text: responseText }, { quoted: message });
         }
@@ -121,15 +114,8 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
         if (contentType.includes('text/')) {
             const text = await response.text();
 
-            let displayText = text;
-            let truncationNote = '';
-            if (text.length > 2500) {
-                displayText = text.substring(0, 2500);
-                truncationNote = '\n\n... (truncated - too large to display)';
-            }
-
             let responseText = `*TEXT RESPONSE:*\n\n`;
-            responseText += `\`\`\`\n${displayText}${truncationNote}\`\`\``;
+            responseText += `\`\`\`\n${text}\`\`\``;
 
             return await sock.sendMessage(chatId, { text: responseText }, { quoted: message });
         }
