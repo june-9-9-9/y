@@ -26,7 +26,7 @@ async function handleAI(sock, chatId, message, query) {
   try {
     const url = `https://iamtkm.vercel.app/ai/copilot?apikey=tkm&text=${encodeURIComponent(query)}`;
     const { data } = await axios.get(url);
-    const reply = data?.data?.answer || "⚠️ No response from AI.";
+    const reply = data?.result || "⚠️ No response from AI.";
     if (reply === "⚠️ No response from AI.") throw new Error('No valid response');
     await sendMsg(sock, chatId, message, reply);
   } catch (err) {
