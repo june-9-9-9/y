@@ -1,6 +1,6 @@
 const fetch = require('node-fetch');
 
-async function inspectCommand(sock, chatId, message, args) {
+async function inspectCommand(sock, chatId, message) {
     try {
         // Show help if no arguments
         if (args.length === 0) {
