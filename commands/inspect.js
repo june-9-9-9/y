@@ -1,29 +1,47 @@
 const fetch = require('node-fetch');
 
-async function inspectCommand(sock, chatId, message, userMessage, senderId) {
-  if (!userMessage) {
-    await sock.sendMessage(chatId, { text: "Enter URL" }, { quoted: message });
-    return;
-  }
+async function inspectCommand(sock, chatId, senderId, message, userMessage) {
+    try {
+        const args = userMessage.split(' ').slice(1);
+        const url = args.join(' ').trim();
 
-  try {
-    let url = userMessage.trim();
-    let res = await fetch(url);
+        if (!url) {
+            return await sock.sendMessage(chatId, {
+                text: `Usage:\n.inspect <url>\nExample:\n.inspect https://example.com`
+            });
+        }
 
-    if (res.headers.get('Content-Type')?.includes('application/json')) {
-      let json = await res.json();
-      await sock.sendMessage(chatId, { text: JSON.stringify(json, null, 2) }, { quoted: message });
-    } else {
-      let resText = await res.text();
-      await sock.sendMessage(chatId, { text: resText }, { quoted: message });
+        if (!/^https?:\/\//i.test(url)) {
+            return await sock.sendMessage(chatId, { text: '❌ URL must start with http:// or https://' });
+        }
+
+        await sock.sendMessage(chatId, { text: `Fetching: ${url}` }, { quoted: message });
+
+        let response;
+        try {
+            response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+        } catch (err) {
+            console.error('Fetch error:', err);
+            return await sock.sendMessage(chatId, { text: `❌ Failed: ${err.message}` });
+        }
+
+        const contentType = response.headers.get('content-type') || 'unknown';
+        let content = await response.text();
+
+        const maxLen = 1000;
+        if (content.length > maxLen) {
+            content = content.substring(0, maxLen) + '\n... [truncated] ...';
+        }
+
+        let resultMessage = `✅ *Fetched:* ${url}\nType: ${contentType}\nStatus: ${response.status}\n\n${content}`;
+
+        await sock.sendMessage(chatId, { text: resultMessage }, { quoted: message });
+
+    } catch (error) {
+        console.error('Command error:', error);
+        await sock.sendMessage(chatId, { text: `❌ Error: ${error.message}` });
     }
-
-    if (!res.ok) {
-      throw new Error(`HTTP Error ${res.status}`);
-    }
-  } catch (error) {
-    await sock.sendMessage(chatId, { text: `Error fetching URL: ${error.message}` }, { quoted: message });
-  }
 }
 
 module.exports = inspectCommand;
