@@ -24,7 +24,7 @@ async function gpt4Command(sock, chatId, message) {
 
 async function handleAI(sock, chatId, message, query) {
   try {
-    const url = `https://api.zenzxz.my.id/api/ai/chatai?query=${encodeURIComponent(query)}&model=deepseek-v3`;
+    const url = `https://iamtkm.vercel.app/ai/copilot?apikey=tkm&text=${encodeURIComponent(query)}`;
     const { data } = await axios.get(url);
     const reply = data?.data?.answer || "⚠️ No response from AI.";
     if (reply === "⚠️ No response from AI.") throw new Error('No valid response');
