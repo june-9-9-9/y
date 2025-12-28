@@ -29,9 +29,20 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
         }
 
         const contentType = response.headers.get('content-type') || 'unknown';
-        let content = await response.text();
+        let content;
 
-        // No truncation – full content returned
+        try {
+            if (contentType.includes('application/json')) {
+                const json = await response.json();
+                content = JSON.stringify(json, null, 2); // pretty-print JSON
+            } else {
+                content = await response.text();
+            }
+        } catch (parseErr) {
+            console.error('Parse error:', parseErr);
+            content = `❌ Failed to parse response: ${parseErr.message}`;
+        }
+
         let resultMessage = `✅ *Fetched:*\nType: ${contentType}\nStatus: ${response.status}\n\n${content}`;
 
         await sock.sendMessage(chatId, { text: resultMessage }, { quoted: message });
