@@ -5,9 +5,9 @@ const { PassThrough } = require('stream');
 const fetch = require('node-fetch');
 
 
-// ================================================
+//================================================
 // OPTION 2: Using webp-converter (Pure JS)
-// ================================================
+//================================================
 // First install: npm install webp-converter
 /*
 const webp = require('webp-converter');
@@ -21,9 +21,7 @@ async function convertStickerToImageWebP(stickerBuffer) {
 }
 */
 
-// ================================================
-// OPTION 1: Using API service (No dependencies)
-// ================================================
+//==========================================
 async function convertStickerToImageAPI(stickerBuffer) {
     try {
         // Using a free API service (CloudConvert)
@@ -74,17 +72,7 @@ async function convertStickerToImageSimple(stickerBuffer) {
 // ================================================
 async function convertStickerToImage(stickerBuffer, mimetype = 'image/webp') {
     try {
-        // Choose your preferred conversion method:
-        // 1. Uncomment sharp method (install sharp first)
-        // return await convertStickerToImageSharp(stickerBuffer);
         
-        // 2. Uncomment webp-converter method
-        // return await convertStickerToImageWebP(stickerBuffer);
-        
-        // 3. Use API method (requires internet and API key)
-        // return await convertStickerToImageAPI(stickerBuffer);
-        
-        // 4. Simple fallback (change mimetype only)
         return await convertStickerToImageSimple(stickerBuffer);
         
     } catch (error) {
@@ -203,7 +191,6 @@ function getHelpText() {
  • .tosgroup text
  • Reply to video/image/sticker with .tosgroup
  • Add caption after command
- • Stickers are automatically converted to images
 ─────────✦`;
 }
 
