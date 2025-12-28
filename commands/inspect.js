@@ -1,8 +1,10 @@
 const fetch = require('node-fetch');
 
-async function inspectCommand(sock, chatId, senderId, message, userMessage) {
+async function inspectCommand(sock, chatId, senderId, message) {
     try {
-        const args = userMessage.split(' ').slice(1);
+        
+        const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
+        const args = text.split(' ').slice(1);
         const url = args.join(' ').trim();
 
         if (!url) {
