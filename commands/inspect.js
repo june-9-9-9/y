@@ -26,4 +26,4 @@ async function inspectCommand(sock, chatId, message, userMessage, senderId) {
   }
 }
 
-module.exports = { inspectCommand };
+module.exports = inspectCommand;
