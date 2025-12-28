@@ -28,10 +28,9 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
             return await sock.sendMessage(chatId, { text: `❌ Failed: ${err.message}` });
         }
 
-        const contentType = response.headers.get('content-type') || 'unknown';
+        const contentType = response.headers.get('content-type') || '';
         let body;
 
-        // Parse JSON if possible
         if (contentType.includes('application/json')) {
             try {
                 body = await response.json();
@@ -42,18 +41,11 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
             body = await response.text();
         }
 
-        // Build structured result
-        const result = {
-            status: response.status,
-            statusText: response.statusText,
-            contentType,
-            url,
-            body
-        };
+        // Send only JSON contents (stringified if object)
+        const output = typeof body === 'object' ? JSON.stringify(body, null, 2) : body;
 
-        // Send nicely formatted JSON
         await sock.sendMessage(chatId, { 
-            text: `✅ *Fetched:*\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\`` 
+            text: `\`\`\`json\n${output}\n\`\`\`` 
         }, { quoted: message });
 
         // Success reaction
