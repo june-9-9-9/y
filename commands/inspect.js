@@ -1,7 +1,9 @@
 const fetch = require('node-fetch');
 
-async function inspectCommand(sock, chatId, message) {
+async function inspectCommand(sock, chatId, message, userMessage) {
     try {
+        
+        const args = userMessage.split(' ').slice(1).join(' ');
         // Show help if no arguments
         if (args.length === 0) {
             const helpMessage = `🔍 *INSPECT COMMAND*\n\n` +
