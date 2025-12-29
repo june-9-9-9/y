@@ -52,13 +52,6 @@ async function demoteCommand(sock, chatId, mentionedJids, message) {
         // Normalize bot JID (strip device suffix if present)
         const botJid = sock.user.id.split(':')[0];
 
-        // 🚫 Prevent self-demotion if the command is from the bot itself
-        if (message.key.fromMe) {
-            await sock.sendMessage(chatId, { 
-                text: 'The bot cannot demote itself.'
-            },{ quoted: message});
-            return;
-        }
         
         // Filter out the bot from the demotion list
         const filteredUsersToDemote = userToDemote.filter(jid => {
