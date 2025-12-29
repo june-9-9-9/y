@@ -28,7 +28,7 @@ async function demoteCommand(sock, chatId, mentionedJids, message) {
         } catch (adminError) {
             console.error('Error checking admin status:', adminError);
             await sock.sendMessage(chatId, { 
-                text: '❌ Error: Please make sure the bot is an admin of this group.'
+                text: ' Please make sure the bot is an admin of this group.'
             });
             return;
         }
@@ -44,7 +44,7 @@ async function demoteCommand(sock, chatId, mentionedJids, message) {
         
         if (userToDemote.length === 0) {
             await sock.sendMessage(chatId, { 
-                text: '❌ Error: Please mention the user or reply to their message to demote!'
+                text: 'Please mention the user or reply to their message to demote!'
             });
             return;
         }
@@ -55,7 +55,7 @@ async function demoteCommand(sock, chatId, mentionedJids, message) {
         // 🚫 Prevent self-demotion if the command is from the bot itself
         if (message.key.fromMe) {
             await sock.sendMessage(chatId, { 
-                text: '❌ Error: The bot cannot demote itself when replying to its own message.'
+                text: 'The bot cannot demote itself when replying to its own message.'
             });
             return;
         }
@@ -68,7 +68,7 @@ async function demoteCommand(sock, chatId, mentionedJids, message) {
         
         if (filteredUsersToDemote.length === 0) {
             await sock.sendMessage(chatId, { 
-                text: '❌ Error: You cannot demote the bot itself!'
+                text: 'You cannot demote the bot itself!'
             });
             return;
         }
