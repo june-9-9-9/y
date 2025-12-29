@@ -78,20 +78,68 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
             const buffer = await response.arrayBuffer();
             const fileBuffer = Buffer.from(buffer);
 
+            // Prepare media object
+            let mediaObject = {
+                mimetype: contentType
+            };
+
             let mediaType;
+            
             if (contentType.includes('audio/')) {
-                await sock.sendMessage(chatId, { audio: fileBuffer, mimetype: contentType }, { quoted: message });
+                mediaObject.audio = fileBuffer;
+                await sock.sendMessage(chatId, mediaObject, { quoted: message });
                 mediaType = 'Audio';
             } else if (contentType.includes('video/')) {
-                await sock.sendMessage(chatId, { video: fileBuffer, mimetype: contentType }, { quoted: message });
+                mediaObject.video = fileBuffer;
+                await sock.sendMessage(chatId, mediaObject, { quoted: message });
                 mediaType = 'Video';
             } else if (contentType.includes('image/')) {
-                await sock.sendMessage(chatId, { image: fileBuffer }, { quoted: message });
+                mediaObject.image = fileBuffer;
+                // For images, you might want to add optional caption
+                if (flags.includes('-c')) {
+                    const captionIndex = flags.indexOf('-c') + 1;
+                    if (captionIndex < flags.length) {
+                        mediaObject.caption = flags[captionIndex];
+                    }
+                }
+                await sock.sendMessage(chatId, mediaObject, { quoted: message });
                 mediaType = 'Image';
             }
 
+            // Prepare and send info message as a separate message
+            const infoMessage = {
+                text: `✅ Downloaded ${mediaType}\n*Size:* ${(fileBuffer.length / 1024).toFixed(2)}KB\n*Type:* ${contentType}\n*Original URL:* ${response.url}`
+            };
+
+            // Send info after media
+            setTimeout(async () => {
+                await sock.sendMessage(chatId, infoMessage, { quoted: message });
+            }, 500);
+
+            return;
+
+        }
+
+        // Enhanced media detection even without -d flag
+        if (!download && (contentType.includes('audio/') || 
+                         contentType.includes('image/') || 
+                         contentType.includes('video/'))) {
+            
+            const buffer = await response.arrayBuffer();
+            const fileBuffer = Buffer.from(buffer);
+            const contentLength = response.headers.get('content-length');
+            const fileSize = contentLength ? parseInt(contentLength) : fileBuffer.length;
+            const maxSize = 50 * 1024 * 1024;
+
+            if (fileSize > maxSize) {
+                return await sock.sendMessage(chatId, {
+                    text: `📁 *Media Detected*\n*Type:* ${contentType}\n*Size:* ${(fileSize/1024/1024).toFixed(2)}MB (too large)\n*URL:* ${response.url}\n\nUse *-d* flag to download media under 50MB`
+                }, { quoted: message });
+            }
+
+            // Offer to download with button or instruction
             return await sock.sendMessage(chatId, {
-                text: `✅ Downloaded ${mediaType}\n*Size:* ${(fileBuffer.length / 1024).toFixed(2)}KB\n*Type:* ${contentType}`
+                text: `📁 *Media Detected*\n*Type:* ${contentType}\n*Size:* ${(fileSize/1024/1024).toFixed(2)}MB\n*URL:* ${response.url}\n\nUse *.inspect ${url} -d* to download this media.`
             }, { quoted: message });
         }
 
@@ -120,7 +168,7 @@ async function inspectCommand(sock, chatId, senderId, message, userMessage) {
             return await sock.sendMessage(chatId, { text: responseText }, { quoted: message });
         }
 
-        // Clean fallback: no verbose RESPONSE DETAILS
+        // Clean fallback
         await sock.sendMessage(chatId, {
             text: `ℹ️ Response received.\n*Status:* ${responseInfo.status} ${responseInfo.statusText}\n*Content-Type:* ${contentType}`
         }, { quoted: message });
