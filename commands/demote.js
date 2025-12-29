@@ -14,7 +14,7 @@ async function demoteCommand(sock, chatId, mentionedJids, message) {
             
             if (!adminStatus.isBotAdmin) {
                 await sock.sendMessage(chatId, { 
-                    text: '❌ Error: Please make the bot an admin first to use this command.'
+                    text: ' Please make the bot an admin first to use this command.'
                 });
                 return;
             }
@@ -55,8 +55,8 @@ async function demoteCommand(sock, chatId, mentionedJids, message) {
         // 🚫 Prevent self-demotion if the command is from the bot itself
         if (message.key.fromMe) {
             await sock.sendMessage(chatId, { 
-                text: 'The bot cannot demote itself when replying to its own message.'
-            });
+                text: 'The bot cannot demote itself.'
+            },{ quoted: message});
             return;
         }
         
