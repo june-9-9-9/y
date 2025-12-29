@@ -49,21 +49,43 @@ async function demoteCommand(sock, chatId, mentionedJids, message) {
             return;
         }
 
+        // Get bot's JID
+        const botJid = sock.user.id;
+        
+        // Filter out the bot from the demotion list
+        const filteredUsersToDemote = userToDemote.filter(jid => jid !== botJid);
+        
+        if (filteredUsersToDemote.length === 0) {
+            await sock.sendMessage(chatId, { 
+                text: '❌ Error: You cannot demote the bot itself!'
+            });
+            return;
+        }
+
+        // Check if bot was in the original list (for warning)
+        const wasBotIncluded = userToDemote.length > filteredUsersToDemote.length;
+        
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-        await sock.groupParticipantsUpdate(chatId, userToDemote, "demote");
+        await sock.groupParticipantsUpdate(chatId, filteredUsersToDemote, "demote");
         
-        const usernames = await Promise.all(userToDemote.map(async jid => {
+        const usernames = await Promise.all(filteredUsersToDemote.map(async jid => {
             return `@${jid.split('@')[0]}`;
         }));
 
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-        const demotionMessage = `Demoted: ${usernames.join(', ')}`;
+        // Prepare demotion message
+        let demotionMessage = `Demoted: ${usernames.join(', ')}`;
+        
+        // Add warning if bot was included in the original list
+        if (wasBotIncluded) {
+            demotionMessage += '\n⚠️ Note: The bot cannot demote itself.';
+        }
         
         await sock.sendMessage(chatId, { 
             text: demotionMessage,
-            mentions: userToDemote
+            mentions: filteredUsersToDemote
         });
     } catch (error) {
         console.error('Error in demote command:', error);
@@ -96,6 +118,17 @@ async function handleDemotionEvent(sock, groupId, participants, author) {
 
         const botJid = sock.user.id;
         
+        // Filter out the bot from participants list to prevent self-demotion
+        const filteredParticipants = participants.filter(jid => {
+            const jidString = typeof jid === 'string' ? jid : (jid.id || jid.toString());
+            return jidString !== botJid;
+        });
+
+        if (filteredParticipants.length === 0) {
+            console.log('No valid participants to demote (bot was only participant)');
+            return;
+        }
+
         const isBotAction = author && author.length > 0 && 
                            (author === botJid || author.includes(botJid));
 
@@ -106,12 +139,12 @@ async function handleDemotionEvent(sock, groupId, participants, author) {
 
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-        const demotedUsernames = await Promise.all(participants.map(async jid => {
+        const demotedUsernames = await Promise.all(filteredParticipants.map(async jid => {
             const jidString = typeof jid === 'string' ? jid : (jid.id || jid.toString());
             return `@${jidString.split('@')[0]}`;
         }));
 
-        let mentionList = participants.map(jid => {
+        let mentionList = filteredParticipants.map(jid => {
             return typeof jid === 'string' ? jid : (jid.id || jid.toString());
         });
 
