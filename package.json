@@ -29,6 +29,7 @@
     "awesome-phonenumber": "^5.9.0",
     "axios": "^1.8.4",
     "chalk": "^4.1.2",
+    "g-i-s": "^2.1.7",
     "adm-zip": "^0.5.16",
     "cheerio": "^1.0.0-rc.12",
     "crypto": "^1.0.1",
