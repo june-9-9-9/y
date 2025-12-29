@@ -2,7 +2,6 @@ const isAdmin = require('../lib/isAdmin');
 
 async function demoteCommand(sock, chatId, mentionedJids, message) {
     try {
-        // First check if it's a group
         if (!chatId.endsWith('@g.us')) {
             await sock.sendMessage(chatId, { 
                 text: 'This command can only be used in groups!'
@@ -10,7 +9,6 @@ async function demoteCommand(sock, chatId, mentionedJids, message) {
             return;
         }
 
-        // Check admin status first, before any other operations
         try {
             const adminStatus = await isAdmin(sock, chatId, message.key.participant || message.key.remoteJid);
             
@@ -37,16 +35,13 @@ async function demoteCommand(sock, chatId, mentionedJids, message) {
 
         let userToDemote = [];
         
-        // Check for mentioned users
         if (mentionedJids && mentionedJids.length > 0) {
             userToDemote = mentionedJids;
         }
-        // Check for replied message
         else if (message.message?.extendedTextMessage?.contextInfo?.participant) {
             userToDemote = [message.message.extendedTextMessage.contextInfo.participant];
         }
         
-        // If no user found through either method
         if (userToDemote.length === 0) {
             await sock.sendMessage(chatId, { 
                 text: '❌ Error: Please mention the user or reply to their message to demote!'
@@ -54,26 +49,21 @@ async function demoteCommand(sock, chatId, mentionedJids, message) {
             return;
         }
 
-        // Add delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         await sock.groupParticipantsUpdate(chatId, userToDemote, "demote");
         
-        // Get usernames for each demoted user
         const usernames = await Promise.all(userToDemote.map(async jid => {
             return `@${jid.split('@')[0]}`;
         }));
 
-        // Add delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-        // Simplified demotion message - Only send when bot demotes
-        const demotionMessage = `🔻 Demoted: ${usernames.join(', ')}\n` +
-                               `👤 Demoter: @${message.key.participant ? message.key.participant.split('@')[0] : message.key.remoteJid.split('@')[0]}`;
+        const demotionMessage = `🔻 Demoted: ${usernames.join(', ')}`;
         
         await sock.sendMessage(chatId, { 
             text: demotionMessage,
-            mentions: [...userToDemote, message.key.participant || message.key.remoteJid]
+            mentions: userToDemote
         });
     } catch (error) {
         console.error('Error in demote command:', error);
@@ -98,31 +88,24 @@ async function demoteCommand(sock, chatId, mentionedJids, message) {
     }
 }
 
-// Function to handle automatic demotion detection
 async function handleDemotionEvent(sock, groupId, participants, author) {
     try {
-        // Safety check for participants
         if (!Array.isArray(participants) || participants.length === 0) {
             return;
         }
 
-        // Get bot's JID
         const botJid = sock.user.id;
         
-        // Check if the demotion was performed by the bot
         const isBotAction = author && author.length > 0 && 
                            (author === botJid || author.includes(botJid));
 
-        // Only send notification if the demotion was done by the bot
         if (!isBotAction) {
             console.log('Demotion not performed by bot, skipping notification');
             return;
         }
 
-        // Add delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-        // Get usernames for demoted participants
         const demotedUsernames = await Promise.all(participants.map(async jid => {
             const jidString = typeof jid === 'string' ? jid : (jid.id || jid.toString());
             return `@${jidString.split('@')[0]}`;
@@ -132,15 +115,9 @@ async function handleDemotionEvent(sock, groupId, participants, author) {
             return typeof jid === 'string' ? jid : (jid.id || jid.toString());
         });
 
-        // Add bot JID to mentions if author is bot
-        mentionList.push(botJid);
-
-        // Add delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-        // Simplified demotion message - Only for bot actions
-        const demotionMessage = `🔻 Demoted: ${demotedUsernames.join(', ')}\n` +
-                               `👤 Demoter: @${botJid.split('@')[0]}`;
+        const demotionMessage = `🔻 Demoted: ${demotedUsernames.join(', ')}`;
         
         await sock.sendMessage(groupId, {
             text: demotionMessage,
