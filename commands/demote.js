@@ -51,6 +51,14 @@ async function demoteCommand(sock, chatId, mentionedJids, message) {
 
         // Normalize bot JID (strip device suffix if present)
         const botJid = sock.user.id.split(':')[0];
+
+        // 🚫 Prevent self-demotion if the command is from the bot itself
+        if (message.key.fromMe) {
+            await sock.sendMessage(chatId, { 
+                text: '❌ Error: The bot cannot demote itself when replying to its own message.'
+            });
+            return;
+        }
         
         // Filter out the bot from the demotion list
         const filteredUsersToDemote = userToDemote.filter(jid => {
@@ -65,7 +73,6 @@ async function demoteCommand(sock, chatId, mentionedJids, message) {
             return;
         }
 
-        // Check if bot was in the original list (for warning)
         const wasBotIncluded = userToDemote.length > filteredUsersToDemote.length;
         
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -78,10 +85,8 @@ async function demoteCommand(sock, chatId, mentionedJids, message) {
 
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-        // Prepare demotion message
         let demotionMessage = `Demoted: ${usernames.join(', ')}`;
         
-        // Add warning if bot was included in the original list
         if (wasBotIncluded) {
             demotionMessage += '\n⚠️ Note: The bot cannot demote itself.';
         }
