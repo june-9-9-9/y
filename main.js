@@ -927,19 +927,63 @@ const fake = createFakeContact(message);
                 await newsCommand(sock, chatId);
                 break;
 
-            case userMessage.startsWith(`${prefix}ttt`) || userMessage.startsWith(`${prefix}tictactoe`):
-                const tttText = userMessage.split(' ').slice(1).join(' ');
-                await tictactoeCommand(sock, chatId, senderId, tttText);
-                break;
+// Inside your command switch/case statement:
+case userMessage.startsWith('.ttt') || userMessage.startsWith('.tictactoe'):
+    const tttText = userMessage.split(' ').slice(1).join(' ');
+    await tictactoeCommand(sock, chatId, senderId, tttText);
+    break;
 
-            case userMessage.startsWith(`${prefix}move`):
-                const position = parseInt(userMessage.split(' ')[1]);
-                if (isNaN(position)) {
-                    await sock.sendMessage(chatId, { text: 'Please provide a valid position number for Tic-Tac-Toe move.', ...channelInfo }, { quoted: message });
-                } else {
-                    await handleTicTacToeMove(sock, chatId, senderId, position.toString());
-                }
-                break;
+case userMessage.startsWith('.move'):
+    const position = parseInt(userMessage.split(' ')[1]);
+    if (isNaN(position)) {
+        await sock.sendMessage(chatId, { 
+            text: 'Please provide a valid position number for Tic-Tac-Toe move.', 
+            ...channelInfo 
+        });
+    } else {
+        await handleTicTacToeMove(sock, chatId, senderId, position);
+    }
+    break;
+
+// === CONNECT FOUR HANDLERS ===
+case userMessage.startsWith('.connectfour') || userMessage.startsWith('.cf'):
+    const cfText = userMessage.split(' ').slice(1).join(' ');
+    await connectFourCommand(sock, chatId, senderId, cfText);
+    break;
+
+case userMessage.startsWith('.drop'):
+    const column = parseInt(userMessage.split(' ')[1]);
+    if (isNaN(column)) {
+        await sock.sendMessage(chatId, { 
+            text: 'Please provide a valid column number (1-7) for Connect Four move.', 
+            ...channelInfo 
+        });
+    } else {
+        const handled = await handleConnectFourMove(sock, chatId, senderId, column.toString());
+        if (!handled) {
+            await sock.sendMessage(chatId, { 
+                text: 'You are not in an active Connect Four game. Start one with `.connectfour`',
+                ...channelInfo
+            });
+        }
+    }
+    break;
+
+// === FORFEIT/SURRENDER FOR BOTH GAMES ===
+case userMessage === '.forfeit' || userMessage === '.surrender':
+    // Try Connect Four first
+    const cfHandled = await handleConnectFourMove(sock, chatId, senderId, 'forfeit');
+    // Then try Tic-Tac-Toe
+    const tttHandled = await handleTicTacToeMove(sock, chatId, senderId, 'forfeit');
+    
+    if (!cfHandled && !tttHandled) {
+        await sock.sendMessage(chatId, { 
+            text: 'You are not in any active game. Start one with `.ttt` or `.connectfour`',
+            ...channelInfo
+        });
+    }
+    break;
+
 
             case userMessage === `${prefix}topmembers`:
                 topMembers(sock, chatId, isGroup);
