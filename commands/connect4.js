@@ -14,7 +14,7 @@ async function connectFourCommand(sock, chatId, senderId, text) {
 
         if (existingGame) {
             await sock.sendMessage(chatId, { 
-                text: '❌ You are still in a Connect Four game. Type *forfeit* to quit.' 
+                text: '❌ You are already in a Connect Four game. Type *.forfeit* to quit.' 
             });
             return;
         }
@@ -51,10 +51,9 @@ ${board}
 
 ▢ *Room ID:* ${room.id}
 ▢ *Rules:*
-• Drop your disc into any column (1-7)
-• Connect 4 of your discs horizontally, vertically, or diagonally to win
-• Type a column number (1-7) to drop your disc
-• Type *forfeit* to give up
+• Use *.drop <column>* to drop your disc (1-7)
+• Connect 4 discs horizontally, vertically, or diagonally to win
+• Type *.forfeit* to give up
 
 🔴 Red Player: @${room.game.playerRed.split('@')[0]}
 🟡 Yellow Player: @${room.game.playerYellow.split('@')[0]}
@@ -88,7 +87,7 @@ ${board}
             connectFourGames[room.id] = room;
 
             await sock.sendMessage(chatId, { 
-                text: `⏳ *Waiting for Connect Four opponent...*\nType *.connectfour${text ? ' ' + text : ''}* to join!\n\nYou will be 🔴 Red. Room will expire in 5 minutes.`
+                text: `⏳ *Waiting for Connect Four opponent...*\nType *.connectfour${text ? ' ' + text : ''}* to join!\n\nYou will be 🔴 Red. Room will expire in 5 minutes.\n\n*Commands:*\n• .drop <1-7> - Drop disc in column\n• .forfeit - Give up`
             });
 
             // Auto-cleanup after 5 minutes if no one joins
@@ -111,7 +110,7 @@ ${board}
     }
 }
 
-async function handleConnectFourMove(sock, chatId, senderId, text) {
+async function handleConnectFourMove(sock, chatId, senderId, columnText) {
     try {
         // Find player's game
         const room = Object.values(connectFourGames).find(room => 
@@ -121,19 +120,20 @@ async function handleConnectFourMove(sock, chatId, senderId, text) {
             room.state === 'PLAYING'
         );
 
-        if (!room) return;
+        if (!room) return false; // Return false if no game found
 
-        const isForfeit = /^(forfeit|give up|quit|resign|surrender)$/i.test(text);
+        const isForfeit = /^(forfeit|give up|quit|resign|surrender)$/i.test(columnText);
+        const column = parseInt(columnText);
         
         // If not a valid move command and not forfeit, ignore
-        if (!isForfeit && !/^[1-7]$/.test(text)) return;
+        if (!isForfeit && (isNaN(column) || column < 1 || column > 7)) return false;
 
         // Check if it's player's turn (except for forfeit)
         if (senderId !== room.game.currentTurn && !isForfeit) {
             await sock.sendMessage(chatId, { 
                 text: '❌ Not your turn! Wait for your opponent to move.' 
             });
-            return;
+            return true;
         }
 
         let moveResult;
@@ -143,14 +143,14 @@ async function handleConnectFourMove(sock, chatId, senderId, text) {
             try {
                 moveResult = room.game.dropDisc(
                     senderId === room.game.playerYellow, // true if player is yellow
-                    parseInt(text) - 1 // Convert to 0-indexed
+                    column - 1 // Convert to 0-indexed
                 );
             } catch (error) {
                 console.error('Move error:', error);
                 await sock.sendMessage(chatId, { 
-                    text: '❌ Invalid column! Please choose a number between 1-7.' 
+                    text: '❌ Invalid column! Please use *.drop 1* to *.drop 7*.' 
                 });
-                return;
+                return true;
             }
         }
 
@@ -158,7 +158,7 @@ async function handleConnectFourMove(sock, chatId, senderId, text) {
             await sock.sendMessage(chatId, { 
                 text: '❌ Column is full! Choose another column.' 
             });
-            return;
+            return true;
         }
 
         let winner = null;
@@ -186,7 +186,7 @@ async function handleConnectFourMove(sock, chatId, senderId, text) {
             }
             
             delete connectFourGames[room.id];
-            return;
+            return true;
         }
 
         // Check game status
@@ -217,7 +217,7 @@ ${board}
 🔴 Red Player: @${room.game.playerRed.split('@')[0]}
 🟡 Yellow Player: @${room.game.playerYellow.split('@')[0]}
 
-${!winner && !isDraw ? '• Type a column number (1-7) to drop your disc\n• Type *forfeit* to give up' : '• Type *.connectfour* to start a new game'}
+${!winner && !isDraw ? '• Use *.drop <1-7>* to make your move\n• Type *.forfeit* to give up' : '• Type *.connectfour* to start a new game'}
 `;
 
         const mentions = [
@@ -243,6 +243,8 @@ ${!winner && !isDraw ? '• Type a column number (1-7) to drop your disc\n• Ty
             delete connectFourGames[room.id];
         }
 
+        return true;
+
     } catch (error) {
         console.error('Error in connectfour move:', error);
         try {
@@ -250,6 +252,7 @@ ${!winner && !isDraw ? '• Type a column number (1-7) to drop your disc\n• Ty
                 text: '❌ An error occurred during the move. Please start a new game.' 
             });
         } catch (e) {}
+        return true;
     }
 }
 
