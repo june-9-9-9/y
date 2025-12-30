@@ -998,6 +998,12 @@ if (/^[1-9]$/.test(userMessage)) {
         await handleConnectFourMove(sock, chatId, senderId, userMessage);
     }
 }
+                
+// === TEXT FORFEIT (ADD THIS TOO) ===
+if (/^(forfeit|surrender|give up|quit|resign)$/i.test(userMessage)) {
+    await handleConnectFourMove(sock, chatId, senderId, userMessage);
+    await handleTicTacToeMove(sock, chatId, senderId, userMessage);
+}
       
 
 
