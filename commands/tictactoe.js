@@ -20,8 +20,10 @@ async function tictactoeCommand(sock, chatId, senderId, text) {
         }
 
         // Clean up old games
+        const now = Date.now();
         Object.keys(games).forEach(id => {
-            if (games[id].state === 'ENDED' || Date.now() - parseInt(id.split('-')[1]) > 3600000) {
+            if (games[id].state === 'ENDED' || 
+                (id.includes('-') && now - parseInt(id.split('-')[1]) > 3600000)) {
                 delete games[id];
             }
         });
@@ -32,7 +34,7 @@ async function tictactoeCommand(sock, chatId, senderId, text) {
             room.id.startsWith('tictactoe') && 
             room.state === 'WAITING' && 
             (!text || room.name === text) &&
-            room.x !== chatId // Prevent joining your own waiting room in same chat
+            room.x !== chatId
         );
 
         if (room) {
@@ -41,34 +43,26 @@ async function tictactoeCommand(sock, chatId, senderId, text) {
             room.game.playerO = senderId;
             room.state = 'PLAYING';
 
-            const arr = room.game.render().map(v => ({
-                'X': '❎',
-                'O': '⭕',
-                '1': '1️⃣',
-                '2': '2️⃣',
-                '3': '3️⃣',
-                '4': '4️⃣',
-                '5': '5️⃣',
-                '6': '6️⃣',
-                '7': '7️⃣',
-                '8': '8️⃣',
-                '9': '9️⃣',
-            }[v] || '⬜'));
-
+            const boardDisplay = room.game.renderWithCoordinates();
+            
             const str = `
-🎮 *TicTacToe Game Started!*
+🎮 *TicTacToe Game Started!* 🎮
 
-Waiting for @${room.game.currentTurn.split('@')[0]} to play...
+⏰ *Turn:* @${room.game.currentTurn.split('@')[0]} (${room.game.currentTurn === room.game.playerX ? '❎' : '⭕'})
 
-${arr.slice(0, 3).join('')}
-${arr.slice(3, 6).join('')}
-${arr.slice(6).join('')}
+${boardDisplay}
 
-▢ *Room ID:* ${room.id}
-▢ *Rules:*
-• Make 3 rows of symbols vertically, horizontally or diagonally to win
-• Type a number (1-9) to place your symbol
+📊 *Players:*
+❎ @${room.game.playerX.split('@')[0]}
+⭕ @${room.game.playerO.split('@')[0]}
+
+📝 *How to play:*
+• Type number *1-9* to place your symbol
+• Available moves: ${room.game.getAvailableMoves().join(', ')}
 • Type *surrender* to give up
+• Type *board* to show current board
+
+🏆 *Win by* making 3 in a row vertically, horizontally or diagonally!
 `;
 
             await sock.sendMessage(chatId, { 
@@ -76,20 +70,23 @@ ${arr.slice(6).join('')}
                 mentions: [room.game.currentTurn, room.game.playerX, room.game.playerO]
             });
 
-            // Also notify the creator
+            // Notify the creator
             if (room.x !== chatId) {
                 await sock.sendMessage(room.x, { 
-                    text: `🎮 Opponent found! Game has started in another chat.`
+                    text: `🎮 Opponent found! Game has started.\n\n${boardDisplay}`
                 });
             }
 
         } else {
-            // Create new room
+            // Create new room with emoji numbers enabled
             room = {
                 id: 'tictactoe-' + Date.now(),
                 x: chatId,
                 o: '',
-                game: new TicTacToe(senderId, 'o'),
+                game: new TicTacToe(senderId, 'o', { 
+                    useEmojiNumbers: true,
+                    highlightWinner: true 
+                }),
                 state: 'WAITING'
             };
 
@@ -98,20 +95,40 @@ ${arr.slice(6).join('')}
 
             games[room.id] = room;
 
+            const emojiBoard = room.game.render().join(' ');
+            const emojiRows = [
+                emojiBoard.slice(0, 3).join(''),
+                emojiBoard.slice(3, 6).join(''),
+                emojiBoard.slice(6).join('')
+            ].join('\n');
+
             await sock.sendMessage(chatId, { 
-                text: `⏳ *Waiting for opponent...*\nType *.ttt${text ? ' ' + text : ''}* to join!\n\nRoom will expire in 5 minutes.`
+                text: `🎮 *TicTacToe Room Created!* 🎮
+
+${emojiRows}
+
+⏳ *Waiting for opponent...*
+📝 Type *.ttt${text ? ' ' + text : ''}* to join!
+
+🎲 *Room ID:* ${room.id.substring(0, 8)}...
+⏰ *Expires in:* 5 minutes
+
+📋 *Available symbols:*
+1️⃣ 2️⃣ 3️⃣
+4️⃣ 5️⃣ 6️⃣
+7️⃣ 8️⃣ 9️⃣
+`
             });
 
-            // Auto-cleanup after 5 minutes if no one joins
+            // Auto-cleanup after 5 minutes
             setTimeout(() => {
                 if (games[room.id] && games[room.id].state === 'WAITING') {
                     delete games[room.id];
                     sock.sendMessage(chatId, { 
-                        text: '⌛ Room expired. No one joined the game.' 
+                        text: '⌛ *Room expired.* No one joined the game.' 
                     }).catch(() => {});
                 }
-            }, 300000); // 5 minutes
-
+            }, 300000);
         }
 
     } catch (error) {
@@ -134,26 +151,40 @@ async function handleTicTacToeMove(sock, chatId, senderId, text) {
 
         if (!room) return;
 
-        const isSurrender = /^(surrender|give up|quit|resign)$/i.test(text);
+        const isSurrender = /^(surrender|give up|quit|resign|ff)$/i.test(text);
+        const showBoard = /^(board|status|show)$/i.test(text);
+        
+        if (showBoard) {
+            const boardDisplay = room.game.renderWithCoordinates();
+            const stats = room.game.getStats();
+            
+            await sock.sendMessage(chatId, { 
+                text: `📊 *Current Board*\n\n${boardDisplay}\n\n⏰ Turn ${stats.turns}/9\n🎲 Next: @${room.game.currentTurn.split('@')[0]}`,
+                mentions: [room.game.currentTurn]
+            });
+            return;
+        }
         
         // If not a valid move command and not surrender, ignore
         if (!isSurrender && !/^[1-9]$/.test(text)) return;
 
         // Check if it's player's turn (except for surrender)
         if (senderId !== room.game.currentTurn && !isSurrender) {
+            const waitMsg = `⏳ Not your turn! Wait for @${room.game.currentTurn.split('@')[0]} to move.`;
             await sock.sendMessage(chatId, { 
-                text: '❌ Not your turn! Wait for your opponent to move.' 
+                text: waitMsg,
+                mentions: [room.game.currentTurn]
             });
             return;
         }
 
         let moveResult;
         if (isSurrender) {
-            moveResult = true; // Allow surrender
+            moveResult = true;
         } else {
             try {
                 moveResult = room.game.turn(
-                    senderId === room.game.playerO, // true if player is O
+                    senderId === room.game.playerO,
                     parseInt(text) - 1
                 );
             } catch (error) {
@@ -166,8 +197,9 @@ async function handleTicTacToeMove(sock, chatId, senderId, text) {
         }
 
         if (!moveResult) {
+            const available = room.game.getAvailableMoves();
             await sock.sendMessage(chatId, { 
-                text: '❌ Invalid move! That position is already taken.' 
+                text: `❌ Invalid move! Position already taken.\n📋 Available moves: ${available.join(', ')}` 
             });
             return;
         }
@@ -176,13 +208,11 @@ async function handleTicTacToeMove(sock, chatId, senderId, text) {
         let isTie = false;
         
         if (isSurrender) {
-            // Set winner to opponent
             winner = senderId === room.game.playerX ? room.game.playerO : room.game.playerX;
             room.state = 'ENDED';
             
-            const surrenderMessage = `🏳️ @${senderId.split('@')[0]} has surrendered!\n🎉 @${winner.split('@')[0]} wins the game!`;
+            const surrenderMessage = `🏳️ *Surrender!*\n@${senderId.split('@')[0]} has given up!\n\n🎉 @${winner.split('@')[0]} wins the game!`;
             
-            // Send to both players
             const mentions = [senderId, winner];
             await sock.sendMessage(room.x, { 
                 text: surrenderMessage,
@@ -203,45 +233,42 @@ async function handleTicTacToeMove(sock, chatId, senderId, text) {
         // Check game status
         winner = room.game.winner || null;
         isTie = room.game.turns >= 9 && !winner;
+        const stats = room.game.getStats();
 
-        const arr = room.game.render().map(v => ({
-            'X': '❎',
-            'O': '⭕',
-            '1': '1️⃣',
-            '2': '2️⃣',
-            '3': '3️⃣',
-            '4': '4️⃣',
-            '5': '5️⃣',
-            '6': '6️⃣',
-            '7': '7️⃣',
-            '8': '8️⃣',
-            '9': '9️⃣',
-        }[v] || '⬜'));
-
+        const boardDisplay = room.game.renderWithCoordinates();
+        
         let gameStatus;
         if (winner) {
-            gameStatus = `🎉 @${winner.split('@')[0]} wins the game!`;
+            gameStatus = `🏆 *VICTORY!* 🏆\n@${winner.split('@')[0]} wins the game!`;
             room.state = 'ENDED';
         } else if (isTie) {
-            gameStatus = `🤝 Game ended in a draw!`;
+            gameStatus = `🤝 *DRAW!* 🤝\nGame ended in a tie!`;
             room.state = 'ENDED';
         } else {
-            gameStatus = `🎲 Turn: @${room.game.currentTurn.split('@')[0]} (${room.game.currentTurn === room.game.playerX ? '❎' : '⭕'})`;
+            gameStatus = `🎲 *Turn ${stats.turns}/9*\nNext: @${room.game.currentTurn.split('@')[0]} (${room.game.currentTurn === room.game.playerX ? '❎' : '⭕'})`;
         }
 
         const str = `
-🎮 *TicTacToe Game*
+🎮 *TicTacToe Game* 🎮
 
 ${gameStatus}
 
-${arr.slice(0, 3).join('')}
-${arr.slice(3, 6).join('')}
-${arr.slice(6).join('')}
+${boardDisplay}
 
-▢ Player ❎: @${room.game.playerX.split('@')[0]}
-▢ Player ⭕: @${room.game.playerO.split('@')[0]}
+📊 *Stats:*
+❎ @${room.game.playerX.split('@')[0]}
+⭕ @${room.game.playerO.split('@')[0]}
+⏰ Time: ${stats.duration}
 
-${!winner && !isTie ? '• Type a number (1-9) to make your move\n• Type *surrender* to give up' : '• Type *.ttt* to start a new game'}
+${!winner && !isTie ? 
+`📝 *Available moves:* ${room.game.getAvailableMoves().join(', ')}
+
+💡 *Commands:*
+• Type number *1-9* to place your symbol
+• Type *surrender* to give up
+• Type *board* to show current board` : 
+`🎮 *Game Over!*
+Type *.ttt* to start a new game!`}
 `;
 
         const mentions = [
@@ -271,7 +298,7 @@ ${!winner && !isTie ? '• Type a number (1-9) to make your move\n• Type *surr
         console.error('Error in tictactoe move:', error);
         try {
             await sock.sendMessage(chatId, { 
-                text: '❌ An error occurred during the move. Please start a new game.' 
+                text: '❌ An error occurred. Please start a new game with *.ttt*' 
             });
         } catch (e) {}
     }
