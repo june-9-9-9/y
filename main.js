@@ -986,7 +986,20 @@ case userMessage === `${prefix}forfeit` ||
             ...channelInfo
         });
     }
-    break;
+
+// === SIMPLE NUMBER INPUTS (ADD THIS IN YOUR REGULAR MESSAGE HANDLER) ===
+// Add this after your command handler, in the regular message processing:
+if (/^[1-9]$/.test(userMessage)) {
+    // Try Tic-Tac-Toe first
+    const tttResult = await handleTicTacToeMove(sock, chatId, senderId, userMessage);
+    // If not in Tic-Tac-Toe and number is 1-7, try Connect Four
+    if (!tttResult && parseInt(userMessage) <= 7) {
+        await handleConnectFourMove(sock, chatId, senderId, userMessage);
+    }
+}
+  
+  break;
+                
                       
    case userMessage === `${prefix}topmembers`:
        topMembers(sock, chatId, isGroup);
