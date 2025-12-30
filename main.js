@@ -451,12 +451,25 @@ const fake = createFakeContact(message);
             }
             return;
         }
-
+/*
         // First check if it's a game move
         if (/^[1-9]$/.test(userMessage) || userMessage.toLowerCase() === 'surrender') {
             await handleTicTacToeMove(sock, chatId, senderId, userMessage);
             return;
         }
+
+*/
+            
+// Add this after your command handler, in the regular message processing:
+if (/^[1-9]$/.test(userMessage)) {
+    // Try Tic-Tac-Toe first
+    const tttResult = await handleTicTacToeMove(sock, chatId, senderId, userMessage);
+    // If not in Tic-Tac-Toe and number is 1-7, try Connect Four
+    if (!tttResult && parseInt(userMessage) <= 7) {
+        await handleConnectFourMove(sock, chatId, senderId, userMessage);
+    }
+}
+
 
         if (!message.key.fromMe) incrementMessageCount(chatId, senderId);
 
@@ -972,45 +985,23 @@ case userMessage.startsWith(`${prefix}drop`):
     }
     break;
                 
-// === FORFEIT/SURRENDER FOR BOTH GAMES ===
-case userMessage === `${prefix}forfeit`:
-    // Handle Connect Four forfeit
+          // === FORFEIT/SURRENDER FOR BOTH GAMES ===
+case userMessage === `${prefix}forfeit` || 
+     userMessage === `surrender`:
+    // Try Connect Four first
     const cfHandled = await handleConnectFourMove(sock, chatId, senderId, 'forfeit');
-    
-    if (!cfHandled) {
-        await sock.sendMessage(chatId, { 
-            text: 'You are not in an active Connect Four game. Start one with `.connectfour`',
-            ...channelInfo
-        });
-    }
-    break;
-
-case userMessage === `${prefix}surrender`:
-    // Handle Tic-Tac-Toe surrender
+    // Then try Tic-Tac-Toe
     const tttHandled = await handleTicTacToeMove(sock, chatId, senderId, 'forfeit');
     
-    if (!tttHandled) {
+    if (!cfHandled && !tttHandled) {
         await sock.sendMessage(chatId, { 
-            text: 'You are not in an active Tic-Tac-Toe game. Start one with `.ttt`',
+            text: 'You are not in any active game. Start one with `.ttt` or `.connectfour`',
             ...channelInfo
         });
     }
     break;
 
-// === SIMPLE NUMBER INPUTS (ADD THIS IN YOUR REGULAR MESSAGE HANDLER) ===
-// Add this after your command handler, in the regular message processing:
-if (/^[1-9]$/.test(userMessage)) {
-    // Try Tic-Tac-Toe first
-    const tttResult = await handleTicTacToeMove(sock, chatId, senderId, userMessage);
-    // If not in Tic-Tac-Toe and number is 1-7, try Connect Four
-    if (!tttResult && parseInt(userMessage) <= 7) {
-        await handleConnectFourMove(sock, chatId, senderId, userMessage);
-    }
-}
-  
-  break;
                 
-                      
    case userMessage === `${prefix}topmembers`:
        topMembers(sock, chatId, isGroup);
       break;
