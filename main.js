@@ -272,6 +272,7 @@ const gpt4Command = require('./commands/aiGpt4');
 const inspectCommand = require('./commands/inspect');
 const { ytmp4Command, ytmp3Command }= require('./commands/ytd');
 const { chaneljidCommand }= require('./commands/chanel');
+const { connectFourCommand, handleConnectFourMove } = require('./commands/connect4');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
