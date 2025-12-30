@@ -971,21 +971,31 @@ case userMessage.startsWith(`${prefix}drop`):
         }
     }
     break;
-
+                
 // === FORFEIT/SURRENDER FOR BOTH GAMES ===
-case userMessage === `${prefix}forfeit` || 
-     userMessage === `${prefix}surrender`:
-    // Try Connect Four first
+case userMessage === `${prefix}forfeit`:
+    // Handle Connect Four forfeit
     const cfHandled = await handleConnectFourMove(sock, chatId, senderId, 'forfeit');
-    // Then try Tic-Tac-Toe
-    const tttHandled = await handleTicTacToeMove(sock, chatId, senderId, 'forfeit');
     
-    if (!cfHandled && !tttHandled) {
+    if (!cfHandled) {
         await sock.sendMessage(chatId, { 
-            text: 'You are not in any active game. Start one with `.ttt` or `.connectfour`',
+            text: 'You are not in an active Connect Four game. Start one with `.connectfour`',
             ...channelInfo
         });
     }
+    break;
+
+case userMessage === `${prefix}surrender`:
+    // Handle Tic-Tac-Toe surrender
+    const tttHandled = await handleTicTacToeMove(sock, chatId, senderId, 'forfeit');
+    
+    if (!tttHandled) {
+        await sock.sendMessage(chatId, { 
+            text: 'You are not in an active Tic-Tac-Toe game. Start one with `.ttt`',
+            ...channelInfo
+        });
+    }
+    break;
 
 // === SIMPLE NUMBER INPUTS (ADD THIS IN YOUR REGULAR MESSAGE HANDLER) ===
 // Add this after your command handler, in the regular message processing:
