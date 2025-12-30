@@ -929,12 +929,13 @@ const fake = createFakeContact(message);
                 break;
 
 // Inside your command switch/case statement:
-case userMessage.startsWith('.ttt') || userMessage.startsWith('.tictactoe'):
+case userMessage.startsWith(`${prefix}ttt`) ||
+     userMessage.startsWith(`${prefix}tictactoe`):
     const tttText = userMessage.split(' ').slice(1).join(' ');
     await tictactoeCommand(sock, chatId, senderId, tttText);
     break;
 
-case userMessage.startsWith('.move'):
+case userMessage.startsWith(`${prefix}move`):
     const position = parseInt(userMessage.split(' ')[1]);
     if (isNaN(position)) {
         await sock.sendMessage(chatId, { 
@@ -947,12 +948,13 @@ case userMessage.startsWith('.move'):
     break;
 
 // === CONNECT FOUR HANDLERS ===
-case userMessage.startsWith('.connectfour') || userMessage.startsWith('.cf'):
+case userMessage.startsWith(`${prefix}connect4`) || 
+     userMessage.startsWith(`${prefix}cf`):
     const cfText = userMessage.split(' ').slice(1).join(' ');
     await connectFourCommand(sock, chatId, senderId, cfText);
     break;
 
-case userMessage.startsWith('.drop'):
+case userMessage.startsWith(`${prefix}drop`):
     const column = parseInt(userMessage.split(' ')[1]);
     if (isNaN(column)) {
         await sock.sendMessage(chatId, { 
@@ -971,7 +973,8 @@ case userMessage.startsWith('.drop'):
     break;
 
 // === FORFEIT/SURRENDER FOR BOTH GAMES ===
-case userMessage === '.forfeit' || userMessage === '.surrender':
+case userMessage === `${prefix}forfeit` || 
+     userMessage === `${prefix}surrender`:
     // Try Connect Four first
     const cfHandled = await handleConnectFourMove(sock, chatId, senderId, 'forfeit');
     // Then try Tic-Tac-Toe
