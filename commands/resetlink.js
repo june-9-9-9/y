@@ -1,5 +1,14 @@
 async function resetlinkCommand(sock, chatId, senderId) {
     try {
+        // Check if it's a group
+        const isGroup = chatId.endsWith('@g.us');
+        if (!isGroup) {
+            await sock.sendMessage(chatId, { 
+                text: '❌ This command can only be used in groups!'
+            });
+            return;
+        }
+
         const groupMetadata = await sock.groupMetadata(chatId);
         
         const isAdmin = groupMetadata.participants.some(p => 
@@ -56,6 +65,15 @@ async function resetlinkCommand(sock, chatId, senderId) {
 
 async function linkCommand(sock, chatId) {
     try {
+        // Check if it's a group
+        const isGroup = chatId.endsWith('@g.us');
+        if (!isGroup) {
+            await sock.sendMessage(chatId, { 
+                text: '❌ This command can only be used in groups!'
+            });
+            return;
+        }
+
         // Get group metadata
         const groupMetadata = await sock.groupMetadata(chatId);
 
