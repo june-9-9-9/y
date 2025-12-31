@@ -48,7 +48,7 @@ async function resetlinkCommand(sock, chatId, senderId) {
         
         await sock.sendMessage(chatId, { 
             text: `✅ Group link has been successfully reset!\n\n📌 New link:\nhttps://chat.whatsapp.com/${newCode}\n\n⚠️ Old link is now invalid.`
-        });
+        }, { quoted: message });
 
     } catch (error) {
         console.error('Error details:', {
@@ -70,7 +70,7 @@ async function linkCommand(sock, chatId) {
         if (!isGroup) {
             await sock.sendMessage(chatId, { 
                 text: '❌ This command can only be used in groups!'
-            });
+            }, { quoted: message});
             return;
         }
 
