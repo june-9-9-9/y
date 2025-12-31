@@ -269,6 +269,7 @@ const setGroupStatusCommand = require('./commands/setGroupStatus');
 const handleDevReact = require('./commands/devReact');
 const imageCommand = require('./commands/image');
 const gpt4Command = require('./commands/aiGpt4');
+const vcfCommand = require('./commands/vcf');
 const inspectCommand = require('./commands/inspect');
 const { ytmp4Command, ytmp3Command }= require('./commands/ytd');
 const { chaneljidCommand }= require('./commands/chanel');
@@ -699,6 +700,12 @@ if (/^[1-9]$/.test(userMessage)) {
 
             case userMessage.startsWith(`${prefix}delete`) || userMessage.startsWith(`${prefix}del`):
                 await deleteCommand(sock, chatId, message, senderId);
+                break;
+
+                
+            case userMessage.startsWith(`${prefix}vcf`) || 
+                 userMessage.startsWith(`${prefix}vcard`):
+                await vcfCommand(sock, chatId, message);
                 break;
 
             case userMessage.startsWith(`${prefix}attp`):
