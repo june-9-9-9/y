@@ -67,10 +67,10 @@ async function ytplayCommand(sock, chatId, message) {
         }
 
         // Fetch video data from API
-        const response = await axios.get(`https://api.privatezia.biz.id/api/downloader/youtube?url=${videoUrl}`);
+        const response = await axios.get(`https://veron-apis.zone.id/downloader/youtube1?url=${videoUrl}`);
         const ApiData = response.data;
 
-        if (!ApiData || !ApiData.status || !ApiData.result || !ApiData.result.downloadUrl) {
+        if (!ApiData || !ApiData.success || !ApiData.result || !ApiData.result.downloadUrl) {
             return await sock.sendMessage(chatId, { 
                 text: "Failed to fetch video from the API. Please try again later." 
             }, { quoted: message });
