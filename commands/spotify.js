@@ -1,11 +1,7 @@
-
-
 const axios = require('axios');
 
 async function spotifyCommand(sock, chatId, message) {
     try {
-
-        
         const rawText = message.message?.conversation?.trim() ||
             message.message?.extendedTextMessage?.text?.trim() ||
             message.message?.imageMessage?.caption?.trim() ||
@@ -17,86 +13,55 @@ async function spotifyCommand(sock, chatId, message) {
         
         if (!query) {
             await sock.sendMessage(chatId, { 
-                text: 'Usage: .spotify <song/artist/keywords or Spotify URL>\n\nExample: .spotify Faded\nExample: .spotify https://open.spotify.com/track/...' 
+                text: 'Usage: .spotify <song/artist/keywords>\n\nExample: .spotify Faded\nExample: .spotify Alan Walker' 
             }, { quoted: message });
             return;
         }
 
-        // Check if input is a Spotify URL
-        const isSpotifyUrl = query.includes('open.spotify.com/track/');
-        
-        let audioUrl, trackInfo;
-
-        if (isSpotifyUrl) {
-            // Use downloader API for direct Spotify links
-            const apiUrl = `https://casper-tech-apis.vercel.app/api/downloader/sportify?url=${encodeURIComponent(query)}`;
-            const { data } = await axios.get(apiUrl, { 
-                timeout: 20000, 
-                headers: { 'user-agent': 'Mozilla/5.0' } 
-            });
-
-                    await sock.sendMessage(chatId, {
-            react: { text: '🎼', key: message.key }
+        // Send initial reaction
+        await sock.sendMessage(chatId, {
+            react: { text: '🔍', key: message.key }
         });
 
-            if (!data?.success || !data?.track) {
-                throw new Error('No result from Spotify downloader API');
-            }
+        // Call the new API
+        const apiUrl = `https://veron-apis.zone.id/downloader/spotify?query=${encodeURIComponent(query)}`;
+        const { data } = await axios.get(apiUrl, { 
+            timeout: 30000, // Increased timeout for processing
+            headers: { 
+                'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'accept': 'application/json'
+            } 
+        });
 
-            const track = data.track;
-            audioUrl = track.audio?.url;
-            trackInfo = {
-                title: track.title || 'Unknown Title',
-                artist: track.artist || 'Unknown Artist',
-                duration: track.duration || '',
-                thumbnail: track.thumbnail || track.album?.cover,
-                spotifyUrl: track.spotify_url || query
-            };
-
-        } else {
-            // Use search API for queries
-            const apiUrl = `https://veron-apis.zone.id/downloader/spotify?query=${encodeURIComponent(query)}`;
-            const { data } = await axios.get(apiUrl, { 
-                timeout: 20000, 
-                headers: { 'user-agent': 'Mozilla/5.0' } 
-            });
-
-            if (!data?.success || !data?.results || data.results.length === 0) {
-                throw new Error('No results found for this query');
-            }
-
-            // Get the first (best match) result
-            const result = data.results[0];
-            audioUrl = result.dirrectDownload;
-            trackInfo = {
-                title: result.title || result.name || 'Unknown Title',
-                artist: result.artists?.join(', ') || result.artist || 'Unknown Artist',
-                duration: result.duration?.formatted || '',
-                thumbnail: result.thumbnail || result.album?.cover,
-                spotifyUrl: result.cover,
-                album: result.album?.name,
-                popularity: result.popularity
-            };
+        // Check if API call was successful
+        if (!data?.success || !data?.result?.success || !data.result.metadata) {
+            throw new Error(data?.result?.error || 'No results found for this query');
         }
 
-        if (!audioUrl) {
-            await sock.sendMessage(chatId, { 
-                text: 'No downloadable audio found for this query.' 
-            }, { quoted: message });
-            return;
-        }
+        const metadata = data.result.metadata;
+        const downloadInfo = data.result.downloadInfo;
+
+        // Build direct download URL
+        const directDownloadUrl = `https://veron-apis.zone.id${downloadInfo.directDownload}`;
 
         // Build caption
-        let caption = `📔 Title: *${trackInfo.title}*\n👤 Artist: ${trackInfo.artist}`;
-        if (trackInfo.album) caption += `\n💿 Album: ${trackInfo.album}`;
-        if (trackInfo.duration) caption += `\n⏰ Duration: ${trackInfo.duration}`;
-        if (trackInfo.popularity) caption += `\n📊 Popularity: ${trackInfo.popularity}%`;
-        caption += `\n🖇️ ${trackInfo.spotifyUrl}`;
+        let caption = `🎵 *Spotify Music*\n\n`;
+        caption += `📔 Title: *${metadata.title}*\n`;
+        caption += `👤 Artist: ${metadata.artist}\n`;
+        caption += `⏰ Duration: ${metadata.duration}\n`;
+        caption += `📦 Size: ${(downloadInfo.size / 1024 / 1024).toFixed(2)} MB\n`;
+        caption += `🎧 Format: ${downloadInfo.format}\n`;
+        caption += `✨ Quality: ${downloadInfo.quality}\n`;
+        
+        if (metadata.url) {
+            caption += `\n🔗 Spotify URL: ${metadata.url}`;
+        }
+        caption += `\n\n📥 Downloading audio...`;
 
         // Send thumbnail with caption
-        if (trackInfo.thumbnail) {
+        if (metadata.cover) {
             await sock.sendMessage(chatId, { 
-                image: { url: trackInfo.thumbnail }, 
+                image: { url: metadata.cover }, 
                 caption 
             }, { quoted: message });
         } else {
@@ -105,25 +70,53 @@ async function spotifyCommand(sock, chatId, message) {
             }, { quoted: message });
         }
 
-        // Send audio file
-        const filename = trackInfo.title.replace(/[\\/:*?"<>|]/g, '');
+        // Update reaction
         await sock.sendMessage(chatId, {
-            audio: { url: audioUrl },
+            react: { text: '⬇️', key: message.key }
+        });
+
+        // Send audio file
+        const safeTitle = metadata.title.replace(/[\\/:*?"<>|]/g, '');
+        await sock.sendMessage(chatId, {
+            audio: { url: directDownloadUrl },
             mimetype: 'audio/mpeg',
-            fileName: `${filename}.mp3`
+            fileName: `${safeTitle} - ${metadata.artist}.mp3`
         }, { quoted: message });
 
-        //success reaction 
+        // Send download info message
         await sock.sendMessage(chatId, {
-            react: { text: '🪩', key: message.key }
+            text: `✅ Download complete!\n\n` +
+                  `*${metadata.title} - ${metadata.artist}*\n` +
+                  `Duration: ${metadata.duration} | Size: ${(downloadInfo.size / 1024 / 1024).toFixed(2)} MB\n` +
+                  `Quality: ${downloadInfo.quality}\n\n` +
+                  `Enjoy your music! 🎶`
+        }, { quoted: message });
+
+        // Success reaction
+        await sock.sendMessage(chatId, {
+            react: { text: '✅', key: message.key }
         });
         
 
     } catch (error) {
         console.error('[SPOTIFY] error:', error?.message || error);
-        const errorMsg = error?.response?.data?.message || error?.message || 'Unknown error';
+        
+        let errorMsg = 'Unknown error occurred';
+        if (error?.response?.data?.message) {
+            errorMsg = error.response.data.message;
+        } else if (error?.message) {
+            errorMsg = error.message;
+        } else if (error?.response?.data?.result?.error) {
+            errorMsg = error.response.data.result.error;
+        }
+
         await sock.sendMessage(chatId, { 
-            text: `❌ Failed to fetch Spotify audio.\nError: ${errorMsg}\n\nTry another query or check the URL.` 
+            text: `❌ *Failed to download Spotify audio*\n\n` +
+                  `_Error:_ ${errorMsg}\n\n` +
+                  `Please try:\n` +
+                  `• Different search keywords\n` +
+                  `• Check your internet connection\n` +
+                  `• Try again later`
         }, { quoted: message });
     }
 }
