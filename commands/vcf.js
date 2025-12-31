@@ -75,8 +75,7 @@ async function vcfCommand(sock, chatId, message) {
             fileName: `${sanitizedGroupName}_contacts.vcf`,
             caption: `📇 *Group Contacts*\n\n` +
                      `🔗 Group: ${groupMetadata.subject}\n` +
-                     `📑 Members: ${participants.length}\n` +
-                     `✅ Valid Contacts: ${contactCount}`
+                     `📑 Members: ${participants.length}`
         }, { quoted: message });
 
         // Cleanup
