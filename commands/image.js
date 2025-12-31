@@ -1,87 +1,156 @@
-const gis = require('g-i-s');
+const yts = require('yt-search');
+const axios = require('axios');
+const fetch = require('node-fetch');
 
-function gisSearch(query) {
-    return new Promise((resolve, reject) => {
-        gis(query, (error, results) => {
-            if (error) return reject(error);
-            resolve(results);
-        });
-    });
+// Fancy text generator for JUNE X
+function applyJuneXText(text) {
+    const fancyBanner = `
+╔═══════════════════════╗
+      J U N E   X
+╚═══════════════════════╝`;
+
+    const footer = `
+✧･ﾟ: *✧･ﾟ:*  *:･ﾟ✧*:･ﾟ✧
+    Powered by JUNE X
+✧･ﾟ: *✧･ﾟ:*  *:･ﾟ✧*:･ﾟ✧`;
+
+    return `${fancyBanner}\n\n${text}\n${footer}`;
 }
 
-async function imageCommand(sock, chatId, message) {
+async function imageCommand(sock, chatId, message, userMessage) {
     try {
-        // Initial reaction 📷
+        // Initial reaction 📸
         await sock.sendMessage(chatId, {
-            react: { text: "📷", key: message.key }
+            react: { text: "📸", key: message.key }
         });
 
-        const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
-        const searchQuery = text.split(' ').slice(1).join(' ').trim();
+        const args = userMessage.split(' ').slice(1);
+        const searchQuery = args.join(' ').trim();
 
         if (!searchQuery) {
             return await sock.sendMessage(chatId, { 
-                text: `📷 *Image Search Command*\n\nUsage:\n.image <search_query>\n\nExample:\n.image cat\n.image beautiful sunset\n.image anime characters`
+                text: applyJuneXText("What images are you looking for?") 
             }, { quoted: message });
         }
 
-        // Search for images
-        const results = await gisSearch(searchQuery);
+        // Try multiple APIs with fallback (using the same pattern as song command)
+        const apis = [
+            `https://api.mrfrankofc.gleeze.com/api/images?query=${encodeURIComponent(searchQuery)}`,
+            `https://api.davidcyriltech.gleeze.com/api/images?query=${encodeURIComponent(searchQuery)}`
+        ];
 
-        if (!results || results.length === 0) {
-            return await sock.sendMessage(chatId, { 
-                text: `❌ No images found for "${searchQuery}"` 
-            }, { quoted: message });
-        }
+        let images = [];
+        let usedAPI = '';
 
-        const imageUrls = results
-            .map(r => r.url)
-            .filter(url => url && (url.endsWith('.jpg') || url.endsWith('.png')))
-            .slice(0, 5);
-
-        if (imageUrls.length === 0) {
-            return await sock.sendMessage(chatId, { 
-                text: `❌ No valid images found for "${searchQuery}"` 
-            }, { quoted: message });
-        }
-
-        // Send status message
-        await sock.sendMessage(chatId, { 
-            text: `🔍 _Found images for:_\n_*${searchQuery}*_` 
-        });
-
-        const fancyBotName = `ᴊᴜɴᴇ-𝚇`;
-
-        // Send each image
-        for (const url of imageUrls) {
+        // Try each API until we get results
+        for (const apiUrl of apis) {
             try {
-                await sock.sendMessage(chatId, {
-                    image: { url },
-                    caption: `📸 𝐃𝐨𝐰𝐧𝐥𝐨𝐚𝐝𝐞𝐝 𝐛𝐲 ${fancyBotName}`,
-                    mimetype: "image/jpeg"
-                }, { quoted: message });
+                const response = await axios.get(apiUrl);
+                const data = response.data;
 
-                // Small delay between sends
-                await new Promise(res => setTimeout(res, 500));
-            } catch (err) {
-                console.error('Error sending image:', err);
-                continue; // Continue with next image if one fails
+                // Handle different API response structures
+                if (apiUrl.includes('mrfrankofc')) {
+                    if (data.status === true && data.result && Array.isArray(data.result)) {
+                        images = data.result;
+                        usedAPI = 'MrFrank API';
+                    } else if (data.data && Array.isArray(data.data)) {
+                        images = data.data;
+                        usedAPI = 'MrFrank API';
+                    }
+                } else if (apiUrl.includes('davidcyriltech')) {
+                    if (data.success && data.results && Array.isArray(data.results)) {
+                        images = data.results;
+                        usedAPI = 'David Cyril API';
+                    }
+                }
+
+                if (images.length > 0) break;
+            } catch (apiError) {
+                console.error(`API ${apiUrl} error:`, apiError.message);
+                continue;
             }
         }
 
-        // Success reaction 
+        if (!images || images.length === 0) {
+            return await sock.sendMessage(chatId, { 
+                text: applyJuneXText("No images found for your search!") 
+            }, { quoted: message });
+        }
+
+        // Send status message with JUNE X styling
         await sock.sendMessage(chatId, { 
-            react: { text: '✅', key: message.key } 
+            text: applyJuneXText(`_🔍 Searching images for:_\n_*"${searchQuery}"*_`)
         });
+
+        // Limit to first 5 images
+        const imagesToSend = images.slice(0, 5);
+        let sentCount = 0;
+
+        // Send each image with JUNE X text
+        for (const image of imagesToSend) {
+            try {
+                let imageUrl = '';
+                
+                // Extract URL from different response formats
+                if (typeof image === 'string') {
+                    imageUrl = image;
+                } else if (image.url) {
+                    imageUrl = image.url;
+                } else if (image.link) {
+                    imageUrl = image.link;
+                }
+
+                if (!imageUrl) continue;
+
+                // Apply JUNE X fancy text to caption
+                const caption = applyJuneXText(
+                    `🔍 *Search:* ${searchQuery}\n📸 *Source:* ${usedAPI}\n🎯 *Result:* ${sentCount + 1}/${imagesToSend.length}`
+                );
+
+                // Fetch image and convert to buffer (similar to song command)
+                let imageBuffer = null;
+                try {
+                    const imageResponse = await fetch(imageUrl);
+                    imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+                } catch (err) {
+                    console.error("Image fetch failed:", err);
+                }
+
+                // Send the image with JUNE X caption
+                await sock.sendMessage(chatId, {
+                    image: { url: imageUrl },
+                    mimetype: "image/jpeg",
+                    caption: caption
+                }, { quoted: message });
+
+                sentCount++;
+                
+                // Small delay between sending images
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+            } catch (imageError) {
+                console.error('Error sending image:', imageError);
+            }
+        }
+
+        // Send summary with JUNE X styling
+        if (sentCount > 0) {
+            await sock.sendMessage(chatId, { 
+                text: applyJuneXText(
+                    `✅ *Successfully sent:* ${sentCount} images\n📸 *Total found:* ${images.length} images\n✨ *Powered by JUNE X*`
+                )
+            });
+        }
+
+        // Success reaction 
+        await sock.sendMessage(chatId, { react: { text: '✅', key: message.key } });
 
     } catch (error) {
         console.error('Error in imageCommand:', error);
         await sock.sendMessage(chatId, { 
-            text: "Failed to search images. Please try again later." 
+            text: applyJuneXText("Image search failed. Please try again later.") 
         }, { quoted: message });
-        await sock.sendMessage(chatId, { 
-            react: { text: '❌', key: message.key } 
-        });
+        await sock.sendMessage(chatId, { react: { text: '❌', key: message.key } });
     }
 }
 
