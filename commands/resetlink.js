@@ -54,4 +54,28 @@ async function resetlinkCommand(sock, chatId, senderId) {
     }
 }
 
-module.exports = resetlinkCommand;
+async function linkCommand(sock, chatId) {
+    try {
+        // Get group metadata
+        const groupMetadata = await sock.groupMetadata(chatId);
+
+        // Get invite code
+        const inviteCode = await sock.groupInviteCode(chatId);
+
+        // Build full link
+        const groupLink = `https://chat.whatsapp.com/${inviteCode}`;
+
+        // Send link
+        await sock.sendMessage(chatId, { 
+            text: `📌 *Group Invite Link:*\n${groupLink}\n\n📛 *Group:* ${groupMetadata.subject}\n👥 *Participants:* ${groupMetadata.participants.length}`
+        });
+
+    } catch (error) {
+        await sock.sendMessage(chatId, { 
+            text: `❌ Failed to get group link!\n${error.message || 'Unknown error'}`
+        });
+    }
+}
+
+
+module.exports = { resetlinkCommand, linkCommand };
