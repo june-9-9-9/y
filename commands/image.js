@@ -36,9 +36,9 @@ async function imageCommand(sock, chatId, message) {
             const apiResponse = await axios.get(apiUrl);
             const data = apiResponse.data;
 
-            if (data && data.status && data.result && Array.isArray(data.result) && data.result.length > 0) {
+            if (data && data.status && data.result && Array.isArray(data.result) && data.result.all > 0) {
                 // Send all images from the result array
-                const imageUrls = data.result.slice(0, 10); // Limit to first 10 images to avoid spam
+                const imageUrls = data.result.all.slice(0, 10); // Limit to first 10 images to avoid spam
                 
                 // Send each image individually with a delay to avoid rate limiting
                 for (let i = 0; i < imageUrls.length; i++) {
