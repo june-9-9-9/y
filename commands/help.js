@@ -127,7 +127,7 @@ const generateMenu = (pushname, currentMode, hostName, ping, uptimeFormatted, pr
 
     // Game Menu
     menu += `┏❐ \`GAME MENU\` ❐\n`;
-    menu += `┃ ${prefix2}tictactoe\n┃ ${prefix2}hangman\n┃ ${prefix2}guess\n┃ ${prefix2}trivia\n┃ ${prefix2}answer\n┃ ${prefix2}truth\n┃ ${prefix2}dare\n┃ ${prefix2}8ball\n┃ ${prefix2}cf\n┃ ${prefix2}connect4\n┃ ${prefix2}connect4\n`;
+    menu += `┃ ${prefix2}tictactoe\n┃ ${prefix2}hangman\n┃ ${prefix2}guess\n┃ ${prefix2}trivia\n┃ ${prefix2}answer\n┃ ${prefix2}truth\n┃ ${prefix2}dare\n┃ ${prefix2}8ball\n┃ ${prefix2}cf\n┃ ${prefix2}connect4\n┃ ${prefix2}connectfour\n`;
     menu += `┗❐\n\n`;
 
     // GitHub Menu
