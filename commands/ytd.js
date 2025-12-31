@@ -13,10 +13,11 @@ async function ytmp4Command(sock, chatId, senderId, message, userMessage) {
     await sock.sendMessage(chatId, { text: `⏬ Downloading MP4 from: ${url}...` }, { quoted: message });
 
     try {
-        // Call the API for MP4
         const { data } = await axios.get(`https://iamtkm.vercel.app/downloaders/ytmp4?apikey=tkm&url=${encodeURIComponent(url)}`);
-        const dlLink = data?.data?.url 
-            || data?.data?.media?.find(item => item.Type === "video" && item.format === "mp4")?.download_link;
+        
+        const dlLink = data?.data?.url; 
+
+        // const dlLink = data?.data?.media?.find(item => item.Type === "video" && item.format === "mp4")?.download_link;
 
         if (!dlLink) throw new Error("No video link");
 
@@ -29,6 +30,7 @@ async function ytmp4Command(sock, chatId, senderId, message, userMessage) {
 
         await sock.sendMessage(chatId, { react: { text: '✅', key: message.key } });
     } catch (err) {
+        console.error(err);
         await sock.sendMessage(chatId, { text: '❌ Failed to download video.' });
     }
 }
@@ -46,8 +48,10 @@ async function ytmp3Command(sock, chatId, senderId, message, userMessage) {
 
     try {
         const { data } = await axios.get(`https://iamtkm.vercel.app/downloaders/ytmp3?apikey=tkm&url=${encodeURIComponent(url)}`);
-        const dlLink = data?.data?.url 
-            || data?.data?.media?.find(item => item.Type === "audio" && item.format === "mp3")?.download_link;
+        
+        const dlLink = data?.data?.url; 
+
+        // const dlLink = data?.data?.media?.find(item => item.Type === "audio" && item.format === "mp3")?.download_link;
 
         if (!dlLink) throw new Error("No audio link");
 
@@ -68,7 +72,8 @@ async function ytmp3Command(sock, chatId, senderId, message, userMessage) {
         }, { quoted: message });
 
         await sock.sendMessage(chatId, { react: { text: '✅', key: message.key } });
-    } catch {
+    } catch (err) {
+        console.error(err); 
         await sock.sendMessage(chatId, { text: '❌ Failed to download audio.' });
     }
 }
