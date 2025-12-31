@@ -15,7 +15,7 @@ async function vcfCommand(sock, chatId, message) {
         const groupMetadata = await sock.groupMetadata(chatId);
         const participants = groupMetadata.participants || [];
         
-        // Validate group size
+        // Validate group size (minimum only, no upper limit)
         if (participants.length < 2) {
             await sock.sendMessage(chatId, { 
                 text: "❌ Group must have at least 2 members." 
@@ -23,66 +23,29 @@ async function vcfCommand(sock, chatId, message) {
             return;
         }
 
-        // Generate VCF content with better contact info
+        // Generate VCF content
         let vcfContent = '';
         participants.forEach(participant => {
             const phoneNumber = participant.id.split('@')[0];
+            const displayName = participant.notify || `User_${phoneNumber}`;
             
-            // Try to get the best available name
-            let displayName = '';
-            let firstName = '';
-            let lastName = '';
-            
-            if (participant.notify) {
-                displayName = participant.notify;
-                // Simple parsing - you can improve this based on your needs
-                const nameParts = participant.notify.split(' ');
-                firstName = nameParts[0] || '';
-                lastName = nameParts.slice(1).join(' ') || '';
-            } else if (participant.name) {
-                displayName = participant.name;
-                const nameParts = participant.name.split(' ');
-                firstName = nameParts[0] || '';
-                lastName = nameParts.slice(1).join(' ') || '';
-            } else {
-                displayName = `User_${phoneNumber}`;
-                firstName = `User_${phoneNumber}`;
-            }
-            
-            // Clean names for VCF format
-            displayName = displayName.replace(/,/g, '').replace(/;/g, '');
-            firstName = firstName.replace(/,/g, '').replace(/;/g, '');
-            lastName = lastName.replace(/,/g, '').replace(/;/g, '');
-            
-            // Generate unique UID for each contact
-            const uid = `${phoneNumber}_${Date.now()}${Math.random().toString(36).substr(2, 9)}`;
-            
-            // Create VCF entry with full contact information
             vcfContent += `BEGIN:VCARD\n` +
-                         `VERSION:3.0\n` +
-                         `N:${lastName};${firstName};;;\n` +
-                         `FN:${displayName}\n` +
-                         `TEL;TYPE=CELL,VOICE:+${phoneNumber}\n` +
-                         `TEL;TYPE=MAIN:+${phoneNumber}\n` +
-                         `ITEM1.TEL:+${phoneNumber}\n` +
-                         `ITEM1.X-ABLabel:Mobile\n` +
-                         `CATEGORIES:${groupMetadata.subject.replace(/[^\w\s]/g, '')}\n` +
-                         `NOTE:From WhatsApp Group: ${groupMetadata.subject}\n` +
-                         `UID:${uid}\n` +
-                         `REV:${new Date().toISOString()}\n` +
-                         `END:VCARD\n\n`;
+                          `VERSION:3.0\n` +
+                          `FN:${displayName}\n` +
+                          `TEL;TYPE=CELL:+${phoneNumber}\n` +
+                          `NOTE:From ${groupMetadata.subject}\n` +
+                          `END:VCARD\n\n`;
         });
 
         // Create temp file
-        const sanitizedGroupName = groupMetadata.subject.replace(/[^\w\s]/g, '_').replace(/\s+/g, '_');
+        const sanitizedGroupName = groupMetadata.subject.replace(/[^\w]/g, '_');
         const tempDir = path.join(__dirname, '../temp');
         
         if (!fs.existsSync(tempDir)) {
             fs.mkdirSync(tempDir, { recursive: true });
         }
         
-        const timestamp = Date.now();
-        const vcfPath = path.join(tempDir, `${sanitizedGroupName}_${timestamp}.vcf`);
+        const vcfPath = path.join(tempDir, `${sanitizedGroupName}_${Date.now()}.vcf`);
         fs.writeFileSync(vcfPath, vcfContent);
 
         // Send VCF file immediately
@@ -90,14 +53,12 @@ async function vcfCommand(sock, chatId, message) {
             document: fs.readFileSync(vcfPath),
             mimetype: 'text/vcard',
             fileName: `${sanitizedGroupName}_contacts.vcf`,
-            caption: `📇 *Group Contacts Export*\n\n` +
-                     `🔗 *Group:* ${groupMetadata.subject}\n` +
-                     `👥 *Total Members:* ${participants.length}\n` +
-                     `📱 *File Format:* VCF (vCard)\n` +
-                     `💾 *Import:* Save to phone contacts`
+            caption: `📇 *Group Contacts*\n\n` +
+                     `🔗 Group: ${groupMetadata.subject}\n` +
+                     `📑 Members: ${participants.length}`
         }, { quoted: message });
 
-        // Cleanup after sending
+        // Cleanup
         setTimeout(() => {
             try {
                 if (fs.existsSync(vcfPath)) {
@@ -106,7 +67,7 @@ async function vcfCommand(sock, chatId, message) {
             } catch (cleanupError) {
                 console.error('Error cleaning up VCF file:', cleanupError);
             }
-        }, 3000);
+        }, 5000);
 
     } catch (error) {
         console.error('VCF Error:', error);
