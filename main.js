@@ -987,7 +987,7 @@ case userMessage.startsWith(`${prefix}drop`):
                 
           // === FORFEIT/SURRENDER FOR BOTH GAMES ===
 case userMessage === `${prefix}forfeit` || 
-     userMessage === `surrender`:
+     userMessage === `${prefix}surrender`:
     // Try Connect Four first
     const cfHandled = await handleConnectFourMove(sock, chatId, senderId, 'forfeit');
     // Then try Tic-Tac-Toe
