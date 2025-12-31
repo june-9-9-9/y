@@ -1082,7 +1082,7 @@ case userMessage === `${prefix}forfeit` ||
 
             case userMessage === `${prefix}img` ||
                  userMessage === `${prefix}image`:
-                await imageCommand(sock, chatId, message, senderId, userMessage);
+                await imageCommand(sock, chatId, message);
                 break;
 
             case userMessage === `${prefix}truth`:
