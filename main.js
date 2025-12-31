@@ -1256,12 +1256,12 @@ case userMessage === `${prefix}forfeit` ||
 
         case userMessage.startsWith(`${prefix}ytmp4`) || 
              userMessage.startsWith(`${prefix}ytv`):
-             await ytplayCommand(sock, chatId, senderId, message, userMessage);
+             await ytplayCommand(sock, chatId, message);
                break;
 
         case userMessage.startsWith(`${prefix}ytaudio`) || 
              userMessage.startsWith(`${prefix}ytplay`):
-             await ytsongCommand(sock, chatId, senderId, message, userMessage);
+             await ytsongCommand(sock, chatId, message,);
                break;
 
             case userMessage.startsWith(`${prefix}take`):
