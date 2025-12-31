@@ -55,7 +55,7 @@ async function spotifyCommand(sock, chatId, message) {
 
         } else {
             // Use search API for queries
-            const apiUrl = `https://casper-tech-apis.vercel.app/api/play/sportify?q=${encodeURIComponent(query)}`;
+            const apiUrl = `https://veron-apis.zone.id/downloader/spotify?query=${encodeURIComponent(query)}`;
             const { data } = await axios.get(apiUrl, { 
                 timeout: 20000, 
                 headers: { 'user-agent': 'Mozilla/5.0' } 
@@ -67,13 +67,13 @@ async function spotifyCommand(sock, chatId, message) {
 
             // Get the first (best match) result
             const result = data.results[0];
-            audioUrl = result.download_url;
+            audioUrl = result.dirrectDownload;
             trackInfo = {
                 title: result.title || result.name || 'Unknown Title',
                 artist: result.artists?.join(', ') || result.artist || 'Unknown Artist',
                 duration: result.duration?.formatted || '',
                 thumbnail: result.thumbnail || result.album?.cover,
-                spotifyUrl: result.spotify_url,
+                spotifyUrl: result.cover,
                 album: result.album?.name,
                 popularity: result.popularity
             };
