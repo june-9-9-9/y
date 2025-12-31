@@ -323,7 +323,7 @@ async function helpCommand(sock, chatId, message) {
     // Random thumbnail selection from local files
     const thumbnailFiles = [
         'menu1.jpg',
-        'IMG-20251225-WA0092.jpg', 
+        'menu2.jpg', 
         'menu3.jpg',
         'menu4.jpg',
         'menu5.jpg'
