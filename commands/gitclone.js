@@ -55,8 +55,12 @@ async function gitcloneCommand(sock, chatId, message) {
         const [, username, repoPath] = match;
         const repo = repoPath.replace(/\.git$/, '');
 
+        // React with clock emoji
         await sock.sendMessage(chatId, {
-            react: { text: '🕖', key: message.key }
+            reactionMessage: {
+                key: message.key,
+                text: '🕖'
+            }
         });
 
         try {
@@ -95,8 +99,12 @@ async function gitcloneCommand(sock, chatId, message) {
                 caption: `📦 *GitHub Repository Clone*\n\n👤 Author: ${username}\n📁 Repository: ${repo}\n🔗 Original: ${url}`
             }, { quoted: message });
 
+            // React with checkmark emoji
             await sock.sendMessage(chatId, {
-                react: { text: '✅', key: message.key }
+                reactionMessage: {
+                    key: message.key,
+                    text: '✅'
+                }
             });
 
         } catch (error) {
