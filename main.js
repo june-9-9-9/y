@@ -271,7 +271,7 @@ const imageCommand = require('./commands/image');
 const gpt4Command = require('./commands/aiGpt4');
 const vcfCommand = require('./commands/vcf');
 const inspectCommand = require('./commands/inspect');
-const { ytmp4Command, ytmp3Command }= require('./commands/ytd');
+const { ytplayCommand, ytsongCommand }= require('./commands/ytdl');
 const { chaneljidCommand }= require('./commands/chanel');
 const { connectFourCommand, handleConnectFourMove } = require('./commands/connect4');
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -1256,12 +1256,12 @@ case userMessage === `${prefix}forfeit` ||
 
         case userMessage.startsWith(`${prefix}ytmp4`) || 
              userMessage.startsWith(`${prefix}ytv`):
-             await ytmp4Command(sock, chatId, senderId, message, userMessage);
+             await ytplayCommand(sock, chatId, senderId, message, userMessage);
                break;
 
         case userMessage.startsWith(`${prefix}ytaudio`) || 
              userMessage.startsWith(`${prefix}ytplay`):
-             await ytmp3Command(sock, chatId, senderId, message, userMessage);
+             await ytsongCommand(sock, chatId, senderId, message, userMessage);
                break;
 
             case userMessage.startsWith(`${prefix}take`):
