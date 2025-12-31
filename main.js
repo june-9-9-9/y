@@ -216,7 +216,7 @@ const characterCommand = require('./commands/character');
 const wastedCommand = require('./commands/wasted');
 const shipCommand = require('./commands/ship');
 const groupInfoCommand = require('./commands/groupinfo');
-const resetlinkCommand = require('./commands/resetlink');
+const { resetlinkCommand, linkCommand } = require('./commands/resetlink');
 const staffCommand = require('./commands/staff');
 const unbanCommand = require('./commands/unban');
 const emojimixCommand = require('./commands/emojimix');
@@ -1122,6 +1122,11 @@ case userMessage === `${prefix}forfeit` ||
                 
             case userMessage === `${prefix}unblock`:
                 await unblockallCommand(sock, chatId, message);
+                break;
+
+                
+            case userMessage === `${prefix}link`:
+                await linkCommand(sock, chatId, message);
                 break;
                 
 
