@@ -1,81 +1,75 @@
 const axios = require('axios');
-const fetch = require('node-fetch');
 
 async function ytmp4Command(sock, chatId, senderId, message, userMessage) {
-    const url = userMessage.split(' ')[1];
-    if (!url) {
-        return sock.sendMessage(chatId, {
-            text: `🎬 *YouTube MP4 Download*\nUsage:\n.ytmp4 <youtube_url>`
-        });
-    }
+const url = userMessage.split(' ')[1];
+if (!url) {
+return sock.sendMessage(chatId, {
+text: 🎬 *YouTube MP4 Download*\nUsage:\n.ytmp4 <youtube_url>
+});
+}
 
-    await sock.sendMessage(chatId, { react: { text: '🕖', key: message.key } });
-    await sock.sendMessage(chatId, { text: `⏬ Downloading MP4 from: ${url}...` }, { quoted: message });
+await sock.sendMessage(chatId, { react: { text: '🕖', key: message.key } });  
+await sock.sendMessage(chatId, { text: `⏬ Downloading MP4 from: ${url}...` }, { quoted: message });  
 
-    try {
-        const { data } = await axios.get(`https://iamtkm.vercel.app/downloaders/ytmp4?apikey=tkm&url=${encodeURIComponent(url)}`);
-        
-        const dlLink = data?.data?.url; 
+try {  
+    const { data } = await axios.get(`https://iamtkm.vercel.app/downloaders/ytmp4?apikey=tkm&url=${encodeURIComponent(url)}`);  
+    const dlLink = data?.data?.url;  
 
-        // const dlLink = data?.data?.media?.find(item => item.Type === "video" && item.format === "mp4")?.download_link;
+    if (!dlLink) throw new Error("No video link");  
 
-        if (!dlLink) throw new Error("No video link");
+    await sock.sendMessage(chatId, {  
+        video: { url: dlLink },  
+        caption: `🎬 ${data.data.title || 'YouTube Video'}`,  
+        mimetype: "video/mp4"  
+    }, { quoted: message });  
 
-        const videoBuffer = await (await fetch(dlLink)).arrayBuffer();
-        await sock.sendMessage(chatId, {
-            video: Buffer.from(videoBuffer),
-            caption: `🎬 ${data.data.title || 'YouTube Video'}`,
-            mimetype: "video/mp4"
-        }, { quoted: message });
+    await sock.sendMessage(chatId, { react: { text: '✅', key: message.key } });  
+} catch (err) {  
+    console.error(err);  
+    await sock.sendMessage(chatId, { text: '❌ Failed to download video.' });  
+}
 
-        await sock.sendMessage(chatId, { react: { text: '✅', key: message.key } });
-    } catch (err) {
-        console.error(err);
-        await sock.sendMessage(chatId, { text: '❌ Failed to download video.' });
-    }
 }
 
 async function ytmp3Command(sock, chatId, senderId, message, userMessage) {
-    const url = userMessage.split(' ')[1];
-    if (!url) {
-        return sock.sendMessage(chatId, {
-            text: `🎵 *YouTube MP3 Download*\nUsage:\n.ytmp3 <youtube_url>`
-        });
-    }
+const url = userMessage.split(' ')[1];
+if (!url) {
+return sock.sendMessage(chatId, {
+text: 🎵 *YouTube MP3 Download*\nUsage:\n.ytmp3 <youtube_url>
+});
+}
 
-    await sock.sendMessage(chatId, { react: { text: '🕖', key: message.key } });
-    await sock.sendMessage(chatId, { text: `⏬ Downloading MP3 from: ${url}...` }, { quoted: message });
+await sock.sendMessage(chatId, { react: { text: '🕖', key: message.key } });  
+await sock.sendMessage(chatId, { text: `⏬ Downloading MP3 from: ${url}...` }, { quoted: message });  
 
-    try {
-        const { data } = await axios.get(`https://iamtkm.vercel.app/downloaders/ytmp3?apikey=tkm&url=${encodeURIComponent(url)}`);
-        
-        const dlLink = data?.data?.url; 
+try {  
+    const { data } = await axios.get(`https://iamtkm.vercel.app/downloaders/ytmp3?apikey=tkm&url=${encodeURIComponent(url)}`);  
+    const dlLink = data?.data?.url;  
 
-        // const dlLink = data?.data?.media?.find(item => item.Type === "audio" && item.format === "mp3")?.download_link;
+    if (!dlLink) throw new Error("No audio link");  
+  
+    await sock.sendMessage(chatId, {  
+        document: { url: dlLink },  
+        mimetype: "audio/mpeg",  
+        fileName: `${data.data.title || 'audio'}.mp3`,  
+        contextInfo: {  
+            externalAdReply: {  
+                thumbnailUrl: data.data.thumbnail,  
+                title: data.data.title || "YouTube Audio",  
+                body: "Downloaded via YouTube MP3",  
+                sourceUrl: null,  
+                renderLargerThumbnail: true,  
+                mediaType: 1  
+            }  
+        }  
+    }, { quoted: message });  
 
-        if (!dlLink) throw new Error("No audio link");
+    await sock.sendMessage(chatId, { react: { text: '✅', key: message.key } });  
+} catch (err) {  
+    console.error(err);  
+    await sock.sendMessage(chatId, { text: '❌ Failed to download audio.' });  
+}
 
-        await sock.sendMessage(chatId, {
-            document: { url: dlLink },
-            mimetype: "audio/mpeg",
-            fileName: `${data.data.title || 'audio'}.mp3`,
-            contextInfo: {
-                externalAdReply: {
-                    thumbnailUrl: data.data.thumbnail,
-                    title: data.data.title || "YouTube Audio",
-                    body: "Downloaded via YouTube MP3",
-                    sourceUrl: null,
-                    renderLargerThumbnail: true,
-                    mediaType: 1
-                }
-            }
-        }, { quoted: message });
-
-        await sock.sendMessage(chatId, { react: { text: '✅', key: message.key } });
-    } catch (err) {
-        console.error(err); 
-        await sock.sendMessage(chatId, { text: '❌ Failed to download audio.' });
-    }
 }
 
 module.exports = { ytmp4Command, ytmp3Command };
