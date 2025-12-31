@@ -23,10 +23,10 @@ async function spotifyCommand(sock, chatId, message) {
             react: { text: '🔍', key: message.key }
         });
 
-        // Call the new API
+        // Call the API
         const apiUrl = `https://veron-apis.zone.id/downloader/spotify?query=${encodeURIComponent(query)}`;
         const { data } = await axios.get(apiUrl, { 
-            timeout: 30000, // Increased timeout for processing
+            timeout: 30000,
             headers: { 
                 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                 'accept': 'application/json'
@@ -56,47 +56,36 @@ async function spotifyCommand(sock, chatId, message) {
         if (metadata.url) {
             caption += `\n🔗 Spotify URL: ${metadata.url}`;
         }
-        caption += `\n\n📥 Downloading audio...`;
+        caption += `\n\n✅ *Downloaded Successfully*\nEnjoy your music! 🎶`;
 
-        // Send thumbnail with caption
-        if (metadata.cover) {
-            await sock.sendMessage(chatId, { 
-                image: { url: metadata.cover }, 
-                caption 
-            }, { quoted: message });
-        } else {
-            await sock.sendMessage(chatId, { 
-                text: caption 
-            }, { quoted: message });
-        }
-
-        // Update reaction
+        // Update reaction to downloading
         await sock.sendMessage(chatId, {
             react: { text: '⬇️', key: message.key }
         });
 
-        // Send audio file
+        // Send audio with caption fused together
         const safeTitle = metadata.title.replace(/[\\/:*?"<>|]/g, '');
+        
+        // Send thumbnail first (optional)
+        if (metadata.cover) {
+            await sock.sendMessage(chatId, { 
+                image: { url: metadata.cover }, 
+                caption: `⬇️ *Downloading:* ${metadata.title} - ${metadata.artist}...`
+            }, { quoted: message });
+        }
+
+        // Send audio with the full caption
         await sock.sendMessage(chatId, {
             audio: { url: directDownloadUrl },
             mimetype: 'audio/mpeg',
-            fileName: `${safeTitle} - ${metadata.artist}.mp3`
-        }, { quoted: message });
-
-        // Send download info message
-        await sock.sendMessage(chatId, {
-            text: `✅ Download complete!\n\n` +
-                  `*${metadata.title} - ${metadata.artist}*\n` +
-                  `Duration: ${metadata.duration} | Size: ${(downloadInfo.size / 1024 / 1024).toFixed(2)} MB\n` +
-                  `Quality: ${downloadInfo.quality}\n\n` +
-                  `Enjoy your music! 🎶`
+            fileName: `${safeTitle} - ${metadata.artist}.mp3`,
+            caption: caption  // This fuses the caption with the audio
         }, { quoted: message });
 
         // Success reaction
         await sock.sendMessage(chatId, {
             react: { text: '✅', key: message.key }
         });
-        
 
     } catch (error) {
         console.error('[SPOTIFY] error:', error?.message || error);
