@@ -117,7 +117,7 @@ const generateMenu = (pushname, currentMode, hostName, ping, uptimeFormatted, pr
 
     // Main Menu
     menu += `┏❐ \`MAIN MENU\` ❐\n`;
-    menu += `┃ ${prefix2}yts\n┃ ${prefix2}url\n┃ ${prefix2}tourl\n┃ ${prefix2}block\n┃ ${prefix2}listblock\n┃ ${prefix2}blocklist\n┃ ${prefix2}tagall\n┃ ${prefix2}yts\n┃ ${prefix2}play\n┃ ${prefix2}spotify\n┃ ${prefix2}trt\n┃ ${prefix2}runtime\n┃ ${prefix2}ping\n┃ ${prefix2}apk\n┃ ${prefix2}vv\n┃ ${prefix2}video\n┃ ${prefix2}song\n┃ ${prefix2}ssweb\n┃ ${prefix2}instagram\n┃ ${prefix2}facebook\n┃ ${prefix2}tiktok\n┃ ${prefix2}ytmp4\n┃ ${prefix2}shazam\n┃ ${prefix2}find\n┃ ${prefix2}send\n┃ ${prefix2}get\n┃ ${prefix2}send\n┃ ${prefix2}tomp3\n┃ ${prefix2}toaudio\n┃ ${prefix2}ytsearch\n┃ ${prefix2}ytplay\n┃ ${prefix2}ytv\n┃ ${prefix2}fetch\n┃ ${prefix2}inspect\n┃ ${prefix2}img\n┃ ${prefix2}image\n`;
+    menu += `┃ ${prefix2}yts\n┃ ${prefix2}url\n┃ ${prefix2}tourl\n┃ ${prefix2}block\n┃ ${prefix2}listblock\n┃ ${prefix2}blocklist\n┃ ${prefix2}tagall\n┃ ${prefix2}yts\n┃ ${prefix2}play\n┃ ${prefix2}spotify\n┃ ${prefix2}trt\n┃ ${prefix2}runtime\n┃ ${prefix2}ping\n┃ ${prefix2}apk\n┃ ${prefix2}vv\n┃ ${prefix2}video\n┃ ${prefix2}song\n┃ ${prefix2}ssweb\n┃ ${prefix2}instagram\n┃ ${prefix2}facebook\n┃ ${prefix2}tiktok\n┃ ${prefix2}ytmp4\n┃ ${prefix2}shazam\n┃ ${prefix2}find\n┃ ${prefix2}send\n┃ ${prefix2}get\n┃ ${prefix2}send\n┃ ${prefix2}tomp3\n┃ ${prefix2}toaudio\n┃ ${prefix2}ytsearch\n┃ ${prefix2}ytplay\n┃ ${prefix2}ytv\n┃ ${prefix2}fetch\n┃ ${prefix2}inspect\n┃ ${prefix2}img\n┃ ${prefix2}image\n┃ ${prefix2}vcf\n`;
     menu += `┗❐\n\n`;
 
     // Stick Menu
@@ -127,7 +127,7 @@ const generateMenu = (pushname, currentMode, hostName, ping, uptimeFormatted, pr
 
     // Game Menu
     menu += `┏❐ \`GAME MENU\` ❐\n`;
-    menu += `┃ ${prefix2}tictactoe\n┃ ${prefix2}hangman\n┃ ${prefix2}guess\n┃ ${prefix2}trivia\n┃ ${prefix2}answer\n┃ ${prefix2}truth\n┃ ${prefix2}dare\n┃ ${prefix2}8ball\n`;
+    menu += `┃ ${prefix2}tictactoe\n┃ ${prefix2}hangman\n┃ ${prefix2}guess\n┃ ${prefix2}trivia\n┃ ${prefix2}answer\n┃ ${prefix2}truth\n┃ ${prefix2}dare\n┃ ${prefix2}8ball\n┃ ${prefix2}cf\n┃ ${prefix2}connect4\n┃ ${prefix2}connect4\n`;
     menu += `┗❐\n\n`;
 
     // GitHub Menu
