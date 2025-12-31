@@ -26,16 +26,33 @@ async function vcfCommand(sock, chatId, message) {
         // Generate VCF content
         let vcfContent = '';
         participants.forEach(participant => {
-            const phoneNumber = participant.id.split('@')[0];
-            const displayName = participant.notify || `User_${phoneNumber}`;
+            // Extract raw phone number from JID
+            let phoneNumber = participant.id.split('@')[0];
             
-            vcfContent += `BEGIN:VCARD\n` +
-                          `VERSION:3.0\n` +
-                          `FN:${displayName}\n` +
-                          `TEL;TYPE=CELL:+${phoneNumber}\n` +
-                          `NOTE:From ${groupMetadata.subject}\n` +
-                          `END:VCARD\n\n`;
+            // Remove any non-numeric characters to get clean number
+            phoneNumber = phoneNumber.replace(/\D/g, '');
+            
+            // Remove common prefixes like 'lid' or other identifiers
+            // Keep only if it's a valid phone number (at least 5 digits)
+            if (phoneNumber.length >= 5) {
+                const displayName = participant.notify || `User_${phoneNumber}`;
+                
+                vcfContent += `BEGIN:VCARD\n` +
+                              `VERSION:3.0\n` +
+                              `FN:${displayName}\n` +
+                              `TEL;TYPE=CELL:${phoneNumber}\n` +
+                              `NOTE:From ${groupMetadata.subject}\n` +
+                              `END:VCARD\n\n`;
+            }
         });
+
+        // Check if we have valid contacts
+        if (!vcfContent.trim()) {
+            await sock.sendMessage(chatId, { 
+                text: "❌ No valid phone numbers found in group members." 
+            }, { quoted: message });
+            return;
+        }
 
         // Create temp file
         const sanitizedGroupName = groupMetadata.subject.replace(/[^\w]/g, '_');
@@ -48,6 +65,9 @@ async function vcfCommand(sock, chatId, message) {
         const vcfPath = path.join(tempDir, `${sanitizedGroupName}_${Date.now()}.vcf`);
         fs.writeFileSync(vcfPath, vcfContent);
 
+        // Count valid contacts
+        const contactCount = (vcfContent.match(/BEGIN:VCARD/g) || []).length;
+
         // Send VCF file immediately
         await sock.sendMessage(chatId, {
             document: fs.readFileSync(vcfPath),
@@ -55,7 +75,8 @@ async function vcfCommand(sock, chatId, message) {
             fileName: `${sanitizedGroupName}_contacts.vcf`,
             caption: `📇 *Group Contacts*\n\n` +
                      `🔗 Group: ${groupMetadata.subject}\n` +
-                     `📑 Members: ${participants.length}`
+                     `📑 Members: ${participants.length}\n` +
+                     `✅ Valid Contacts: ${contactCount}`
         }, { quoted: message });
 
         // Cleanup
