@@ -1,18 +1,21 @@
 const axios = require('axios');
 
-async function imageCommand(sock, message, chatId) {
+async function imageCommand(sock, chatId, message) {
     try {
-        // Check if there's a search query
-        if (!message.text || message.text.trim().split(' ').length < 2) {
-            await sock.sendMessage(chatId, {
-                text: 'Please provide a search query!\n\nExample: .image cats'
-            });
-            return;
+        // Initial reaction 📸
+        await sock.sendMessage(chatId, {
+            react: { text: "📸", key: message.key }
+        });
+
+        const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
+        const searchQuery = text.split(' ').slice(1).join(' ').trim();
+
+        if (!searchQuery) {
+            return await sock.sendMessage(chatId, { 
+                text: "What image do you want to search?\n\nExample: .image cats" 
+            }, { quoted: message });
         }
 
-        // Extract search query (remove command part)
-        const searchQuery = message.text.trim().split(' ').slice(1).join(' ');
-        
         // Define the APIs
         const apis = [
             `https://api.mrfrankofc.gleeze.com/api/images?query=${encodeURIComponent(searchQuery)}`,
@@ -47,51 +50,47 @@ async function imageCommand(sock, message, chatId) {
         }
 
         if (!success || images.length === 0) {
-            await sock.sendMessage(chatId, {
+            return await sock.sendMessage(chatId, {
                 text: `No images found for "${searchQuery}". Try a different search term.`
-            });
-            return;
+            }, { quoted: message });
         }
 
-        // Send the first image (or you can send multiple)
+        // Send status message
+        await sock.sendMessage(chatId, { 
+            text: `_📸 Searching images for:_\n_*${searchQuery}*_` 
+        });
+
+        // Get the first image
         const imageData = images[0];
         
-        // Check if the image has a valid URL
-        if (imageData.url) {
-            // Send as image
-            await sock.sendMessage(chatId, {
-                image: { url: imageData.url },
-                caption: `📸 *Image Search Results*\n\n` +
-                         `🔍 *Query:* ${searchQuery}\n` +
-                         `📁 *Source:* ${imageData.source || 'Unknown'}\n` +
-                         `🌐 *API:* ${new URL(usedAPI).hostname}\n\n` +
-                         `Total images found: ${images.length}`
-            });
-        } else {
-            await sock.sendMessage(chatId, {
+        if (!imageData.url) {
+            return await sock.sendMessage(chatId, {
                 text: 'Error: No valid image URL found in the response.'
-            });
+            }, { quoted: message });
         }
 
-        // Optional: Send more images (limited to avoid flooding)
-        // You can add this if you want to send multiple images
-        /*
-        const limitedImages = images.slice(1, 5); // Send next 4 images
-        for (const img of limitedImages) {
-            if (img.url) {
-                await sock.sendMessage(chatId, {
-                    image: { url: img.url }
-                });
-                // Small delay between images
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-        }
-        */
+        // Send the image with caption
+        await sock.sendMessage(chatId, {
+            image: { url: imageData.url },
+            caption: `📸 *Image Search Results*\n\n` +
+                     `🔍 *Query:* ${searchQuery}\n` +
+                     `📁 *Source:* ${imageData.source || 'Unknown'}\n` +
+                     `🌐 *API:* ${new URL(usedAPI).hostname}\n\n` +
+                     `Total images found: ${images.length}`
+        }, { quoted: message });
+
+        // Success reaction 
+        await sock.sendMessage(chatId, { 
+            react: { text: '✅', key: message.key } 
+        });
 
     } catch (error) {
-        console.error('Error in image command:', error);
-        await sock.sendMessage(chatId, {
-            text: '❌ An error occurred while fetching images. Please try again later.'
+        console.error('Error in imageCommand:', error);
+        await sock.sendMessage(chatId, { 
+            text: "Failed to fetch images. Please try again later." 
+        }, { quoted: message });
+        await sock.sendMessage(chatId, { 
+            react: { text: '❌', key: message.key } 
         });
     }
 }
