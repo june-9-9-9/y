@@ -74,23 +74,23 @@ const generateMenu = (pushname, currentMode, hostName, ping, uptimeFormatted, pr
     let newOwner = getOwnerName();
     const menuSettings = getMenuSettings();
     
-    let menu = `┏❐⟢ JUNE-X BOT ⟢❐\n`;
-    menu += `┃⋆ *Prefix:* [${prefix2}]\n`;
-    menu += `┃⋆ *Owner:* ${newOwner}\n`;
-    menu += `┃⋆ *Mode:* ${currentMode}\n`;
-    menu += `┃⋆ *platform:* ${hostName}\n`;
-    menu += `┃⋆ *Speed:* ${ping} ms\n`;
+    let menu = `┏❐✦ JUNE-X BOT ✦❐\n`;
+    menu += `┃✦ Prefix: [${prefix2}]\n`;
+    menu += `┃✦ Owner: ${newOwner}\n`;
+    menu += `┃✦ Mode: ${currentMode}\n`;
+    menu += `┃✦ platform: ${hostName}\n`;
+    menu += `┃✦ Speed: ${ping} ms\n`;
     
     
     if (menuSettings.showUptime) {
-        menu += `┃⋆ *Uptime:* ${uptimeFormatted}\n`;
+        menu += `┃✦ Uptime: ${uptimeFormatted}\n`;
     }
     
-    menu += `┃⋆ *version:* v${settings.version}\n`;
+    menu += `┃✦ version: v${settings.version}\n`;
     
     if (menuSettings.showMemory) {
-        menu += `┃⋆ *Usage:* ${formatMemory(botUsedMemory)} of ${formatMemory(totalMemory)}\n`;
-        menu += `┃⋆ *RAM:* ${progressBar(systemUsedMemory, totalMemory)}\n`;
+        menu += `┃✦ Usage: ${formatMemory(botUsedMemory)} of ${formatMemory(totalMemory)}\n`;
+        menu += `┃✦ RAM: ${progressBar(systemUsedMemory, totalMemory)}\n`;
     }
     
     menu += `┗❐\n${readmore}\n`;
