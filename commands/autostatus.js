@@ -14,7 +14,7 @@ const channelInfo = {
 };
 
 // Array of random emojis for reactions
-const randomEmojis = ['❤️', '😂', '😮', '😢', '😡', '👏', '🔥', '⭐', '🎉', '🙏', '👍', '👎', '💯', '🤔', '🤯', '😍', '🥰', '🤗', '😎', '🤩'];
+const randomEmojis = ['❤️', '❄️', '💕', '🎁', '💙', '💘', '🔥', '⭐', '🎉', '🙏', '💚', '🌟', '💗', '🤍', '🖤', '❣️', '💝', '💛', '💫', '💓'];
 
 // Path to store auto status configuration
 const configPath = path.join(__dirname, '../data/autoStatus.json');
@@ -91,7 +91,7 @@ async function autoStatusCommand(sock, chatId, msg, args) {
             const currentEmoji = config.reactionEmoji || '🖤';
             const randomStatus = config.randomReactions ? '✅ Enabled' : '❌ Disabled';
             await sock.sendMessage(chatId, { 
-                text: `🔄 *Auto Status Settings*\n\n📱 *Auto Status View:* ${status}\n💫 *Status Reactions:* ${reactStatus}\n🎯 *Reaction Emoji:* ${currentEmoji}\n🎲 *Random Reactions:* ${randomStatus}\n\n*Commands:*\n• .autostatus on/off\n• .autostatus react on/off\n• .autostatus emoji <emoji>\n• .autostatus random on/off\n• .autostatus reset`,
+                text: `*  🄹 🅄 🄽 🄴   🅇 Settings*\n\n✦ *Auto Status View:* ${status}\n↘️ *Status Reactions:* ${reactStatus}\n✦ *Reaction Emoji:* ${currentEmoji}\n✦ *Random Reactions:* ${randomStatus}\n\n🔙 *Commands:*\n✦ autostatus on/off\n✦ autostatus react on/off\n✦ autostatus emoji <emoji>\n✦ autostatus random on/off\n✦ autostatus reset`,
                 ...channelInfo
             }, { quoted: msg });
             return;
