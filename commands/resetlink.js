@@ -1,7 +1,13 @@
-// Reset group link (admin only)
+// Reset group link (group only, admin only)
 async function resetlinkCommand(sock, chatId) {
     try {
         const groupMetadata = await sock.groupMetadata(chatId);
+
+        // Group-only restriction
+        if (!groupMetadata) {
+            await sock.sendMessage(chatId, { text: '❌ This command can only be used in groups!' });
+            return;
+        }
 
         // Find bot participant
         const botId = sock.user?.id || sock.authState?.creds?.me?.id;
@@ -15,8 +21,11 @@ async function resetlinkCommand(sock, chatId) {
 
         // Reset link
         const newCode = await sock.groupRevokeInvite(chatId);
+        const groupLink = `https://chat.whatsapp.com/${newCode}`;
+
+        // Send both formatted and clean link
         await sock.sendMessage(chatId, { 
-            text: `✅ Group link reset!\n\n📌 New link:\nhttps://chat.whatsapp.com/${newCode}`
+            text: `✅ Group link reset!\n\n📌 New link:\n${groupLink}\n\n🔗 Clean link:\n${groupLink}`
         });
 
     } catch (error) {
@@ -25,10 +34,16 @@ async function resetlinkCommand(sock, chatId) {
     }
 }
 
-// Get group link (admin only)
+// Get group link (group only, admin only)
 async function linkCommand(sock, chatId) {
     try {
         const groupMetadata = await sock.groupMetadata(chatId);
+
+        // Group-only restriction
+        if (!groupMetadata) {
+            await sock.sendMessage(chatId, { text: '❌ This command can only be used in groups!' });
+            return;
+        }
 
         // Find bot participant
         const botId = sock.user?.id || sock.authState?.creds?.me?.id;
@@ -44,8 +59,9 @@ async function linkCommand(sock, chatId) {
         const code = await sock.groupInviteCode(chatId);
         const groupLink = `https://chat.whatsapp.com/${code}`;
 
+        // Send both formatted and clean link
         await sock.sendMessage(chatId, { 
-            text: `📌 *Group Link:*\n${groupLink}\n\n⚠️ Only admins can reset the link.`
+            text: `📌 *Group Link:*\n${groupLink}\n\n🔗 Clean link:\n${groupLink}\n\n⚠️ Only admins can reset the link.`
         });
 
     } catch (error) {
