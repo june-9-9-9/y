@@ -61,13 +61,7 @@ async function pairCommand(sock, chatId, message) {
 
                 await sleep(3000); // shorter wait for UX
                 await sock.sendMessage(chatId, {
-                    text: ${code},
-                    contextInfo: { forwardingScore: 1, isForwarded: true }
-                });
-                
-                                // Send explanation separately
-                await sock.sendMessage(chatId, {
-                    text: `📌 How to link ${number}:\n\n1. Open WhatsApp on your phone.\n2. Go to *Linked Devices* in settings.\n3. Tap *Link a Device*.\n4. Enter the code above when prompted.\n\nThis will link the number securely.`,
+                    text: `${code}`,
                     contextInfo: { forwardingScore: 1, isForwarded: true }
                 });
 
