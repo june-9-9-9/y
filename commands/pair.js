@@ -20,7 +20,7 @@ async function pairCommand(sock, chatId, message) {
         }
 
         // Normalize and validate numbers
-        const numbers = q.split(",")
+        const numbers = q.split(" ")
             .map(v => v.replace(/[^0-9]/g, "")) // keep only digits
             .filter(v => v.length >= 6 && v.length <= 20);
 
@@ -50,8 +50,8 @@ async function pairCommand(sock, chatId, message) {
 
             try {
                 const response = await axios.get(
-                    `https://pairtesth2-e3bee12e097b.herokuapp.com/pair/code?number=${number}`,
-                    { timeout: 10000 } // defensive timeout
+                    `https://pairtesth2-e3bee12e097b.herokuapp.com/code?number=${number}`,
+                    { timeout: 50000 } // defensive timeout
                 );
 
                 const code = response.data?.code;
