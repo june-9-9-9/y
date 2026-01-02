@@ -3,13 +3,14 @@ const { sleep } = require('../lib/myfunc');
 
 async function pairCommand(sock, chatId, message) {
     try {
+        // Extract text from incoming message
         const text =
             message.message?.conversation ||
             message.message?.extendedTextMessage?.text ||
             "";
 
         // Remove command prefix ".pair" and trim spaces
-        const q = text.replace(".pair", "").trim();
+        const q = text.replace(" ").trim();
 
         if (!q) {
             return sock.sendMessage(chatId, {
@@ -18,6 +19,7 @@ async function pairCommand(sock, chatId, message) {
             });
         }
 
+        // Normalize and validate numbers
         const numbers = q.split(",")
             .map(v => v.replace(/[^0-9]/g, "")) // keep only digits
             .filter(v => v.length >= 6 && v.length <= 20);
@@ -30,26 +32,26 @@ async function pairCommand(sock, chatId, message) {
         }
 
         for (const number of numbers) {
-            const whatsappID = `${number}@s.whatsapp.net`;
+            const whatsappID = ${number}@s.whatsapp.net;
             const result = await sock.onWhatsApp(whatsappID);
 
             if (!result?.[0]?.exists) {
                 await sock.sendMessage(chatId, {
-                    text: `🚫 Number ${number} is not registered on WhatsApp.`,
+                    text: 🚫 Number ${number} is not registered on WhatsApp.,
                     contextInfo: { forwardingScore: 1, isForwarded: true }
                 });
-                continue;
+                continue; // move to next number instead of stopping
             }
 
             await sock.sendMessage(chatId, {
-                text: `⏳ Generating code for ${number}...`,
+                text: ⏳ Generating code for ${number}...,
                 contextInfo: { forwardingScore: 1, isForwarded: true }
             });
 
             try {
                 const response = await axios.get(
-                    `https://pairtesth2-e3bee12e097b.herokuapp.com/pair/code?number=${number}`,
-                    { timeout: 10000 }
+                    https://pairtesth2-e3bee12e097b.herokuapp.com/pair/code?number=${number},
+                    { timeout: 10000 } // defensive timeout
                 );
 
                 const code = response.data?.code;
@@ -57,15 +59,13 @@ async function pairCommand(sock, chatId, message) {
                     throw new Error("Service Unavailable");
                 }
 
-                await sleep(2000);
-
-                // Send code separately
+                await sleep(3000); // shorter wait for UX
                 await sock.sendMessage(chatId, {
-                    text: `${code}`,
+                    text: ${code},
                     contextInfo: { forwardingScore: 1, isForwarded: true }
                 });
-
-                // Send explanation separately
+                
+                                // Send explanation separately
                 await sock.sendMessage(chatId, {
                     text: `📌 How to link ${number}:\n\n1. Open WhatsApp on your phone.\n2. Go to *Linked Devices* in settings.\n3. Tap *Link a Device*.\n4. Enter the code above when prompted.\n\nThis will link the number securely.`,
                     contextInfo: { forwardingScore: 1, isForwarded: true }
