@@ -13,7 +13,7 @@ async function gitcloneCommand(sock, chatId, message) {
         const query = parts.slice(1).join(' ').trim();
 
         if (!query) return await sock.sendMessage(chatId, {
-            text: '🔗 Provide a GitHub repository URL!\nExample: .gitclone https://github.com/username/repository'
+            text: '🔗 Provide a GitHub repository URL!\nExample: .gitclone https://github.com/vinpink2/repo...'
         }, { quoted: message });
 
         if (!query.includes('github.com')) return await sock.sendMessage(chatId, {
