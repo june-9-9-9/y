@@ -43,7 +43,7 @@ async function chaneljidCommand(sock, chatId, message) {
                     forwardingScore: 999,
                     isForwarded: true,
                     forwardedNewsletterMessageInfo: {
-                        newsletterJid: '120363200367779016@newsletter',
+                        newsletterJid: '@newsletter',
                         newsletterName: 'Silva MD Channels 📢',
                         serverMessageId: Math.floor(Math.random() * 1000)
                     }
@@ -59,7 +59,7 @@ async function chaneljidCommand(sock, chatId, message) {
                 forwardingScore: 999,
                 isForwarded: true,
                 forwardedNewsletterMessageInfo: {
-                    newsletterJid: '120363200367779016@newsletter',
+                    newsletterJid: '@newsletter',
                     newsletterName: 'Silva MD Channels 📢',
                     serverMessageId: Math.floor(Math.random() * 1000)
                 }
