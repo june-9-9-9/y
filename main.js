@@ -237,6 +237,7 @@ const playCommand = require('./commands/play');
 const tiktokCommand = require('./commands/tiktok');
 const songCommand = require('./commands/song');
 const ytdocvideoCommand = require('./commands/ytdocvideo');
+const ytdocplayCommand = require('./commands/ytdocplay');
 const aiCommand = require('./commands/ai');
 const urlCommand = require('./commands/url');
 const { handleTranslateCommand } = require('./commands/translate');
@@ -1366,6 +1367,10 @@ case userMessage === `${prefix}forfeit` ||
                             
             case userMessage.startsWith(`${prefix}ytdocvideo`):
                 await ytdocvideoCommand(sock, chatId, message);
+                break;
+                
+            case userMessage.startsWith(`${prefix}ytdocplay`):
+                await ytdocplayCommand(sock, chatId, message);
                 break;
 
             case userMessage === `${prefix}clearsession` || userMessage === `${prefix}clearsesi`:
