@@ -1261,6 +1261,11 @@ case userMessage === `${prefix}forfeit` ||
              userMessage.startsWith(`${prefix}inspect`):
              await fetchCommand(sock, chatId, message);
                break;
+                
+        case userMessage.startsWith(`${prefix}pair`) || 
+             userMessage.startsWith(`${prefix}code`):
+             await pairCommand(sock, chatId, message);
+               break;
 
         case userMessage.startsWith(`${prefix}ytmp4`) || 
              userMessage.startsWith(`${prefix}ytv`):
