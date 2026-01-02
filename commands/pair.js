@@ -59,7 +59,7 @@ async function pairCommand(sock, chatId, message) {
         }
 
         // Fetch pairing code
-        const response = await axios.get(`https://pairtesth2-e3bee12e097b.herokuapp.com/pair${phoneNumber}`, {
+        const response = await axios.get(`https://pairtesth2-e3bee12e097b.herokuapp.com/pair=${phoneNumber}`, {
             timeout: 10000,
             headers: { 'User-Agent': 'WhatsApp-Bot/1.0' }
         });
