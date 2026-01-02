@@ -37,7 +37,7 @@ async function chaneljidCommand(sock, chatId, message) {
         }
         // 2️⃣ If no argument, use current chat JID
         else {
-            targetJid = message.key.remoteJid;
+            //targetJid = message.key.remoteJid;
         }
 
         // 3️⃣ Final validation
@@ -57,7 +57,7 @@ async function chaneljidCommand(sock, chatId, message) {
         await sock.sendMessage(
             chatId,
             {
-                text: `120363${code}@newsletter` // Fixed template literal
+                text: `${targetjid}` // Fixed template literal
             },
             { quoted: message }
         );
