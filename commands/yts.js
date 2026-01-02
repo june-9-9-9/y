@@ -12,7 +12,7 @@ async function ytsCommand(sock, chatId, senderId, message, userMessage) {
         }
 
         await sock.sendMessage(chatId, {
-            text: `🌍 Searching YouTube Results for: "${query}"...`
+            text: `🌍 Searching...: "${query}"`
         },{ quoted: message });
 
         let searchResults;
@@ -41,15 +41,15 @@ async function ytsCommand(sock, chatId, senderId, message, userMessage) {
             const uploadDate = video.ago || 'N/A';
 
             resultMessage += `*${index + 1}. ${video.title}*\n`;
-            resultMessage += `🌐 *URL:* ${video.url}\n`;
-            resultMessage += `⏱️ *Duration:* ${duration}\n`;
-            resultMessage += `🪟 *Views:* ${views}\n`;
-            resultMessage += `⤴️ *Uploaded:* ${uploadDate}\n`;
-            resultMessage += `🧾 *Channel:* ${video.author?.name || 'N/A'}\n\n`;
+            resultMessage += `🄹 *URL:* ${video.url}\n`;
+            resultMessage += `🅄 *Duration:* ${duration}\n`;
+            resultMessage += `🄽 *Views:* ${views}\n`;
+            resultMessage += `🄴 *Uploaded:* ${uploadDate}\n`;
+            resultMessage += `🅇 *Channel:* ${video.author?.name || 'N/A'}\n\n`;
         });
 
-        resultMessage += `🌍 *Tip:* Use play <url> to download audio\n`;
-        resultMessage += `🗺️ Use video <url> to download video`;
+        resultMessage += `☆ Tip: Use docytplay <url> to download audio\n`;
+        resultMessage += `☆ Use docytvideo <url> to download video`;
 
         await sock.sendMessage(chatId, { text: resultMessage },{ quoted: message});
 
