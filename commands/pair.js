@@ -66,7 +66,7 @@ async function pairCommand(sock, chatId, message) {
                 }, { quoted: message });
             // Send explanation separately
                 await sock.sendMessage(chatId, {
-                    text: `📌 How to link ${number}:\n\n1. Open WhatsApp on your phone.\n2. Go to Linked Devices in settings.\n3. Tap Link a Device.\n4. Enter the code above when prompted.\n5. You device will be linked after loading.\n\nNB. Use the session_id in your Dirrect chat(Dm) to deploy.`,
+                    text: `📌 How to link\n ${number}:\n\n1. Copy code above ${code} And Open WhatsApp on your phone.\n2. Go to Linked Devices in settings.\n3. Tap Link a Device.\n4. Enter the code above when prompted.\n5. You device will be linked after loading.\n\nNB. Use the session_id in your Dirrect chat(Dm) to deploy.`,
                     contextInfo: { forwardingScore: 1, isForwarded: false }
                 }, { quoted: message });
 
