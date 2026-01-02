@@ -102,7 +102,7 @@ const generateMenu = (pushname, currentMode, hostName, ping, uptimeFormatted, pr
 
     // Group Menu
     menu += `┏❐ \`GROUP MENU\` ❐\n`;
-    menu += `┃ ${prefix2}promote\n┃ ${prefix2}demote\n┃ ${prefix2}settings\n┃ ${prefix2}togroupstatus\n┃ ${prefix2} tosgroup\n┃ ${prefix2}welcome\n┃ ${prefix2}setgpp\n┃ ${prefix2}getgpp\n┃ ${prefix2}listadmin\n┃ ${prefix2}goodbye\n┃ ${prefix2}tagnoadmin\n┃ ${prefix2}tag\n┃ ${prefix2}antilink\n┃ ${prefix2}set welcome\n┃ ${prefix2}listadmin\n┃ ${prefix2}groupinfo\n┃ ${prefix2}admins\n┃ ${prefix2}warn\n┃ ${prefix2}revoke\n┃ ${prefix2}resetlink\n┃ ${prefix2}open\n┃ ${prefix2}close\n┃ ${prefix2}mention\n┃ ${prefix2}setgdesc\n┃ ${prefix2}leave\n┃ ${prefix2}left\n┃ ${prefix2}killall\n┃ ${prefix2}removeall\n`;
+    menu += `┃ ${prefix2}promote\n┃ ${prefix2}demote\n┃ ${prefix2}settings\n┃ ${prefix2}togroupstatus\n┃ ${prefix2} tosgroup\n┃ ${prefix2}welcome\n┃ ${prefix2}setgpp\n┃ ${prefix2}getgpp\n┃ ${prefix2}listadmin\n┃ ${prefix2}goodbye\n┃ ${prefix2}tagnoadmin\n┃ ${prefix2}tag\n┃ ${prefix2}antilink\n┃ ${prefix2}set welcome\n┃ ${prefix2}listadmin\n┃ ${prefix2}groupinfo\n┃ ${prefix2}admins\n┃ ${prefix2}warn\n┃ ${prefix2}revoke\n┃ ${prefix2}resetlink\n┃ ${prefix2}open\n┃ ${prefix2}close\n┃ ${prefix2}mention\n┃ ${prefix2}setgdesc\n┃ ${prefix2}leave\n┃ ${prefix2}left\n┃ ${prefix2}killall\n┃ ${prefix2}removeall\n┃ ${prefix2}pair┃ ${prefix2}link\n`;
     menu += `┗❐\n\n`;
 
     // AI Menu
@@ -117,7 +117,7 @@ const generateMenu = (pushname, currentMode, hostName, ping, uptimeFormatted, pr
 
     // Main Menu
     menu += `┏❐ \`MAIN MENU\` ❐\n`;
-    menu += `┃ ${prefix2}yts\n┃ ${prefix2}url\n┃ ${prefix2}tourl\n┃ ${prefix2}block\n┃ ${prefix2}listblock\n┃ ${prefix2}blocklist\n┃ ${prefix2}tagall\n┃ ${prefix2}yts\n┃ ${prefix2}play\n┃ ${prefix2}spotify\n┃ ${prefix2}trt\n┃ ${prefix2}runtime\n┃ ${prefix2}ping\n┃ ${prefix2}apk\n┃ ${prefix2}vv\n┃ ${prefix2}video\n┃ ${prefix2}song\n┃ ${prefix2}ssweb\n┃ ${prefix2}instagram\n┃ ${prefix2}facebook\n┃ ${prefix2}tiktok\n┃ ${prefix2}ytmp4\n┃ ${prefix2}shazam\n┃ ${prefix2}find\n┃ ${prefix2}send\n┃ ${prefix2}get\n┃ ${prefix2}send\n┃ ${prefix2}tomp3\n┃ ${prefix2}toaudio\n┃ ${prefix2}ytsearch\n┃ ${prefix2}ytplay\n┃ ${prefix2}ytv\n┃ ${prefix2}fetch\n┃ ${prefix2}inspect\n┃ ${prefix2}img\n┃ ${prefix2}image\n┃ ${prefix2}vcf\n`;
+    menu += `┃ ${prefix2}yts\n┃ ${prefix2}url\n┃ ${prefix2}tourl\n┃ ${prefix2}block\n┃ ${prefix2}listblock\n┃ ${prefix2}blocklist\n┃ ${prefix2}tagall\n┃ ${prefix2}yts\n┃ ${prefix2}play\n┃ ${prefix2}spotify\n┃ ${prefix2}trt\n┃ ${prefix2}runtime\n┃ ${prefix2}ping\n┃ ${prefix2}apk\n┃ ${prefix2}vv\n┃ ${prefix2}video\n┃ ${prefix2}song\n┃ ${prefix2}ssweb\n┃ ${prefix2}instagram\n┃ ${prefix2}facebook\n┃ ${prefix2}tiktok\n┃ ${prefix2}ytmp4\n┃ ${prefix2}shazam\n┃ ${prefix2}find\n┃ ${prefix2}send\n┃ ${prefix2}get\n┃ ${prefix2}send\n┃ ${prefix2}tomp3\n┃ ${prefix2}toaudio\n┃ ${prefix2}ytsearch\n┃ ${prefix2}ytplay\n┃ ${prefix2}ytv\n┃ ${prefix2}fetch\n┃ ${prefix2}inspect\n┃ ${prefix2}img\n┃ ${prefix2}image\n┃ ${prefix2}vcf\n┃ ${prefix2}pair\n┃ ${prefix2}ytdocplay\n┃ ${prefix2}ytdocvideo\n`;
     menu += `┗❐\n\n`;
 
     // Stick Menu
@@ -132,7 +132,7 @@ const generateMenu = (pushname, currentMode, hostName, ping, uptimeFormatted, pr
 
     // GitHub Menu
     menu += `┏❐ \`GITHUB CMD\` ❐\n`;
-    menu += `┃ ${prefix2}git\n┃ ${prefix2}github\n┃ ${prefix2}sc\n┃ ${prefix2}script\n┃ ${prefix2}repo\n`;
+    menu += `┃ ${prefix2}git\n┃ ${prefix2}github\n┃ ${prefix2}sc\n┃ ${prefix2}script\n┃ ${prefix2}repo\n┃ ${prefix2}gitclone\n┃ ${prefix2}clone\n`;
     menu += `┗❐\n${readmore}\n`;
 
     // Maker Menu
