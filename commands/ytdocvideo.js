@@ -73,7 +73,7 @@ async function ytdocvideoCommand(sock, chatId, message) {
             document: { url: filePath },
             mimetype: "video/mp4",
             fileName: `${video.title.substring(0, 100)}.mp4`,
-            caption: `🎬 *YouTube Video Downloaded*\n\n📌 *Title:* ${video.title}\n *Duration:* ${video.timestamp}\n *Channel:* ${video.author.name}\ *Size:* ${fileSizeMB} MB`
+            caption: `↘️ *Video Downloaded*\n*Title:* ${video.title}\n *Duration:* ${video.timestamp}\n *Channel:* ${video.author.name}\ *Size:* ${fileSizeMB} MB`
         }, { quoted: message });
 
         // Cleanup
