@@ -82,4 +82,4 @@ async function chaneljidCommand(sock, chatId, message) {
     }
 }
 
-module.exports = chaneljidCommand;
+module.exports = { chaneljidCommand };
