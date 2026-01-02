@@ -1,3 +1,5 @@
+const isAdmin = require('../lib/isAdmin');
+
 async function addCommand(sock, chatId, message) {
   try {
     await sock.sendMessage(chatId, { react: { text: "➕", key: message.key } });
@@ -9,17 +11,11 @@ async function addCommand(sock, chatId, message) {
     const target = text ? text.replace(/\D/g, '') + '@s.whatsapp.net' : message.quoted?.sender;
     if (!target) return sock.sendMessage(chatId, { text: "📌 Usage: .add 2547xxxxxxx or reply" }, { quoted: message });
 
-    const meta = await sock.groupMetadata(chatId);
-    const participants = meta.participants || [];
-    const normalize = jid => jid?.split(':')[0].split('@')[0] || '';
-
-    const isAdmin = jid => {
-      const p = participants.find(x => normalize(x.id) === normalize(jid));
-      return p && ['admin', 'superadmin'].includes(p.admin);
-    };
-
-    if (!isAdmin(sock.user.id)) return sock.sendMessage(chatId, { text: "❌ I need admin rights" }, { quoted: message });
-    if (!isAdmin(message.key.participant || message.key.remoteJid))
+    // Use the imported isAdmin function
+    if (!await isAdmin(sock, chatId, sock.user.id)) 
+      return sock.sendMessage(chatId, { text: "❌ I need admin rights" }, { quoted: message });
+    
+    if (!await isAdmin(sock, chatId, message.key.participant || message.key.remoteJid))
       return sock.sendMessage(chatId, { text: "❌ Only admins can add" }, { quoted: message });
 
     const res = await sock.groupParticipantsUpdate(chatId, [target], 'add');
