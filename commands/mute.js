@@ -1,62 +1,60 @@
 const isAdmin = require('../lib/isAdmin');
+const activeMuteTimers = new Map();
 
 async function muteCommand(sock, chatId, senderId, message, durationInMinutes) {
-    
-
     const { isSenderAdmin, isBotAdmin } = await isAdmin(sock, chatId, senderId);
-    if (!isBotAdmin) {
-        await sock.sendMessage(chatId, { text: 'Please make the bot an admin first.' }, { quoted: message });
-        return;
-    }
 
+    if (!isBotAdmin) {
+        return sock.sendMessage(chatId, { text: '⚠️ Please make the bot an admin first.' }, { quoted: message });
+    }
     if (!isSenderAdmin) {
-        await sock.sendMessage(chatId, { text: 'Only group admins can use the mute command.' }, { quoted: message });
-        return;
+        return sock.sendMessage(chatId, { text: '🚫 Only group admins can use the mute command.' }, { quoted: message });
     }
 
     try {
         let groupName = "the group";
-        
-        // Try to get group metadata to get the group name
         try {
             const groupMetadata = await sock.groupMetadata(chatId);
             groupName = groupMetadata.subject || "the group";
-        } catch (metadataError) {
-            console.error('Error fetching group metadata:', metadataError);
-            // Continue with default group name if metadata fetch fails
+        } catch (err) {
+            console.error('[MUTE] Metadata fetch failed:', err);
         }
 
-        // Mute the group
+        // Apply mute
         await sock.groupSettingUpdate(chatId, 'announcement');
-        
-        if (durationInMinutes !== undefined && durationInMinutes > 0) {
-            const durationInMilliseconds = durationInMinutes * 60 * 1000;
-            await sock.sendMessage(chatId, { text: `🔇 ${groupName} has been muted for ${durationInMinutes} minutes.` }, { quoted: message });
-            
-            // Store the timeout reference to prevent memory leaks
-            const unmuteTimeout = setTimeout(async () => {
+        await sock.sendMessage(chatId, { text: `🔇 ${groupName} muted${durationInMinutes ? ` for ${durationInMinutes} minutes` : ''}.` }, { quoted: message });
+        await sock.sendMessage(chatId, { react: { text: '🔇', key: message.key } });
+
+        if (durationInMinutes && durationInMinutes > 0) {
+            const durationMs = durationInMinutes * 60 * 1000;
+
+            // Clear existing timer if any
+            if (activeMuteTimers.has(chatId)) {
+                clearTimeout(activeMuteTimers.get(chatId));
+            }
+
+            const timer = setTimeout(async () => {
                 try {
-                    await sock.groupSettingUpdate(chatId, 'not_announcement');
-                    await sock.sendMessage(chatId, { text: `🔊 ${groupName} has been unmuted automatically.` });
-                } catch (unmuteError) {
-                    console.error('Error unmuting group:', unmuteError);
-                    try {
-                        await sock.sendMessage(chatId, { text: `❌ Failed to automatically unmute ${groupName}. Please unmute manually.` });
-                    } catch (sendError) {
-                        console.error('Error sending unmute failure message:', sendError);
+                    const { isBotAdmin: stillAdmin } = await isAdmin(sock, chatId, senderId);
+                    if (!stillAdmin) {
+                        return sock.sendMessage(chatId, { text: `❌ Bot is no longer admin. Please unmute ${groupName} manually.` });
                     }
+                    await sock.groupSettingUpdate(chatId, 'not_announcement');
+                    await sock.sendMessage(chatId, { text: `🔊 ${groupName} has been automatically unmuted.` });
+                    await sock.sendMessage(chatId, { react: { text: '🔊', key: message.key } });
+                } catch (err) {
+                    console.error('[UNMUTE] Error:', err);
+                    await sock.sendMessage(chatId, { text: `❌ Failed to unmute ${groupName}. Please unmute manually.` });
+                } finally {
+                    activeMuteTimers.delete(chatId);
                 }
-            }, durationInMilliseconds);
+            }, durationMs);
 
-            // Optional: Store the timeout reference if you need to clear it later
-            // You might want to store this in a Map or object for management
-            // timeoutReferences.set(chatId, unmuteTimeout);
-
-        } else {
-            await sock.sendMessage(chatId, { text: `🔇 ${groupName} has been muted.` }, { quoted: message });
+            activeMuteTimers.set(chatId, timer);
+            console.log(`[MUTE] Group: ${groupName}, Duration: ${durationInMinutes}m, By: ${senderId}`);
         }
     } catch (error) {
-        console.error('Error muting/unmuting the group:', error);
+        console.error('[MUTE] Error:', error);
         await sock.sendMessage(chatId, { text: '❌ An error occurred while muting the group. Please try again.' }, { quoted: message });
     }
 }
