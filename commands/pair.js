@@ -44,7 +44,7 @@ async function pairCommand(sock, chatId, message) {
             }
 
             await sock.sendMessage(chatId, {
-                text: ⏳ Generating code for ${number}...,
+                text: `⏳ Generating code for ${number}...`,
                 contextInfo: { forwardingScore: 1, isForwarded: true }
             });
 
@@ -61,7 +61,7 @@ async function pairCommand(sock, chatId, message) {
 
                 await sleep(3000); // shorter wait for UX
                 await sock.sendMessage(chatId, {
-                    text: `${code}`,
+                    text: `${number}`,
                     contextInfo: { forwardingScore: 1, isForwarded: true }
                 });
 
