@@ -1365,19 +1365,24 @@ case userMessage === `${prefix}forfeit` ||
             await toAudioCommand(sock, chatId, message);
           break;
                             
-            case userMessage.startsWith(`${prefix}ytdocvideo`):
+            case userMessage === `${prefix}ytdocvideo` || 
+                 userMessage === `${prefix}docytvideo` ||                 
+                 userMessage === `${prefix}docytsong`:
                 await ytdocvideoCommand(sock, chatId, message);
                 break;
                 
-            case userMessage.startsWith(`${prefix}ytdocplay`):
+            case userMessage === `${prefix}ytdocplay` || 
+                 userMessage === `${prefix}docytplay` ||               
+                 userMessage === `${prefix}docytv`:
                 await ytdocplayCommand(sock, chatId, message);
                 break;
 
             case userMessage === `${prefix}clearsession` || userMessage === `${prefix}clearsesi`:
                 await clearSessionCommand(sock, chatId, message);
                 break;
-
-            case userMessage.startsWith(`${prefix}autostatus`):
+                
+            case userMessage === `${prefix}autostatus` ||              
+                 userMessage === `${prefix}autostatusview`:
                 const autoStatusArgs = userMessage.split(' ').slice(1);
                 await autoStatusCommand(sock, chatId, message, autoStatusArgs);
                 break;
