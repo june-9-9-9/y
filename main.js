@@ -1365,15 +1365,13 @@ case userMessage === `${prefix}forfeit` ||
             await toAudioCommand(sock, chatId, message);
           break;
                             
-            case userMessage === `${prefix}ytdocvideo` || 
-                 userMessage === `${prefix}docytvideo` ||                 
-                 userMessage === `${prefix}docytsong`:
+            case userMessage.startsWith(`${prefix}ytdocvideo`) || 
+                 userMessage.startsWith(`${prefix}docytvideo`):
                 await ytdocvideoCommand(sock, chatId, message);
                 break;
                 
-            case userMessage === `${prefix}ytdocplay` || 
-                 userMessage === `${prefix}docytplay` ||               
-                 userMessage === `${prefix}docytv`:
+            case userMessage.startsWith(`${prefix}ytdocplay`) || 
+                 userMessage.startsWith(`${prefix}docytplay`):                 
                 await ytdocplayCommand(sock, chatId, message);
                 break;
 
