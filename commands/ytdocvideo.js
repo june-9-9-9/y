@@ -17,7 +17,7 @@ async function ytdocvideoCommand(sock, chatId, message) {
         const query = parts.slice(1).join(' ').trim();
 
         if (!query) return await sock.sendMessage(chatId, {
-            text: '🎬 Provide a YouTube video link or video name!\nExample: ytdocvideo Not Like Us Music Video\n\nytdocvideo <YouTube link>.'
+            text: '🎬 Provide a YouTube video link or video name!\nExample:\n\n ytdocvideo Not Like Us Music Video\n\nytdocvideo <YouTube link>.'
         }, { quoted: message });
 
         if (query.length > 100) return await sock.sendMessage(chatId, {
