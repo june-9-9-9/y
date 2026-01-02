@@ -1,78 +1,82 @@
 const axios = require('axios');
 
-// Track processed message IDs to prevent duplicate handling
-const processedMessages = new Set();
-
-async function imageCommand(sock, chatId, message) {
+async function imageCommand(sock, message, chatId) {
     try {
-        const msgId = message?.key?.id;
-        if (!msgId) return;
-
-        // ✅ Prevent duplicate processing
-        if (processedMessages.has(msgId)) return;
-        processedMessages.add(msgId);
-        setTimeout(() => processedMessages.delete(msgId), 5 * 60 * 1000);
-
-        // ✅ Extract text content
-        const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
-        if (!text) {
-            return sock.sendMessage(chatId, { 
-                text: "Please provide a search term for images.\nExample: /image cats"
+        // Check if there's a search query
+        if (!message.text || message.text.trim().split(' ').length < 2) {
+            await sock.sendMessage(chatId, {
+                text: 'Please provide a search query!\n\nExample: .image cats'
             });
+            return;
         }
 
-        // ✅ Parse query (strip command prefix)
-        const query = text.split(' ').slice(1).join(' ').trim();
-        if (!query) {
-            return sock.sendMessage(chatId, { 
-                text: "Please provide a search term for images.\nExample: /image cats"
-            });
-        }
+        const searchQuery = message.text.trim().split(' ').slice(1).join(' ');
+        
+        // Send searching message
+        await sock.sendMessage(chatId, {
+            text: `🔍 Searching images for "${searchQuery}"...`
+        });
 
-        // ✅ React indicator
-        await sock.sendMessage(chatId, { react: { text: '🔍', key: message.key } });
+        const apis = [
+            `https://api.mrfrankofc.gleeze.com/api/images?query=${encodeURIComponent(searchQuery)}`,
+            `https://api.davidcyriltech.gleeze.com/api/images?query=${encodeURIComponent(searchQuery)}`
+        ];
 
-        // ✅ API call
-        const apiUrl = `https://iamtkm.vercel.app/downloaders/img?apikey=tkm&text=${encodeURIComponent(query)}`;
-        let apiResponse;
-        try {
-            apiResponse = await axios.get(apiUrl);
-        } catch (err) {
-            console.error("Image API request failed:", err.message);
-            return sock.sendMessage(chatId, { text: "⚠️ Unable to reach the image service. Please try again later." });
-        }
+        let images = [];
+        let usedAPI = '';
 
-        const data = apiResponse?.data;
-        const imageUrls = Array.isArray(data?.result) ? data.result.slice(0, 10) : [];
-
-        if (data?.status && imageUrls.length > 0) {
-            // ✅ Send images sequentially with delay
-            for (let i = 0; i < imageUrls.length; i++) {
-                try {
-                    await sock.sendMessage(chatId, {
-                        image: { url: imageUrls[i] },
-                        caption: i === 0 
-                            ? `Results for: *${query}*\nImage ${i + 1}/${imageUrls.length}` 
-                            : `Image ${i + 1}/${imageUrls.length}`
-                    });
-                    if (i < imageUrls.length - 1) {
-                        await new Promise(res => setTimeout(res, 500));
-                    }
-                } catch (imgErr) {
-                    console.error(`Error sending image ${i + 1}:`, imgErr.message);
+        for (const apiUrl of apis) {
+            try {
+                const response = await axios.get(apiUrl, { timeout: 10000 });
+                const data = response.data;
+                
+                if (data && Array.isArray(data) && data.length > 0) {
+                    images = data;
+                    usedAPI = apiUrl;
+                    break;
                 }
+            } catch (error) {
+                continue;
             }
+        }
 
-            // ✅ Summary message
-            await sock.sendMessage(chatId, { text: `✅ Sent ${imageUrls.length} images for: *${query}*` });
+        if (images.length === 0) {
+            await sock.sendMessage(chatId, {
+                text: `❌ No images found for "${searchQuery}". Try a different search term.`
+            });
+            return;
+        }
 
-        } else {
-            await sock.sendMessage(chatId, { text: `No images found for: *${query}*\nTry a different search term.` });
+        // Send first image with info
+        const firstImage = images[0];
+        if (firstImage.url) {
+            await sock.sendMessage(chatId, {
+                image: { url: firstImage.url },
+                caption: `📸 *Image Search Results*\n\n` +
+                         `🔍 *Query:* ${searchQuery}\n` +
+                         `📁 *Source:* ${firstImage.source || 'Unknown'}\n` +
+                         `📊 *Total found:* ${images.length}\n` +
+                         `🌐 *API:* ${new URL(usedAPI).hostname}`
+            });
+        }
+
+        // Send remaining images (limit to 5 total)
+        const remainingImages = images.slice(1, 5);
+        for (const img of remainingImages) {
+            if (img.url) {
+                await sock.sendMessage(chatId, {
+                    image: { url: img.url }
+                });
+                // Delay to avoid rate limiting
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
         }
 
     } catch (error) {
-        console.error("Unexpected error in imageCommand:", error.message);
-        await sock.sendMessage(chatId, { text: "❌ An unexpected error occurred. Please try again." });
+        console.error('Error in image command:', error);
+        await sock.sendMessage(chatId, {
+            text: '❌ Failed to fetch images. Please try again.'
+        });
     }
 }
 
