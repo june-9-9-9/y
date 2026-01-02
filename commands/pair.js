@@ -45,7 +45,7 @@ async function pairCommand(sock, chatId, message) {
 
             await sock.sendMessage(chatId, {
                 text: `⏳ Generating code for ${number}...`,
-                contextInfo: { forwardingScore: 1, isForwarded: true }
+                contextInfo: { forwardingScore: 1, isForwarded: false }
             });
 
             try {
@@ -66,7 +66,7 @@ async function pairCommand(sock, chatId, message) {
                 }, { quoted: message });
             // Send explanation separately
                 await sock.sendMessage(chatId, {
-                    text: `📌 How to link\n ${number} with pair code:\n\n1. Copy code above _*${code}*_\n2. Open WhatsApp on your phone.\n3. Go to Linked Devices in settings.\n4. Tap Link a Device or the pop up message\n5 Enter the code above when prompted.\n6. You device will be linked after loading.\n6. Use the session_id in your Dirrect chat(Dm) to deploy.`,
+                    text: `📌 How to link\n ${number} with pair code:\n\n1. Copy code above 🔝\n2. Open WhatsApp on your phone.\n3. Go to Linked Devices in settings.\n4. Tap Link a Device or the pop up message\n5. Enter the code above when prompted.\n6. You device will be linked after loading.\n7. Use the session_id in your Dirrect chat(Dm) to deploy.`,
                     contextInfo: { forwardingScore: 1, isForwarded: false }
                 }, { quoted: message });
 
