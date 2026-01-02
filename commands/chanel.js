@@ -1,77 +1,48 @@
-// Channel JID Extractor
 async function chaneljidCommand(sock, chatId, message) {
     try {
-        const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
+        // Get message text
+        const text = message.message?.conversation || 
+                    message.message?.extendedTextMessage?.text || '';
         
-        // Extract args from the message text
-        let args = [];
-        if (text) {
-            // Split text by spaces and remove the command part
-            args = text.trim().split(/\s+/).slice(1);
+        // Get command arguments (remove command word)
+        const args = text.trim().split(' ').slice(1);
+        
+        // User must provide link/JID
+        if (!args[0]) {
+            return sock.sendMessage(chatId, { 
+                text: '❌ Please provide a WhatsApp channel link\nExample: !channeljid https://whatsapp.com/channel/XXXXXXX' 
+            });
         }
         
-        let targetJid = null;
-
-        // 1️⃣ If a link or JID is provided
-        if (args[0]) {
-            const input = args[0];
-
-            // Newsletter JID directly
-            if (input.endsWith('@newsletter')) {
-                targetJid = input;
-            }
-            // WhatsApp channel/newsletter link
-            else if (input.includes('whatsapp.com/channel/')) {
-                const code = input.split('/').pop().trim();
-                targetJid = `120363${code}@newsletter`; // Fixed template literal
-            }
-            else {
-                return await sock.sendMessage(
-                    chatId,
-                    {
-                        text: '❌ Invalid channel link or JID'
-                    },
-                    { quoted: message }
-                );
-            }
+        const input = args[0];
+        let jid;
+        
+        // If it's already a JID
+        if (input.includes('@newsletter')) {
+            jid = input;
         }
-        // 2️⃣ If no argument, use current chat JID
+        // If it's a WhatsApp channel link
+        else if (input.includes('whatsapp.com/channel/')) {
+            const code = input.split('/').pop();
+            jid = `120363${code}@newsletter`;
+        }
+        // Invalid input
         else {
-            //targetJid = message.key.remoteJid;
+            return sock.sendMessage(chatId, { 
+                text: '❌ Invalid WhatsApp channel link' 
+            });
         }
-
-        // 3️⃣ Final validation
-        if (!targetJid.endsWith('@newsletter')) {
-            return await sock.sendMessage(
-                chatId,
-                {
-                    text: '❌ This is not a WhatsApp channel/newsletter\n\n' +
-                          '📌 Tip:\n' +
-                          '.channeljid <channel link or JID>'
-                },
-                { quoted: message }
-            );
-        }
-
-        // 4️⃣ Output ONLY the JID (clean & obvious)
-        await sock.sendMessage(
-            chatId,
-            {
-                text: `${targetjid}` // Fixed template literal
-            },
-            { quoted: message }
-        );
-
-    } catch (err) {
-        console.error('❌ ChannelJID Error:', err);
-
-        await sock.sendMessage(
-            chatId,
-            {
-                text: '⚠️ Failed to fetch channel JID'
-            },
-            { quoted: message }
-        );
+        
+        // Send the JID
+        await sock.sendMessage(chatId, { 
+            text: jid 
+        });
+        
+    } catch (error) {
+        console.error('Error:', error);
+        await sock.sendMessage(chatId, { 
+            text: '❌ Error getting channel JID' 
+        });
     }
 }
 
