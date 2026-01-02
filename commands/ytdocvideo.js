@@ -17,7 +17,7 @@ async function ytdocvideoCommand(sock, chatId, message) {
         const query = parts.slice(1).join(' ').trim();
 
         if (!query) return await sock.sendMessage(chatId, {
-            text: '🎬 Provide a YouTube video name!\nExample: .ytdocvideo Not Like Us Music Video'
+            text: '🎬 Provide a YouTube video link or video name!\nExample: ytdocvideo Not Like Us Music Video\n\nytdocvideo <YouTube link>.'
         }, { quoted: message });
 
         if (query.length > 100) return await sock.sendMessage(chatId, {
@@ -43,10 +43,6 @@ async function ytdocvideoCommand(sock, chatId, message) {
         const fileName = `video_${timestamp}.mp4`;
         const filePath = path.join(tempDir, fileName);
 
-        // Send processing message
-        await sock.sendMessage(chatId, {
-            text: `📥 *Downloading Video...*\n_Title: ${video.title}_\n_Duration: ${video.timestamp}_\n_Channel: ${video.author.name}_`
-        }, { quoted: message });
 
         // Download MP4 video
         const videoResponse = await axios({
@@ -77,7 +73,7 @@ async function ytdocvideoCommand(sock, chatId, message) {
             document: { url: filePath },
             mimetype: "video/mp4",
             fileName: `${video.title.substring(0, 100)}.mp4`,
-            caption: `🎬 *YouTube Video Downloaded*\n\n📌 *Title:* ${video.title}\n⏱️ *Duration:* ${video.timestamp}\n👤 *Channel:* ${video.author.name}\n📊 *Size:* ${fileSizeMB} MB`
+            caption: `🎬 *YouTube Video Downloaded*\n\n📌 *Title:* ${video.title}\n *Duration:* ${video.timestamp}\n *Channel:* ${video.author.name}\ *Size:* ${fileSizeMB} MB`
         }, { quoted: message });
 
         // Cleanup
