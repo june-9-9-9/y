@@ -1,76 +1,64 @@
-// Reset group link (group only, admin only)
-async function resetlinkCommand(sock, chatId) {
+async function resetlinkCommand(sock, chatId, message) {
     try {
-        const groupMetadata = await sock.groupMetadata(chatId);
-
-        // Group-only restriction
-        if (!groupMetadata) {
-            await sock.sendMessage(chatId, { text: '❌ This command can only be used in groups!' });
-            return;
+        // Check if it's a group chat
+        if (!chatId.endsWith('@g.us')) {
+            return await sock.sendMessage(chatId, {
+                text: "❌ This command can only be used in groups!"
+            });
         }
 
-        // Find bot participant
-        const botId = sock.user?.id || sock.authState?.creds?.me?.id;
-        const botParticipant = groupMetadata.participants.find(p => p.id === botId);
+        // Get the sender's ID and group metadata
+        const sender = message.key.participant || message.key.remoteJid;
+        const metadata = await sock.groupMetadata(chatId);
+        
+        // Check if sender is an admin
+        const isAdmin = metadata.participants.find(
+            participant => participant.id === sender
+        )?.admin;
 
-        // Admin restriction
-        if (!botParticipant || !['admin', 'superadmin'].includes(botParticipant.admin)) {
-            await sock.sendMessage(chatId, { text: '❌ Bot must be admin to reset group link!' });
-            return;
+        if (!isAdmin) {
+            return await sock.sendMessage(chatId, {
+                text: "⛔ This command is restricted to group admins only!"
+            });
         }
 
-        // Reset link
-        const newCode = await sock.groupRevokeInvite(chatId);
-        const groupLink = `https://chat.whatsapp.com/${newCode}`;
-
-        // Send both formatted and clean link
-        await sock.sendMessage(chatId, { 
-            text: `✅ Group link reset!\n\n📌 New link:\n${groupLink}\n\n🔗 Clean link:\n${groupLink}`
+        // Reset group invite link
+        const newLink = await sock.groupRevokeInvite(chatId);
+        const inviteLink = `https://chat.whatsapp.com/${newLink}`;
+        
+        await sock.sendMessage(chatId, {
+            text: `✅ *Group Link Reset Successfully!*\n\n📱 *New Link:* ${inviteLink}\n\n⚠️ *Note:* Previous link has been deactivated.`
         });
-
     } catch (error) {
-        console.error('Error resetting group link:', error);
-        await sock.sendMessage(chatId, { text: `❌ Failed to reset group link!\nError: ${error.message}` });
+        console.error("Error resetting group link:", error);
+        await sock.sendMessage(chatId, {
+            text: "❌ Failed to reset group link. Make sure I have admin permissions."
+        });
     }
 }
 
-// Get group link (group only, admin only)
-async function linkCommand(sock, chatId) {
+async function linkCommand(sock, chatId, message) {
     try {
-        const groupMetadata = await sock.groupMetadata(chatId);
-
-        // Group-only restriction
-        if (!groupMetadata) {
-            await sock.sendMessage(chatId, { text: '❌ This command can only be used in groups!' });
-            return;
+        // Check if it's a group chat
+        if (!chatId.endsWith('@g.us')) {
+            return await sock.sendMessage(chatId, {
+                text: "❌ This command can only be used in groups!"
+            });
         }
 
-        // Find bot participant
-        const botId = sock.user?.id || sock.authState?.creds?.me?.id;
-        const botParticipant = groupMetadata.participants.find(p => p.id === botId);
-
-        // Admin restriction
-        if (!botParticipant || !['admin', 'superadmin'].includes(botParticipant.admin)) {
-            await sock.sendMessage(chatId, { text: '❌ Bot must be admin to get group link!' });
-            return;
-        }
-
-        // Get link
-        const code = await sock.groupInviteCode(chatId);
-        const groupLink = `https://chat.whatsapp.com/${code}`;
-
-        // Send both formatted and clean link
-        await sock.sendMessage(chatId, { 
-            text: `📌 *Group Link:*\n${groupLink}\n\n🔗 Clean link:\n${groupLink}\n\n⚠️ Only admins can reset the link.`
+        // Get current group invite link
+        const link = await sock.groupInviteCode(chatId);
+        await sock.sendMessage(chatId, {
+            text: `📱 *Group Invite Link:*\nhttps://chat.whatsapp.com/${link}\n\n🔗 *Share this link to invite others to the group.*`
         });
-
     } catch (error) {
-        console.error('Error getting group link:', error);
-        await sock.sendMessage(chatId, { text: `❌ Failed to get group link!\nError: ${error.message}` });
+        console.error("Error getting group link:", error);
+        await sock.sendMessage(chatId, {
+            text: "❌ Failed to get group link. Make sure I have admin permissions or the group has an active invite link."
+        });
     }
 }
 
-// Export
 module.exports = {
     resetlinkCommand,
     linkCommand
