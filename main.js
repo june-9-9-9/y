@@ -1311,12 +1311,9 @@ case userMessage === `${prefix}forfeit` ||
                 await groupInfoCommand(sock, chatId, message);
                 break;
 
-            case userMessage === `${prefix}reset` || userMessage === `${prefix}revoke`:
-                if (!isGroup) {
-                    await sock.sendMessage(chatId, { text: 'This command can only be used in groups!', ...channelInfo }, { quoted: message });
-                    return;
-                }
-                await resetlinkCommand(sock, chatId, senderId);
+            case userMessage === `${prefix}reset` ||
+                userMessage === `${prefix}revoke`:
+                await resetlinkCommand(sock, chatId, message);
                 break;
 
             case userMessage === `${prefix}admin` ||
