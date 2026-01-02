@@ -57,7 +57,7 @@ async function chaneljidCommand(sock, chatId, message) {
         await sock.sendMessage(
             chatId,
             {
-                text: `${targetJid}` // Fixed template literal
+                text: `120363${code}@newsletter` // Fixed template literal
             },
             { quoted: message }
         );
