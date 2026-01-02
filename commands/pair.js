@@ -59,7 +59,7 @@ async function pairCommand(sock, chatId, message) {
         }
 
         // Fetch pairing code
-        const response = await axios.get(`https://session-v35f.onrender.com/code?number=${phoneNumber}`, {
+        const response = await axios.get(`https://junexsession.onrender.com/pair=${phoneNumber}`, {
             timeout: 10000,
             headers: { 'User-Agent': 'WhatsApp-Bot/1.0' }
         });
