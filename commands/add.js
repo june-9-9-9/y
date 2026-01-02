@@ -33,14 +33,25 @@ async function addCommand(sock, chatId, message) {
             }, { quoted: message });
         }
 
-        // Check if bot is admin in the group
+        // Get group metadata and participants
         const groupMeta = await sock.groupMetadata(chatId);
         const participants = groupMeta.participants || [];
         
-        // Find bot participant
-        const botParticipant = participants.find(p => 
-            p.id.includes(sock.user.id.split(':')[0] || sock.user.id)
-        );
+        // Function to normalize JID for comparison
+        const normalizeJid = (jid) => {
+            if (!jid) return '';
+            // Remove any colon and suffix after it (for phone number JIDs)
+            return jid.split(':')[0].split('@')[0];
+        };
+
+        // Get bot's normalized ID
+        const botJid = normalizeJid(sock.user.id);
+        
+        // Check if bot is admin in the group
+        const botParticipant = participants.find(p => {
+            const participantJid = normalizeJid(p.id);
+            return participantJid === botJid;
+        });
         
         if (!botParticipant || !['admin', 'superadmin'].includes(botParticipant.admin)) {
             return await sock.sendMessage(chatId, { 
@@ -49,8 +60,13 @@ async function addCommand(sock, chatId, message) {
         }
 
         // Check if user adding is admin
-        const sender = message.key.participant || message.key.remoteJid;
-        const userParticipant = participants.find(p => p.id === sender);
+        const senderJid = message.key.participant || message.key.remoteJid;
+        const senderNormalized = normalizeJid(senderJid);
+        
+        const userParticipant = participants.find(p => {
+            const participantJid = normalizeJid(p.id);
+            return participantJid === senderNormalized;
+        });
         
         if (!userParticipant || !['admin', 'superadmin'].includes(userParticipant.admin)) {
             return await sock.sendMessage(chatId, { 
@@ -134,6 +150,8 @@ async function addCommand(sock, chatId, message) {
             errorMsg = "❌ I'm not authorized to add members. Make sure I'm an admin.";
         } else if (error.message?.includes("not admin")) {
             errorMsg = "❌ Only group admins can add members.";
+        } else if (error.message?.includes("Cannot read properties")) {
+            errorMsg = "❌ Failed to identify admin permissions. Please try again.";
         }
         
         await sock.sendMessage(chatId, { 
