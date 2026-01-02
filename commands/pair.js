@@ -10,7 +10,7 @@ async function pairCommand(sock, chatId, message) {
             "";
 
         // Remove command prefix ".pair" and trim spaces
-        const q = text.replace(/^\.pair\s*/i, "").trim();
+        const q = text.replace(" ").trim();
 
         if (!q) {
             return sock.sendMessage(chatId, {
