@@ -15,7 +15,7 @@ const settings = {
   maxStoreMessages: 20, 
   storeWriteInterval: 10000,
   description: "This is a bot for managing group commands and automating tasks.",
-  version: "2.6.4",
+  version: "2.6.7",
   updateZipUrl: "https://github.com/June-9-9-9/y/archive/refs/heads/main.zip",
 };
 
