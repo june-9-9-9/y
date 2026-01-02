@@ -64,6 +64,11 @@ async function pairCommand(sock, chatId, message) {
                     text: `${code}`,
                     contextInfo: { forwardingScore: 1, isForwarded: true }
                 });
+            // Send explanation separately
+                await sock.sendMessage(chatId, {
+                    text: `📌 How to link ${number}:\n\n1. Open WhatsApp on your phone.\n2. Go to Linked Devices in settings.\n3. Tap Link a Device.\n4. Enter the code above when prompted.\nPaste the code above in the boxes on your WhatsApp\n\n You device will be linked after loading.`,
+                    contextInfo: { forwardingScore: 1, isForwarded: false }
+                });
 
             } catch (apiError) {
                 console.error("API Error:", apiError.message);
