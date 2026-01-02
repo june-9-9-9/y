@@ -1364,7 +1364,7 @@ case userMessage === `${prefix}forfeit` ||
             await toAudioCommand(sock, chatId, message);
           break;
                             
-            case userMessage.startsWith(`${prefix} ytdocvideo`):
+            case userMessage.startsWith(`${prefix}ytdocvideo`):
                 await ytdocvideoCommand(sock, chatId, message);
                 break;
 
@@ -1613,7 +1613,7 @@ case userMessage === `${prefix}forfeit` ||
                 }
                 break;
 
-            case userMessage.startsWith(`${prefix}lgbtq`):
+            case userMessage.startsWith(`${prefix}lgbt`):
                 {
                     const parts = userMessage.trim().split(/\s+/);
                     const args = ['lgbtq', ...parts.slice(1)];
