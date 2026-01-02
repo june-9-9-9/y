@@ -727,12 +727,9 @@ if (/^[1-9]$/.test(userMessage)) {
                 await settingsCommand(sock, chatId, message);
                 break;
 
-           case userMessage === `${prefix}chanelid`:
-                await chaneljidCommand(sock, chatId, message);
-                break;
 
 
-                case userMessage.startsWith(`${prefix}mode`): {
+    case userMessage.startsWith(`${prefix}mode`): {
     // Check if sender is the owner
     if (!message.key.fromMe && !senderIsSudo) {
         await sock.sendMessage(chatId, { text: 'Only bot owner can use this command!' }, { quoted: fake });
@@ -1333,6 +1330,11 @@ case userMessage === `${prefix}forfeit` ||
             case userMessage.startsWith(`${prefix}tourl`) || 
                  userMessage.startsWith(`${prefix}url`):
                 await urlCommand(sock, chatId, message);
+                break;
+                
+            case userMessage.startsWith(`${prefix}chanelid`) || 
+                 userMessage.startsWith(`${prefix}chjid`):
+                await chaneljidCommand(sock, chatId, message);
                 break;
 
                 
