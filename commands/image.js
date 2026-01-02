@@ -1,81 +1,71 @@
-const axios = require('axios');
+const gis = require('g-i-s');
 
-async function imageCommand(sock, message, chatId) {
-    try {
-        // Check if there's a search query
-        if (!message.text || message.text.trim().split(' ').length < 2) {
-            await sock.sendMessage(chatId, {
-                text: 'Please provide a search query!\n\nExample: .image cats'
-            });
-            return;
-        }
-
-        const searchQuery = message.text.trim().split(' ').slice(1).join(' ');
-        
-        // Send searching message
-        await sock.sendMessage(chatId, {
-            text: `🔍 Searching images for "${searchQuery}"...`
+function gisSearch(query) {
+    return new Promise((resolve, reject) => {
+        gis(query, (error, results) => {
+            if (error) return reject(error);
+            resolve(results);
         });
+    });
+}
 
-        const apis = [
-            `https://api.mrfrankofc.gleeze.com/api/images?query=${encodeURIComponent(searchQuery)}`,
-            `https://api.davidcyriltech.gleeze.com/api/images?query=${encodeURIComponent(searchQuery)}`
-        ];
+async function imageCommand(sock, chatId, message) {
+    try {
+        // Extract text from message
+        const userMessage = message?.message?.conversation || 
+                          message?.message?.extendedTextMessage?.text ||
+                          '';
+        
+        const args = userMessage.split(' ').slice(1);
+        const query = args.join(' ');
 
-        let images = [];
-        let usedAPI = '';
-
-        for (const apiUrl of apis) {
-            try {
-                const response = await axios.get(apiUrl, { timeout: 10000 });
-                const data = response.data;
-                
-                if (data && Array.isArray(data) && data.length > 0) {
-                    images = data;
-                    usedAPI = apiUrl;
-                    break;
-                }
-            } catch (error) {
-                continue;
-            }
-        }
-
-        if (images.length === 0) {
-            await sock.sendMessage(chatId, {
-                text: `❌ No images found for "${searchQuery}". Try a different search term.`
-            });
-            return;
-        }
-
-        // Send first image with info
-        const firstImage = images[0];
-        if (firstImage.url) {
-            await sock.sendMessage(chatId, {
-                image: { url: firstImage.url },
-                caption: `📸 *Image Search Results*\n\n` +
-                         `🔍 *Query:* ${searchQuery}\n` +
-                         `📁 *Source:* ${firstImage.source || 'Unknown'}\n` +
-                         `📊 *Total found:* ${images.length}\n` +
-                         `🌐 *API:* ${new URL(usedAPI).hostname}`
+        if (!query) {
+            return await sock.sendMessage(chatId, {
+                text: `📷 *Image Search Command*\n\nUsage:\n.image <search_query>\n\nExample:\n.image cat\n.image beautiful sunset\n.image anime characters`
             });
         }
 
-        // Send remaining images (limit to 5 total)
-        const remainingImages = images.slice(1, 5);
-        for (const img of remainingImages) {
-            if (img.url) {
-                await sock.sendMessage(chatId, {
-                    image: { url: img.url }
-                });
-                // Delay to avoid rate limiting
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
-        }
-
-    } catch (error) {
-        console.error('Error in image command:', error);
         await sock.sendMessage(chatId, {
-            text: '❌ Failed to fetch images. Please try again.'
+            text: `🔍 Searching images for: "${query}"...`
+        }, { quoted: message });
+
+        const results = await gisSearch(query);
+
+        if (!results || results.length === 0) {
+            return await sock.sendMessage(chatId, {
+                text: `❌ No images found for "${query}"`
+            });
+        }
+
+        const imageUrls = results
+            .map(r => r.url)
+            .filter(url => url && (url.endsWith('.jpg') || url.endsWith('.png')))
+            .slice(0, 5);
+
+        if (imageUrls.length === 0) {
+            return await sock.sendMessage(chatId, {
+                text: `❌ No valid images found for "${query}"`
+            });
+        }
+
+        const fancyBotName = `ᴊᴜɴᴇ-𝚇`;
+
+        for (const url of imageUrls) {
+            try {
+                await sock.sendMessage(chatId, {
+                    image: { url },
+                    caption: `📸 𝐃𝐨𝐰𝐧𝐥𝐨𝐚𝐝𝐞𝐝 𝐛𝐲 ${fancyBotName}`
+                }, { quoted: message });
+
+                await new Promise(res => setTimeout(res, 500));
+            } catch (err) {
+                console.error('Error sending image:', err);
+            }
+        }
+    } catch (error) {
+        console.error('Image command error:', error);
+        await sock.sendMessage(chatId, {
+            text: '❌ An unexpected error occurred. Please try again.'
         });
     }
 }
