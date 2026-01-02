@@ -49,7 +49,7 @@ async function setGroupStatusCommand(sock, chatId, msg) {
         const commandRegex = /^[.!#/]?(togstatus|swgc|groupstatus|tosgroup)\s*/i;
 
         if (!quotedMessage && (!messageText.trim() || messageText.trim().match(commandRegex))) {
-            return sock.sendMessage(chatId, { text: getHelpText() });
+            return sock.sendMessage(chatId, { text: getHelpText() }, { quoted: msg });
         }
 
         let payload = null;
@@ -100,15 +100,15 @@ async function setGroupStatusCommand(sock, chatId, msg) {
 // 📌 Short help text
 function getHelpText() {
     return `
-🎖️ *GROUP STATUS*
+✦ *GROUP STATUS* ✦
 
 Commands:
-.togroupstatus / .tosgroup
+✦ togroupstatus / .tosgroup
 
 Usage:
-• .tosgroup text
-• Reply to media/sticker with .tosgroup
-• Add caption after command`;
+✦ tosgroup text
+✦ Reply to media/sticker with .tosgroup
+✦ Add caption after command`;
 }
 
 // 📌 Build payload from quoted message
