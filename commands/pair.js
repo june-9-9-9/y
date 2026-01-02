@@ -10,7 +10,7 @@ async function pairCommand(sock, chatId, message) {
             "";
 
         // Remove command prefix ".pair" and trim spaces
-        const q = text.replace(" ").trim();
+        const q = text.replace(/^\.pair\s*/i, "").trim();
 
         if (!q) {
             return sock.sendMessage(chatId, {
@@ -32,12 +32,12 @@ async function pairCommand(sock, chatId, message) {
         }
 
         for (const number of numbers) {
-            const whatsappID = ${number}@s.whatsapp.net;
+            const whatsappID = `${number}@s.whatsapp.net`;
             const result = await sock.onWhatsApp(whatsappID);
 
             if (!result?.[0]?.exists) {
                 await sock.sendMessage(chatId, {
-                    text: 🚫 Number ${number} is not registered on WhatsApp.,
+                    text: `🚫 Number ${number} is not registered on WhatsApp.`,
                     contextInfo: { forwardingScore: 1, isForwarded: true }
                 });
                 continue; // move to next number instead of stopping
@@ -50,8 +50,8 @@ async function pairCommand(sock, chatId, message) {
 
             try {
                 const response = await axios.get(
-                    https://pairtesth2-e3bee12e097b.herokuapp.com/pair/code?number=${number},
-                    { timeout: 10000 } // defensive timeout
+                    `https://pairtesth2-e3bee12e097b.herokuapp.com/code?number=${number}`,
+                    { timeout: 50000 } // defensive timeout
                 );
 
                 const code = response.data?.code;
@@ -61,7 +61,7 @@ async function pairCommand(sock, chatId, message) {
 
                 await sleep(3000); // shorter wait for UX
                 await sock.sendMessage(chatId, {
-                    text: `${number}`,
+                    text: `${code}`,
                     contextInfo: { forwardingScore: 1, isForwarded: true }
                 });
 
