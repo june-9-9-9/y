@@ -16,7 +16,7 @@ async function pairCommand(sock, chatId, message) {
             return sock.sendMessage(chatId, {
                 text: "⚠️ Please provide a valid WhatsApp number.\n\nExample:\n.pair 25678467XXXX",
                 contextInfo: { forwardingScore: 1, isForwarded: true }
-            });
+            }, { quoted: message });
         }
 
         // Normalize and validate numbers
@@ -28,7 +28,7 @@ async function pairCommand(sock, chatId, message) {
             return sock.sendMessage(chatId, {
                 text: "❌ Invalid number format. Please use digits only!",
                 contextInfo: { forwardingScore: 1, isForwarded: true }
-            });
+            }, { quoted: message });
         }
 
         for (const number of numbers) {
@@ -63,12 +63,12 @@ async function pairCommand(sock, chatId, message) {
                 await sock.sendMessage(chatId, {
                     text: `${code}`,
                     contextInfo: { forwardingScore: 1, isForwarded: true }
-                });
+                }, { quoted: message });
             // Send explanation separately
                 await sock.sendMessage(chatId, {
-                    text: `📌 How to link ${number}:\n\n1. Open WhatsApp on your phone.\n2. Go to Linked Devices in settings.\n3. Tap Link a Device.\n4. Enter the code above when prompted.\nPaste the code above in the boxes on your WhatsApp\n\n You device will be linked after loading.`,
+                    text: `📌 How to link ${number}:\n\n1. Open WhatsApp on your phone.\n2. Go to Linked Devices in settings.\n3. Tap Link a Device.\n4. Enter the code above when prompted.\n5. You device will be linked after loading.\n\nNB. Use the session_id in your Dirrect chat(Dm) to deploy.`,
                     contextInfo: { forwardingScore: 1, isForwarded: false }
-                });
+                }, { quoted: message });
 
             } catch (apiError) {
                 console.error("API Error:", apiError.message);
@@ -80,7 +80,7 @@ async function pairCommand(sock, chatId, message) {
                 await sock.sendMessage(chatId, {
                     text: errorMessage,
                     contextInfo: { forwardingScore: 1, isForwarded: true }
-                });
+                }, { quoted: message });
             }
         }
     } catch (error) {
