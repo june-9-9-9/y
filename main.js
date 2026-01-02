@@ -276,6 +276,7 @@ const fetchCommand = require('./commands/fetch');
 const { ytplayCommand, ytsongCommand }= require('./commands/ytdl');
 const { chaneljidCommand }= require('./commands/chanel');
 const { connectFourCommand, handleConnectFourMove } = require('./commands/connect4');
+const pairCommand = require('./commands/pair');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
