@@ -236,6 +236,7 @@ const spotifyCommand = require('./commands/spotify');
 const playCommand = require('./commands/play');
 const tiktokCommand = require('./commands/tiktok');
 const songCommand = require('./commands/song');
+const ytdocvideoCommand = require('./commands/ytdocvideo');
 const aiCommand = require('./commands/ai');
 const urlCommand = require('./commands/url');
 const { handleTranslateCommand } = require('./commands/translate');
@@ -1358,9 +1359,14 @@ case userMessage === `${prefix}forfeit` ||
                 break;
 
               
-            case userMessage === `${prefix}toaudio` || userMessage === `${prefix}tomp3`:
+            case userMessage === `${prefix}toaudio` ||
+                userMessage === `${prefix}tomp3`:
             await toAudioCommand(sock, chatId, message);
           break;
+                            
+            case userMessage.startsWith(`${prefix} ytdocvideo`):
+                await ytdocvideoCommand(sock, chatId, message);
+                break;
 
             case userMessage === `${prefix}clearsession` || userMessage === `${prefix}clearsesi`:
                 await clearSessionCommand(sock, chatId, message);
