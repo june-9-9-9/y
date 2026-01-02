@@ -9,28 +9,48 @@ async function addCommand(sock, chatId, message) {
 
     const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
     const target = text ? text.replace(/\D/g, '') + '@s.whatsapp.net' : message.quoted?.sender;
-    if (!target) return sock.sendMessage(chatId, { text: "📌 Usage: .add 2547xxxxxxx or reply" }, { quoted: message });
+    if (!target) 
+      return sock.sendMessage(chatId, { text: "📌 Usage: .add 2547xxxxxxx or reply" }, { quoted: message });
 
-    // Use the imported isAdmin function
+    // Admin checks
     if (!await isAdmin(sock, chatId, sock.user.id)) 
       return sock.sendMessage(chatId, { text: "❌ I need admin rights" }, { quoted: message });
-    
-    if (!await isAdmin(sock, chatId, message.key.participant || message.key.remoteJid))
+
+    const issuer = message.key.participant || message.key.remoteJid;
+    if (!await isAdmin(sock, chatId, issuer))
       return sock.sendMessage(chatId, { text: "❌ Only admins can add" }, { quoted: message });
+
+    // Get group metadata for subject
+    const meta = await sock.groupMetadata(chatId);
 
     const res = await sock.groupParticipantsUpdate(chatId, [target], 'add');
     for (let r of res) {
+      console.log("Add status:", r.status);
+
       const statusMsg = {
         408: "❌ Already in group",
         401: "🚫 I'm blocked",
-        409: "⚠️ User recently left",
         500: "❌ Invalid request"
       }[r.status];
 
       if (statusMsg)
         return sock.sendMessage(chatId, { text: statusMsg, mentions: [target] }, { quoted: message });
 
+      if (r.status === 409) {
+        // Recently left → pardon with invite
+        const link = await sock.groupInviteCode(chatId);
+        await sock.sendMessage(chatId, {
+          text: `⚠️ @${target.split('@')[0]} left recently.\n📩 Invite link sent instead.`,
+          mentions: [target]
+        }, { quoted: message });
+        return sock.sendMessage(target, {
+          text: `📢 *Group Invitation*\n🏷️ ${meta.subject}\n🔗 https://chat.whatsapp.com/${link}`,
+          detectLink: true
+        });
+      }
+
       if (r.status === 403) {
+        // Privacy settings → invite link
         const link = await sock.groupInviteCode(chatId);
         await sock.sendMessage(chatId, {
           text: `@${target.split('@')[0]} has privacy settings.\n📩 Invite link sent.`,
@@ -47,6 +67,7 @@ async function addCommand(sock, chatId, message) {
         return;
       }
 
+      // Success
       await sock.sendMessage(chatId, {
         text: `✅ Added @${target.split('@')[0]}!`,
         mentions: [target]
