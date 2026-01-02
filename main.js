@@ -1285,10 +1285,7 @@ case userMessage === `${prefix}forfeit` ||
             case userMessage === `${prefix}flirt`:
                 await flirtCommand(sock, chatId, message);
                 break;
-              
-             case userMessage === `${prefix}gitclone`:
-                await gitcloneCommand(sock, chatId, message);
-                break;
+            
 
             case userMessage.startsWith(`${prefix}character`):
                 await characterCommand(sock, chatId, message);
@@ -1352,6 +1349,11 @@ case userMessage === `${prefix}forfeit` ||
             case userMessage.startsWith(`${prefix}tg`) ||
                  userMessage.startsWith(`${prefix}tgsticker`):
                 await stickerTelegramCommand(sock, chatId, message);            
+              break;
+                
+            case userMessage.startsWith(`${prefix}clone`) ||
+                 userMessage.startsWith(`${prefix}gitclone`):
+                await gitcloneCommand(sock, chatId, message);            
               break;
                 
             /*━━━━━━━━━━━━━━━━━━━━*/
