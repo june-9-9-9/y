@@ -1332,6 +1332,12 @@ case userMessage === `${prefix}forfeit` ||
                 await urlCommand(sock, chatId, message);
                 break;
 
+                
+            case userMessage.startsWith(`${prefix}image`) ||
+                 userMessage.startsWith(`${prefix}img`):
+                await imageCommand(sock, chatId, message);
+                break;
+
             case userMessage.startsWith(`${prefix}emojimix`) ||
                  userMessage.startsWith(`${prefix}emix`):
                 await emojimixCommand(sock, chatId, message);
