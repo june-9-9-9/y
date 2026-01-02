@@ -277,6 +277,7 @@ const { ytplayCommand, ytsongCommand }= require('./commands/ytdl');
 const { chaneljidCommand }= require('./commands/chanel');
 const { connectFourCommand, handleConnectFourMove } = require('./commands/connect4');
 const pairCommand = require('./commands/pair');
+const addCommand = require('./commands/add');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -1284,8 +1285,12 @@ case userMessage === `${prefix}forfeit` ||
                 break;
             
 
-            case userMessage.startsWith(`${prefix}character`):
+            case userMessage.startsWith(`${prefix}rate`):
                 await characterCommand(sock, chatId, message);
+                break;
+
+            case userMessage.startsWith(`${prefix}add`):
+                await addCommand(sock, chatId, message);
                 break;
 
             case userMessage.startsWith(`${prefix}waste`):
