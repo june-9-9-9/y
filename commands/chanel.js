@@ -1,4 +1,4 @@
-async function channeljidCommand(sock, chatId, message) {
+async function chaneljidCommand(sock, chatId, message) {
     try {
         // Initial reaction 📢
         await sock.sendMessage(chatId, {
@@ -25,7 +25,7 @@ async function channeljidCommand(sock, chatId, message) {
             }
             else {
                 return await sock.sendMessage(chatId, { 
-                    text: '❌ Invalid channel link or JID\n\n📌 Usage:\n.song <song name>\n.channeljid <channel link or JID>' 
+                    text: '❌ Invalid channel link or JID\n\n📌 Usage:\n.song <song name>\n.chaneljid <channel link or JID>' 
                 }, { quoted: message });
             }
         }
@@ -37,7 +37,7 @@ async function channeljidCommand(sock, chatId, message) {
         // 3️⃣ Final validation
         if (!targetJid.endsWith('@newsletter')) {
             return await sock.sendMessage(chatId, {
-                text: '❌ This is not a WhatsApp channel/newsletter\n\n📌 Tip:\n.channeljid <channel link or JID>',
+                text: '❌ This is not a WhatsApp channel/newsletter\n\n📌 Tip:\n.chaneljid <channel link or JID>',
                 contextInfo: {
                     mentionedJid: [message.key.participant || chatId],
                     forwardingScore: 999,
@@ -72,7 +72,7 @@ async function channeljidCommand(sock, chatId, message) {
         });
 
     } catch (error) {
-        console.error('Error in channeljidCommand:', error);
+        console.error('Error in chaneljidCommand:', error);
         await sock.sendMessage(chatId, { 
             text: "Failed to fetch channel JID. Please try again later." 
         }, { quoted: message });
@@ -82,4 +82,4 @@ async function channeljidCommand(sock, chatId, message) {
     }
 }
 
-module.exports = channeljidCommand;
+module.exports = chaneljidCommand;
