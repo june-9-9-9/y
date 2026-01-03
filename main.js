@@ -1263,8 +1263,8 @@ case userMessage === `${prefix}forfeit` ||
                break;
 
                 
-        case userMessage.startsWith(`${prefix}nopromotion`) || 
-             userMessage.startsWith(`${prefix}antipromote`):
+        case userMessage.startsWith(`${prefix}antidemote`) || 
+             userMessage.startsWith(`${prefix}nodemote`):
              await antidemoteCommand(sock, chatId, message);
              sock.ev.on('group-participants.update', (event) => {
              handleDemoteEvent(sock, event);
