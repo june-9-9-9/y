@@ -34,9 +34,10 @@ async function chaneljidCommand(sock, chatId, message) {
         const args = text.trim().split(/\s+/).slice(1);
         const sender = message.key.participant || message.key.remoteJid;
 
-        let channelJid = null;
-        let channelMeta = null;
+        let targetJid = null;
+        let meta = null;
         let method = 'Unknown';
+        let type = 'Chat';
 
         // ─────────────────────────────
         // METHOD 1: Argument provided
@@ -45,83 +46,76 @@ async function chaneljidCommand(sock, chatId, message) {
             const input = normalizeInput(args[0]);
 
             if (input.endsWith('@newsletter')) {
-                // Case A: Direct JID
-                channelJid = input;
+                // Case A: Direct Channel JID
+                targetJid = input;
                 method = 'Direct JID';
-                channelMeta = await fetchMeta('jid', channelJid);
+                type = 'Channel';
+                meta = await fetchMeta('jid', targetJid);
             } else if (input.includes('whatsapp.com/channel/')) {
                 // Case B: Channel link
                 const inviteCode = input.split('/channel/')[1]?.split('?')[0]?.trim();
                 if (!inviteCode) throw new Error('Invalid channel link format');
                 method = 'Invite Link';
-                channelMeta = await fetchMeta('invite', inviteCode);
-                channelJid = channelMeta?.id;
+                type = 'Channel';
+                meta = await fetchMeta('invite', inviteCode);
+                targetJid = meta?.id;
             } else if (input.length > 10 && !input.includes('/')) {
                 // Case C: Raw invite code
                 method = 'Invite Code';
-                channelMeta = await fetchMeta('invite', input);
-                channelJid = channelMeta?.id;
+                type = 'Channel';
+                meta = await fetchMeta('invite', input);
+                targetJid = meta?.id;
             } else {
-                throw new Error('Invalid channel input');
+                // Case D: Assume raw JID (chat/group)
+                targetJid = input;
+                method = 'Raw JID';
+                type = targetJid.endsWith('@g.us') ? 'Group' : 'Chat';
             }
         }
 
         // ─────────────────────────────
-        // METHOD 2: Current chat
+        // METHOD 2: Current chat context
         // ─────────────────────────────
         else {
-            const currentJid = message.key.remoteJid;
-            if (!currentJid.endsWith('@newsletter')) {
-                return await sock.sendMessage(
-                    chatId,
-                    {
-                        text: `❌ This is not a WhatsApp channel
-
-📌 Usage:
-.channeljid <channel link | invite code | JID>
-
-💡 Tip:
-Run the command inside a channel to get its JID`
-                    },
-                    { quoted: message }
-                );
+            targetJid = message.key.remoteJid;
+            method = 'Current Context';
+            if (targetJid.endsWith('@newsletter')) {
+                type = 'Channel';
+                meta = await fetchMeta('jid', targetJid);
+            } else if (targetJid.endsWith('@g.us')) {
+                type = 'Group';
+            } else {
+                type = 'Chat';
             }
-            channelJid = currentJid;
-            method = 'Current Channel';
-            channelMeta = await fetchMeta('jid', channelJid);
         }
 
         // ─────────────────────────────
         // VALIDATION
         // ─────────────────────────────
-        if (!channelJid || !channelJid.endsWith('@newsletter')) {
-            throw new Error('Failed to resolve channel JID');
+        if (!targetJid) {
+            throw new Error('Failed to resolve JID');
         }
 
         // ─────────────────────────────
         // RESPONSE FORMAT
         // ─────────────────────────────
-        const response = `📡 *CHANNEL JID RESOLVED*
+        let response = `📡 *JID RESOLVED*\n\n🆔 JID:\n${targetJid}\n\n🛠 Method:\n${method}\n📂 Type:\n${type}`;
 
-🆔 JID:
-${channelJid}
-
-🛠 Method:
-${method}
-${channelMeta ? `
-📊 Channel Info:
-• Name: ${channelMeta.name || 'N/A'}
-• Subscribers: ${formatNumber(channelMeta.subscribers)}
-• Verified: ${channelMeta.verified ? '✅' : '❌'}
+        if (type === 'Channel' && meta) {
+            response += `\n\n📊 Channel Info:
+• Name: ${meta.name || 'N/A'}
+• Subscribers: ${formatNumber(meta.subscribers)}
+• Verified: ${meta.verified ? '✅' : '❌'}
 • Description:
-${shortenText(channelMeta.description)}` : ''}
+${shortenText(meta.description)}`;
+        }
 
-✅ Checklist:
+        response += `\n\n✅ Checklist:
 ✓ JID resolved
 ✓ Metadata optional
 ✓ Command executed successfully
 
-⚡ Silva MD Channel Tools`;
+⚡ Silva MD Tools`;
 
         await sock.sendMessage(chatId, { text: response }, { quoted: message });
 
@@ -131,19 +125,7 @@ ${shortenText(channelMeta.description)}` : ''}
         await sock.sendMessage(
             chatId,
             {
-                text: `❌ *Channel JID Resolution Failed*
-
-Reason:
-${err.message}
-
-Checklist:
-✓ Channel is public
-✓ Link or invite code is valid
-✓ Bot has internet access
-✓ You are subscribed to the channel
-
-📌 Usage:
-.channeljid <link | invite-code | JID>`
+                text: `❌ *JID Resolution Failed*\n\nReason:\n${err.message}\n\nChecklist:\n✓ Input is valid\n✓ Bot has internet access\n✓ You are subscribed (for channels)\n\n📌 Usage:\n.channeljid <link | invite-code | JID>`
             },
             { quoted: message }
         );
