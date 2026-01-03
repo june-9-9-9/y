@@ -76,9 +76,9 @@ async function facebookCommand(sock, chatId, message) {
 
         // Extract video URL from API response
         let fbvid = null;
-        let title = apiResult.answer.title;
+        let title = "";
 
-        if (apiResult && apiResult.result) {
+        if (apiResult && apiResult.answer) {
             // Check for HD quality first
             if (apiResult.answer.hd) {
                 fbvid = apiResult.answer.hd;
