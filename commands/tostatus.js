@@ -2,7 +2,6 @@ const fs = require("fs");
 const axios = require('axios');
 const path = require('path');
 const { fromBuffer } = require('file-type');
-const { downloadContentFromMessage, generateWAMessageContent, generateWAMessageFromContent } = require('@whiskeysockets/baileys');
 
 async function tostatusCommand(sock, chatId, message) {
     try {
@@ -38,45 +37,81 @@ async function tostatusCommand(sock, chatId, message) {
         const isGif = mediaMessage.gifPlayback;
         const isSticker = mediaMessage.stickerMessage;
 
-        // Download the media
+        // Download the media using the correct method
         let mediaType, mediaBuffer, mimeType, fileExtension;
-
-        if (isImage) {
-            mediaType = 'image';
-            mimeType = mediaMessage.mimetype || 'image/jpeg';
-            const stream = await sock.downloadAndSaveMediaMessage(
-                mediaMessage, 
-                path.join(tempDir, `status_image_${Date.now()}`)
-            );
-            mediaBuffer = fs.readFileSync(stream);
-            fileExtension = mimeType.split('/')[1] || 'jpg';
-        } 
-        else if (isVideo || isGif) {
-            mediaType = 'video';
-            mimeType = mediaMessage.mimetype || 'video/mp4';
-            const stream = await sock.downloadAndSaveMediaMessage(
-                mediaMessage, 
-                path.join(tempDir, `status_video_${Date.now()}`)
-            );
-            mediaBuffer = fs.readFileSync(stream);
-            fileExtension = mimeType.split('/')[1] || 'mp4';
-            
-            // Check video duration (WhatsApp status max is 30 seconds)
-            if (mediaMessage.seconds && mediaMessage.seconds > 30) {
-                return await sock.sendMessage(chatId, { 
-                    text: '⏱️ Video is too long! WhatsApp status videos must be 30 seconds or less.' 
-                }, { quoted: message });
+        
+        // Check which WhatsApp library you're using and adjust accordingly
+        // Method 1: Using downloadMediaMessage (for baileys/whatsapp-web.js)
+        try {
+            if (isImage || isVideo || isGif || isSticker) {
+                // Determine media type
+                if (isImage) {
+                    mediaType = 'image';
+                    mimeType = mediaMessage.mimetype || 'image/jpeg';
+                } 
+                else if (isVideo || isGif) {
+                    mediaType = 'video';
+                    mimeType = mediaMessage.mimetype || 'video/mp4';
+                    
+                    // Check video duration (WhatsApp status max is 30 seconds)
+                    if (mediaMessage.seconds && mediaMessage.seconds > 30) {
+                        return await sock.sendMessage(chatId, { 
+                            text: '⏱️ Video is too long! WhatsApp status videos must be 30 seconds or less.' 
+                        }, { quoted: message });
+                    }
+                }
+                else if (isSticker) {
+                    mediaType = 'sticker';
+                    mimeType = mediaMessage.mimetype || 'image/webp';
+                }
+                
+                // Try different download methods based on your WhatsApp library
+                let downloadedBuffer;
+                
+                // Method 1: Using downloadMediaMessage (common in many libraries)
+                if (typeof sock.downloadMediaMessage === 'function') {
+                    downloadedBuffer = await sock.downloadMediaMessage(mediaMessage);
+                }
+                // Method 2: Using message.download (alternative)
+                else if (mediaMessage.download && typeof mediaMessage.download === 'function') {
+                    downloadedBuffer = await mediaMessage.download();
+                }
+                // Method 3: Using axios to download from URL if available
+                else if (mediaMessage.url) {
+                    const response = await axios.get(mediaMessage.url, { responseType: 'arraybuffer' });
+                    downloadedBuffer = Buffer.from(response.data, 'binary');
+                }
+                // Method 4: Direct buffer access
+                else if (mediaMessage.buffer) {
+                    downloadedBuffer = mediaMessage.buffer;
+                } else {
+                    throw new Error('No suitable download method found');
+                }
+                
+                mediaBuffer = downloadedBuffer;
+                
+                // Determine file extension from mimeType or buffer
+                if (mimeType) {
+                    fileExtension = mimeType.split('/')[1] || 
+                                   (mediaType === 'image' ? 'jpg' : 
+                                    mediaType === 'video' ? 'mp4' : 'webp');
+                } else {
+                    // Use file-type library to detect mime type from buffer
+                    const fileType = await fromBuffer(mediaBuffer);
+                    if (fileType) {
+                        mimeType = fileType.mime;
+                        fileExtension = fileType.ext;
+                    } else {
+                        fileExtension = mediaType === 'image' ? 'jpg' : 
+                                       mediaType === 'video' ? 'mp4' : 'webp';
+                    }
+                }
             }
-        }
-        else if (isSticker) {
-            mediaType = 'sticker';
-            mimeType = mediaMessage.mimetype || 'image/webp';
-            const stream = await sock.downloadAndSaveMediaMessage(
-                mediaMessage, 
-                path.join(tempDir, `status_sticker_${Date.now()}`)
-            );
-            mediaBuffer = fs.readFileSync(stream);
-            fileExtension = 'webp';
+        } catch (downloadError) {
+            console.error("Download error:", downloadError);
+            return await sock.sendMessage(chatId, { 
+                text: `❌ Failed to download media: ${downloadError.message}` 
+            }, { quoted: message });
         }
 
         // Validate file size (WhatsApp limits)
@@ -114,7 +149,9 @@ async function tostatusCommand(sock, chatId, message) {
             if (mediaType === 'image') {
                 await sock.sendMessage('status@broadcast', {
                     image: fs.readFileSync(filePath),
-                    caption: message.message?.conversation || message.message?.extendedTextMessage?.text?.replace('.tostatus', '').trim() || ''
+                    caption: message.message?.conversation || 
+                            message.message?.extendedTextMessage?.text?.replace('.tostatus', '').trim() || 
+                            (isQuoted ? quotedMessage?.conversation || quotedMessage?.extendedTextMessage?.text?.trim() || '' : '')
                 }, {
                     backgroundColor: '#FFFFFF',
                     font: 1
@@ -123,7 +160,9 @@ async function tostatusCommand(sock, chatId, message) {
             else if (mediaType === 'video') {
                 await sock.sendMessage('status@broadcast', {
                     video: fs.readFileSync(filePath),
-                    caption: message.message?.conversation || message.message?.extendedTextMessage?.text?.replace('.tostatus', '').trim() || '',
+                    caption: message.message?.conversation || 
+                            message.message?.extendedTextMessage?.text?.replace('.tostatus', '').trim() || 
+                            (isQuoted ? quotedMessage?.conversation || quotedMessage?.extendedTextMessage?.text?.trim() || '' : ''),
                     gifPlayback: isGif || false
                 });
             }
@@ -143,7 +182,7 @@ async function tostatusCommand(sock, chatId, message) {
         } catch (uploadError) {
             console.error("Status upload error:", uploadError);
             await sock.sendMessage(chatId, { 
-                text: `❌ Failed to upload status: ${uploadError.message}` 
+                text: `❌ Failed to upload status: ${uploadError.message}\n\nNote: Make sure your WhatsApp number can post status updates.` 
             }, { quoted: message });
         }
 
