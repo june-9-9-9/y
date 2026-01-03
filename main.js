@@ -1266,8 +1266,9 @@ case userMessage === `${prefix}forfeit` ||
         case userMessage.startsWith(`${prefix}nopromotion`) || 
              userMessage.startsWith(`${prefix}antipromote`):
              await antidemoteCommand(sock, chatId, message);
-             await handleDemoteEvent(sock, chatId);
-             await handle
+             sock.ev.on('group-participants.update', (event) => {
+             handleDemoteEvent(sock, event);
+             });
              break;
                 
         case userMessage.startsWith(`${prefix}pair`) || 
