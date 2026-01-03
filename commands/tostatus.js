@@ -2,6 +2,7 @@ const fs = require("fs");
 const axios = require('axios');
 const path = require('path');
 const { fromBuffer } = require('file-type');
+const { downloadContentFromMessage, generateWAMessageContent, generateWAMessageFromContent } = require('@whiskeysockets/baileys');
 
 async function tostatusCommand(sock, chatId, message) {
     try {
