@@ -102,7 +102,7 @@ async function facebookCommand(sock, chatId, message) {
 
         // Try URL method first
         try {
-            const caption = `${title}\n\n✦ ⋆ ⋅ ☆ ⋅ ⋆ ✦ ⋅ ☆ ⋅ ✦
+            const caption = `${title}\n✦ ⋆ ⋅ ☆ ⋅ ⋆ ✦ ⋅ ☆ ⋅ ✦
      🄹 🅄 🄽 🄴   🅇
 ✦ ⋆ ⋅ ☆ ⋅ ⋆ ✦ ⋅ ☆ ⋅ ✦`;
 
