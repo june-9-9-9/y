@@ -11,7 +11,7 @@ function createFakeContact(message) {
         },
         message: {
             contactMessage: {
-                displayName: "DAVE-X",
+                displayName: "🄹 🅄 🄽 🄴   🅇",
                 vcard: `BEGIN:VCARD\nVERSION:3.0\nN:Sy;Bot;;;\nFN:DAVE-X\nitem1.TEL;waid=${message.key.participant?.split('@')[0] || message.key.remoteJid.split('@')[0]}:${message.key.participant?.split('@')[0] || message.key.remoteJid.split('@')[0]}\nitem1.X-ABLabel:Phone\nEND:VCARD`
             }
         },
