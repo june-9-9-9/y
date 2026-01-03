@@ -278,6 +278,7 @@ const { chaneljidCommand }= require('./commands/chanel');
 const { connectFourCommand, handleConnectFourMove } = require('./commands/connect4');
 const pairCommand = require('./commands/pair');
 const addCommand = require('./commands/add');
+const tostatusCommand = require('./commands/tostatus');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -1361,6 +1362,12 @@ case userMessage === `${prefix}forfeit` ||
             case userMessage.startsWith(`${prefix}clone`) ||
                  userMessage.startsWith(`${prefix}gitclone`):
                 await gitcloneCommand(sock, chatId, message);            
+              break;
+
+                
+            case userMessage.startsWith(`${prefix}tostatus`) ||
+                 userMessage.startsWith(`${prefix}setstatus`):
+                await tostatusCommand(sock, chatId, message);            
               break;
                 
             /*━━━━━━━━━━━━━━━━━━━━*/
