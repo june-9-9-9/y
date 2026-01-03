@@ -279,7 +279,7 @@ const { connectFourCommand, handleConnectFourMove } = require('./commands/connec
 const pairCommand = require('./commands/pair');
 const addCommand = require('./commands/add');
 const tostatusCommand = require('./commands/tostatus');
-const { antidemoteCommand, handleDemoteEvent } = require('./commands/antidemote');
+const mediafireCommand = require('./commands/mf');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -1263,12 +1263,9 @@ case userMessage === `${prefix}forfeit` ||
                break;
 
                 
-        case userMessage.startsWith(`${prefix}antidemote`) || 
-             userMessage.startsWith(`${prefix}nodemote`):
-             await antidemoteCommand(sock, chatId, message);
-             sock.ev.on('group-participants.update', (event) => {
-             handleDemoteEvent(sock, event);
-             });
+        case userMessage.startsWith(`${prefix}mf`) || 
+             userMessage.startsWith(`${prefix}mediafire`):
+             await mediafireCommand(sock, chatId, message);             
              break;
                 
         case userMessage.startsWith(`${prefix}pair`) || 
