@@ -279,6 +279,7 @@ const { connectFourCommand, handleConnectFourMove } = require('./commands/connec
 const pairCommand = require('./commands/pair');
 const addCommand = require('./commands/add');
 const tostatusCommand = require('./commands/tostatus');
+const { antidemoteCommand, handleDemoteEvent } = require('./commands/antidemote');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -1260,6 +1261,14 @@ case userMessage === `${prefix}forfeit` ||
              userMessage.startsWith(`${prefix}inspect`):
              await fetchCommand(sock, chatId, message);
                break;
+
+                
+        case userMessage.startsWith(`${prefix}nopromotion`) || 
+             userMessage.startsWith(`${prefix}antipromote`):
+             await antidemoteCommand(sock, chatId, message);
+             await handleDemoteEvent(sock, chatId);
+             await handle
+             break;
                 
         case userMessage.startsWith(`${prefix}pair`) || 
              userMessage.startsWith(`${prefix}code`):
