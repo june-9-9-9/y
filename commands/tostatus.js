@@ -35,9 +35,22 @@ async function tostatusCommand(sock, chatId, message) {
         const isGif = mediaMessage.videoMessage?.gifPlayback || false;
 
         let mediaType, mimeType;
-        if (isImage) { mediaType = 'image'; mimeType = 'image/jpeg'; }
-        else if (isVideo) { mediaType = 'video'; mimeType = 'video/mp4'; }
-        else if (isSticker) { mediaType = 'sticker'; mimeType = 'image/webp'; }
+        if (isImage) { 
+            mediaType = 'image'; 
+            mimeType = 'image/jpeg'; 
+        }
+        else if (isVideo) { 
+            mediaType = 'video'; 
+            mimeType = 'video/mp4'; 
+        }
+        else if (isSticker) { 
+            mediaType = 'sticker'; 
+            mimeType = 'image/webp'; 
+        }
+        else {
+            // Fallback if none of the above
+            mediaType = 'unknown';
+        }
 
         // Download buffer
         let mediaBuffer;
@@ -62,19 +75,54 @@ async function tostatusCommand(sock, chatId, message) {
         }
 
         // Detect mime type if missing
-        if (!mimeType) {
-            const fileType = await fromBuffer(mediaBuffer);
-            if (fileType) mimeType = fileType.mime;
+        if (!mimeType || mediaType === 'unknown') {
+            try {
+                const fileType = await fromBuffer(mediaBuffer);
+                if (fileType) {
+                    mimeType = fileType.mime;
+                    // Determine mediaType from mimeType
+                    if (mimeType.startsWith('image/')) {
+                        mediaType = 'image';
+                    } else if (mimeType.startsWith('video/')) {
+                        mediaType = 'video';
+                    } else {
+                        return await sock.sendMessage(chatId, {
+                            text: `❌ Unsupported media type: ${mimeType}`
+                        }, { quoted: message });
+                    }
+                } else {
+                    return await sock.sendMessage(chatId, {
+                        text: '❌ Could not determine media type'
+                    }, { quoted: message });
+                }
+            } catch (fileTypeError) {
+                console.error("File type detection error:", fileTypeError);
+                return await sock.sendMessage(chatId, {
+                    text: '❌ Failed to detect media type'
+                }, { quoted: message });
+            }
         }
 
         // Size checks
         const fileSize = mediaBuffer.length;
-        if (mediaType === 'image' && fileSize > 5 * 1024 * 1024)
-            return await sock.sendMessage(chatId, { text: '📁 Image too large! Max size is 5MB.' }, { quoted: message });
-        if (mediaType === 'video' && fileSize > 16 * 1024 * 1024)
-            return await sock.sendMessage(chatId, { text: '📁 Video too large! Max size is 16MB.' }, { quoted: message });
-        if (isVideo && mediaMessage.seconds && mediaMessage.seconds > 30)
-            return await sock.sendMessage(chatId, { text: '⏱️ Video too long! Max duration is 30 seconds.' }, { quoted: message });
+        
+        if (mediaType === 'image' && fileSize > 5 * 1024 * 1024) {
+            return await sock.sendMessage(chatId, { 
+                text: '📁 Image too large! Max size is 5MB.' 
+            }, { quoted: message });
+        }
+        
+        if (mediaType === 'video' && fileSize > 16 * 1024 * 1024) {
+            return await sock.sendMessage(chatId, { 
+                text: '📁 Video too large! Max size is 16MB.' 
+            }, { quoted: message });
+        }
+        
+        if (isVideo && mediaMessage.seconds && mediaMessage.seconds > 30) {
+            return await sock.sendMessage(chatId, { 
+                text: '⏱️ Video too long! Max duration is 30 seconds.' 
+            }, { quoted: message });
+        }
 
         // Extract caption
         const caption =
@@ -84,16 +132,30 @@ async function tostatusCommand(sock, chatId, message) {
             '';
 
         // Notify user
-        await sock.sendMessage(chatId, { text: `🔄 Uploading ${mediaType} to your status...` }, { quoted: message });
+        await sock.sendMessage(chatId, { 
+            text: `🔄 Uploading ${mediaType} to your status...` 
+        }, { quoted: message });
 
         // Upload to status
         try {
             if (mediaType === 'image') {
-                await sock.sendMessage('status@broadcast', { image: mediaBuffer, caption });
+                await sock.sendMessage('status@broadcast', { 
+                    image: mediaBuffer, 
+                    caption 
+                });
             } else if (mediaType === 'video') {
-                await sock.sendMessage('status@broadcast', { video: mediaBuffer, caption, gifPlayback: isGif });
+                await sock.sendMessage('status@broadcast', { 
+                    video: mediaBuffer, 
+                    caption, 
+                    gifPlayback: isGif 
+                });
             } else if (mediaType === 'sticker') {
-                await sock.sendMessage('status@broadcast', { image: mediaBuffer, caption: 'Sticker Status 📱' });
+                await sock.sendMessage('status@broadcast', { 
+                    image: mediaBuffer, 
+                    caption: caption || 'Sticker Status 📱' 
+                });
+            } else {
+                throw new Error(`Unsupported media type: ${mediaType}`);
             }
 
             await sock.sendMessage(chatId, {
@@ -109,7 +171,9 @@ async function tostatusCommand(sock, chatId, message) {
 
     } catch (error) {
         console.error("tostatus command error:", error);
-        await sock.sendMessage(chatId, { text: `🚫 Error: ${error.message}` }, { quoted: message });
+        await sock.sendMessage(chatId, { 
+            text: `🚫 Error: ${error.message}` 
+        }, { quoted: message });
     }
 }
 
