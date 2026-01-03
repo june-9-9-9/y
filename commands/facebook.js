@@ -56,7 +56,7 @@ async function facebookCommand(sock, chatId, message) {
         });
 
         // Use new API
-        const apiUrl = `https://apiskeith.vercel.app/download/fbdown?url=${encodeURIComponent(url)}`;
+        const apiUrl = `https://meta-api.zone.id/downloader/fbdlv2?url=${encodeURIComponent(url)}`;
         let apiResult;
 
         try {
@@ -76,21 +76,21 @@ async function facebookCommand(sock, chatId, message) {
 
         // Extract video URL from API response
         let fbvid = null;
-        let title = "Facebook Video";
+        let title = apiResult.answer.title;
 
         if (apiResult && apiResult.result) {
             // Check for HD quality first
-            if (apiResult.result.hd) {
-                fbvid = apiResult.result.hd;
-            } else if (apiResult.result.sd) {
-                fbvid = apiResult.result.sd;
-            } else if (apiResult.result.url) {
-                fbvid = apiResult.result.url;
+            if (apiResult.answer.hd) {
+                fbvid = apiResult.answer.hd;
+            } else if (apiResult.answer.sd) {
+                fbvid = apiResult.answer.sd;
+            } else if (apiResult.answer.url) {
+                fbvid = apiResult.answer.url;
             }
 
             // Extract title if available
-            if (apiResult.result.title) {
-                title = apiResult.result.title;
+            if (apiResult.answer.title) {
+                title = apiResult.answer.title;
             }
         }
 
