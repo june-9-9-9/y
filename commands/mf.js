@@ -48,7 +48,7 @@ async function mediafireCommand(sock, chatId, message) {
 
     if (!url) {
         return sock.sendMessage(chatId, { 
-            text: "Provide mediafire link after .mediafire"
+            text: "Provide mediafire link...\nmediafire https://www.mediafire.com/..."
         }, { quoted: fake });
     }
 
@@ -73,7 +73,7 @@ async function mediafireCommand(sock, chatId, message) {
             },
             fileName: fileInfo[0].nama,
             mimetype: fileInfo[0].mime,
-            caption: `*${fileInfo[0].nama}*\nSize: ${fileInfo[0].size}\n`,
+            caption: `*${fileInfo[0].nama}*\n`,
         }, { quoted: fake });
 
     } catch (error) {
