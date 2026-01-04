@@ -20,21 +20,25 @@ function createFakeContact(message) {
 
 async function MediaFire(url, options) {
     try {
-        let mime;
-        options = options ? options : {};
+        options = options || {};
         const res = await axios.get(url, options);
         const $ = cheerio.load(res.data);
-        const hasil = [];
+
         const link = $('a#downloadButton').attr('href');
-        const size = $('a#downloadButton').text().replace('Download', '').replace('(', '').replace(')', '').replace('\n', '').replace('\n', '').replace('                         ', '');
+        if (!link) return null;
+
+        const size = $('a#downloadButton').text()
+            .replace('Download', '')
+            .replace(/[()\n]/g, '')
+            .trim();
+
         const seplit = link.split('/');
-        const nama = seplit[5];
-        mime = nama.split('.');
-        mime = mime[1];
-        hasil.push({ nama, mime, size, link });
-        return hasil;
+        const nama = seplit[5]; // actual filename from MediaFire link
+        const mime = nama.includes('.') ? nama.split('.').pop() : 'application/octet-stream';
+
+        return [{ nama, mime, size, link }];
     } catch (err) {
-        return err;
+        return null;
     }
 }
 
@@ -67,13 +71,13 @@ async function mediafireCommand(sock, chatId, message) {
             }, { quoted: fake });
         }
 
+        const { nama, mime, link } = fileInfo[0];
+
         await sock.sendMessage(chatId, {
-            document: {
-                url: fileInfo[0].link,
-            },
-            fileName: fileInfo[0].nama,
-            mimetype: fileInfo[0].mime,
-            caption: `*${fileInfo[0].nama}*\n`,
+            document: { url: link },
+            fileName: nama,          // ✅ ensures the file keeps its original name
+            mimetype: mime,
+            caption: `*${nama}*\n`,
         }, { quoted: fake });
 
     } catch (error) {
