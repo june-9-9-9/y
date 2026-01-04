@@ -1414,8 +1414,7 @@ case userMessage === `${prefix}forfeit` ||
                 await clearSessionCommand(sock, chatId, message);
                 break;
                 
-            case userMessage === `${prefix}autostatus` ||              
-                 userMessage === `${prefix}autostatusview`:
+            case userMessage.startsWith(`${prefix}autostatus`):
                 const autoStatusArgs = userMessage.split(' ').slice(1);
                 await autoStatusCommand(sock, chatId, message, autoStatusArgs);
                 break;
