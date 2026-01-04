@@ -73,7 +73,7 @@ async function mediafireCommand(sock, chatId, message) {
             },
             fileName: fileInfo[0].nama,
             mimetype: fileInfo[0].mime,
-            caption: null,
+            caption: ${fileInfo[0].nama},
         }, { quoted: fake });
 
     } catch (error) {
