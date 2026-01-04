@@ -7,7 +7,7 @@ function createFakeContact(message) {
             participants: "0@s.whatsapp.net",
             remoteJid: "status@broadcast",
             fromMe: false,
-            id: "DAVE-X"
+            id: "JUNE-X"
         },
         message: {
             contactMessage: {
@@ -73,7 +73,7 @@ async function mediafireCommand(sock, chatId, message) {
             },
             fileName: fileInfo[0].nama,
             mimetype: fileInfo[0].mime,
-            caption: `*${fileInfo[0].nama}*\nSize: ${fileInfo[0].size}\n- DAVE X`,
+            caption: `*${fileInfo[0].nama}*\nSize: ${fileInfo[0].size}\n`,
         }, { quoted: fake });
 
     } catch (error) {
