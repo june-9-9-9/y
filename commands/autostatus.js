@@ -21,7 +21,7 @@ if (!fs.existsSync(configPath)) {
     fs.writeFileSync(configPath, JSON.stringify({ 
         enabled: false, 
         reactOn: false,
-        emoji: '💚' // Default emoji
+        emoji: '💘' // Default emoji
     }));
 }
 
@@ -82,7 +82,7 @@ async function autoStatusCommand(sock, chatId, msg, args) {
                 config.reactOn = true;
                 fs.writeFileSync(configPath, JSON.stringify(config));
                 await sock.sendMessage(chatId, { 
-                    text: `💫 Status reactions have been enabled!\nBot will now react to status updates with emoji: ${config.emoji || '💚'}`,
+                    text: `Status reactions have been enabled!\n\nBot react to status updates with emoji: ${config.emoji || '💚'}`,
                     ...channelInfo
                 });
             } else if (reactCommand === 'off') {
@@ -127,12 +127,12 @@ async function autoStatusCommand(sock, chatId, msg, args) {
             
             const reactStatus = config.reactOn ? 'enabled' : 'disabled';
             await sock.sendMessage(chatId, { 
-                text: `✅ Status reaction emoji set to: ${emoji}\n\nStatus reactions: ${reactStatus}\nWhen reactions are enabled, bot will use this emoji to react to status updates.`,
+                text: `✅ Status reaction emoji set to: ${emoji}\n\nStatus reactions: ${reactStatus}\n`,
                 ...channelInfo
             }, { quoted: msg });
         } else {
             await sock.sendMessage(chatId, { 
-                text: '❌ Invalid command! Use:\n.autostatus on/off - Enable/disable auto status view\n.autostatus react on/off - Enable/disable status reactions\n.autostatus emoji [emoji] - Set reaction emoji\nExample: .autostatus emoji 🤍',
+                text: '❌ Invalid command! Use:\n.autostatus on/off - Enable/disable\n.autostatus react on/off - Enable/disable reactions\n.autostatus emoji [emoji] - reaction emoji\nExample: .autostatus emoji 🤍',
                 ...channelInfo
             }, { quoted: msg });
         }
@@ -172,10 +172,10 @@ function isStatusReactionEnabled() {
 function getStatusEmoji() {
     try {
         const config = JSON.parse(fs.readFileSync(configPath));
-        return config.emoji || '💚'; // Default to green heart if not set
+        return config.emoji || '💘'; // Default to green heart if not set
     } catch (error) {
         console.error('Error getting status emoji:', error);
-        return '💚';
+        return '💘';
     }
 }
 
