@@ -4,7 +4,7 @@ const path = require('path');
 const channelInfo = {
     contextInfo: {
         forwardingScore: 1,
-        isForwarded: true,
+        isForwarded: false,
         forwardedNewsletterMessageInfo: {
             newsletterJid: '',
             newsletterName: '',
@@ -32,7 +32,7 @@ async function autoStatusCommand(sock, chatId, msg, args) {
             await sock.sendMessage(chatId, { 
                 text: '❌ This command can only be used by the owner!',
                 ...channelInfo
-            });
+            }, { quoted: msg });
             return;
         }
 
@@ -46,7 +46,7 @@ async function autoStatusCommand(sock, chatId, msg, args) {
             await sock.sendMessage(chatId, { 
                 text: `🔄 *Auto Status Settings*\n\n📱 *Auto Status View:* ${status}\n💫 *Status Reactions:* ${reactStatus}\n🎯 *Reaction Emoji:* ${config.emoji || '💚'}\n\n*Commands:*\n.autostatus on - Enable auto status view\n.autostatus off - Disable auto status view\n.autostatus react on - Enable status reactions\n.autostatus react off - Disable status reactions\n.autostatus emoji [emoji] - Set reaction emoji\nExample: .autostatus emoji 🤍`,
                 ...channelInfo
-            });
+            }, { quoted: msg });
             return;
         }
 
@@ -66,14 +66,14 @@ async function autoStatusCommand(sock, chatId, msg, args) {
             await sock.sendMessage(chatId, { 
                 text: '❌ Auto status view has been disabled!\nBot will no longer automatically view statuses.',
                 ...channelInfo
-            });
+            }, { quoted: msg });
         } else if (command === 'react') {
             // Handle react subcommand
             if (!args[1]) {
                 await sock.sendMessage(chatId, { 
                     text: '❌ Please specify on/off for reactions!\nUse: .autostatus react on/off',
                     ...channelInfo
-                });
+                }, { quoted: msg });
                 return;
             }
             
@@ -91,12 +91,12 @@ async function autoStatusCommand(sock, chatId, msg, args) {
                 await sock.sendMessage(chatId, { 
                     text: '❌ Status reactions have been disabled!\nBot will no longer react to status updates.',
                     ...channelInfo
-                });
+                }, { quoted: msg });
             } else {
                 await sock.sendMessage(chatId, { 
                     text: '❌ Invalid reaction command! Use: .autostatus react on/off',
                     ...channelInfo
-                });
+                }, { quoted: msg });
             }
         } else if (command === 'emoji') {
             // Handle emoji subcommand
@@ -104,7 +104,7 @@ async function autoStatusCommand(sock, chatId, msg, args) {
                 await sock.sendMessage(chatId, { 
                     text: `❌ Please specify an emoji!\nCurrent emoji: ${config.emoji || '💚'}\nUse: .autostatus emoji [emoji]\nExample: .autostatus emoji 🤍`,
                     ...channelInfo
-                });
+                }, { quoted: msg });
                 return;
             }
             
@@ -118,7 +118,7 @@ async function autoStatusCommand(sock, chatId, msg, args) {
                 await sock.sendMessage(chatId, { 
                     text: '❌ Please provide a valid emoji (1-2 characters max)!\nExample: 🤍, 💚, 👍, ❤️',
                     ...channelInfo
-                });
+                }, { quoted: msg });
                 return;
             }
             
@@ -129,12 +129,12 @@ async function autoStatusCommand(sock, chatId, msg, args) {
             await sock.sendMessage(chatId, { 
                 text: `✅ Status reaction emoji set to: ${emoji}\n\nStatus reactions: ${reactStatus}\nWhen reactions are enabled, bot will use this emoji to react to status updates.`,
                 ...channelInfo
-            });
+            }, { quoted: msg });
         } else {
             await sock.sendMessage(chatId, { 
                 text: '❌ Invalid command! Use:\n.autostatus on/off - Enable/disable auto status view\n.autostatus react on/off - Enable/disable status reactions\n.autostatus emoji [emoji] - Set reaction emoji\nExample: .autostatus emoji 🤍',
                 ...channelInfo
-            });
+            }, { quoted: msg });
         }
 
     } catch (error) {
@@ -142,7 +142,7 @@ async function autoStatusCommand(sock, chatId, msg, args) {
         await sock.sendMessage(chatId, { 
             text: '❌ Error occurred while managing auto status!\n' + error.message,
             ...channelInfo
-        });
+        }, { quoted: msg });
     }
 }
 
