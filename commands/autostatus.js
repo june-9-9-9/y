@@ -41,10 +41,10 @@ async function autoStatusCommand(sock, chatId, msg, args) {
 
         // If no arguments, show current status
         if (!args || args.length === 0) {
-            const status = config.enabled ? 'enabled' : 'disabled';
-            const reactStatus = config.reactOn ? 'enabled' : 'disabled';
+            const status = config.enabled ? 'ON ✅' : 'OFF 🚫';
+            const reactStatus = config.reactOn ? 'ON' : 'OFF';
             await sock.sendMessage(chatId, { 
-                text: `🔄 *Auto Status Settings*\n\n📱 *Auto Status View:* ${status}\n💫 *Status Reactions:* ${reactStatus}\n🎯 *Reaction Emoji:* ${config.emoji || '💚'}\n\n*Commands:*\n.autostatus on - Enable auto status view\n.autostatus off - Disable auto status view\n.autostatus react on - Enable status reactions\n.autostatus react off - Disable status reactions\n.autostatus emoji [emoji] - Set reaction emoji\nExample: .autostatus emoji 🤍`,
+                text: `*Auto Status Settings*\n\n*Auto Status View:* ${status}\n*Status Reactions:* ${reactStatus}\n*Reaction Emoji:* ${config.emoji || '💘'}\n\n*Commands:*\n.autostatus on/off - Enable/disable\n.autostatus react on/off - Enable/disable status reaction\n.autostatus emoji [emoji] - Set reaction emoji\n\nExample: .autostatus emoji 🤍`,
                 ...channelInfo
             }, { quoted: msg });
             return;
