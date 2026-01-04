@@ -11,7 +11,7 @@ function createFakeContact(message) {
         },
         message: {
             contactMessage: {
-                vcard: `BEGIN:VCARD\nVERSION:3.0\nN:Sy;Bot;;;\nFN:JUNE X\nitem1.TEL;waid=${message.key.participant?.split('@')[0] || message.key.remoteJid.split('@')[0]}:${message.key.participant?.split('@')[0] || message.key.remoteJid.split('@')[0]}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`
+                vcard: BEGIN:VCARD\nVERSION:3.0\nN:Sy;Bot;;;\nFN:JUNE X\nitem1.TEL;waid=${message.key.participant?.split('@')[0] || message.key.remoteJid.split('@')[0]}:${message.key.participant?.split('@')[0] || message.key.remoteJid.split('@')[0]}\nitem1.X-ABLabel:Ponsel\nEND:VCARD
             }
         },
         participant: "0@s.whatsapp.net"
@@ -20,25 +20,21 @@ function createFakeContact(message) {
 
 async function MediaFire(url, options) {
     try {
-        options = options || {};
+        let mime;
+        options = options ? options : {};
         const res = await axios.get(url, options);
         const $ = cheerio.load(res.data);
-
+        const hasil = [];
         const link = $('a#downloadButton').attr('href');
-        if (!link) return null;
-
-        const size = $('a#downloadButton').text()
-            .replace('Download', '')
-            .replace(/[()\n]/g, '')
-            .trim();
-
+        const size = $('a#downloadButton').text().replace('Download', '').replace('(', '').replace(')', '').replace('\n', '').replace('\n', '').replace('                         ', '');
         const seplit = link.split('/');
-        const nama = seplit[5]; // actual filename from MediaFire link
-        const mime = nama.includes('.') ? nama.split('.').pop() : 'application/octet-stream';
-
-        return [{ nama, mime, size, link }];
+        const nama = seplit[5];
+        mime = nama.split('.');
+        mime = mime[1];
+        hasil.push({ nama, mime, size, link });
+        return hasil;
     } catch (err) {
-        return null;
+        return err;
     }
 }
 
@@ -71,13 +67,13 @@ async function mediafireCommand(sock, chatId, message) {
             }, { quoted: fake });
         }
 
-        const { nama, mime, link } = fileInfo[0];
-
         await sock.sendMessage(chatId, {
-            document: { url: link },
-            fileName: nama,          // ✅ ensures the file keeps its original name
-            mimetype: mime,
-            caption: `*${nama}*\n`,
+            document: {
+                url: fileInfo[0].link,
+            },
+            fileName: fileInfo[0].nama,
+            mimetype: fileInfo[0].mime,
+            caption: null,
         }, { quoted: fake });
 
     } catch (error) {
