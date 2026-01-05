@@ -1,3 +1,5 @@
+const isAdmin = require('../lib/isAdmin');
+
 async function kickAllCommand(sock, chatId, message) {
     try {
         const isOwner = message.key.fromMe;
@@ -28,11 +30,11 @@ async function kickAllCommand(sock, chatId, message) {
             return;
         }
 
-        // Check if user is group admin
+        // Check if user is group admin using isAdmin function
         const senderId = message.key.participant || message.key.remoteJid;
-        const senderParticipant = chat.participants.find(p => p.id === senderId);
+        const isUserAdmin = await isAdmin(sock, chatId, senderId);
         
-        if (!senderParticipant || !['admin', 'superadmin'].includes(senderParticipant.admin)) {
+        if (!isUserAdmin) {
             await sock.sendMessage(chatId, { 
                 text: '❌ You need to be a group admin to use this command!',
                 quoted: message
@@ -40,9 +42,11 @@ async function kickAllCommand(sock, chatId, message) {
             return;
         }
 
-        // Check if bot is admin
-        const botParticipant = chat.participants.find(p => p.id.includes(sock.user.id.split(':')[0]));
-        if (!botParticipant || !['admin', 'superadmin'].includes(botParticipant.admin)) {
+        // Check if bot is admin using isAdmin function
+        const botJid = sock.user.id;
+        const isBotAdmin = await isAdmin(sock, chatId, botJid);
+        
+        if (!isBotAdmin) {
             await sock.sendMessage(chatId, { 
                 text: '❌ I need to be a group admin to kick members!',
                 quoted: message
