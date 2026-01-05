@@ -27,11 +27,11 @@ async function gpt4Command(sock, chatId, message) {
         await sock.sendPresenceUpdate('composing', chatId);
 
         // Fetch AI response
-        const apiUrl = `https://apis.davidcyriltech.my.id/ai/metaai?text=${encodeURIComponent(query)}`;
+        const apiUrl = `https://meta-api.zone.id/ai/chatgptfree?prompt=${encodeURIComponent(query)}&hello=chatgpt4`;
         const response = await axios.get(apiUrl, { timeout: 30000 });
         const apiData = response.data;
 
-        if (!apiData.success || !apiData.response) {
+        if (!apiData.responseTime || !apiData.answer) {
             throw new Error("API failed to generate response!");
         }
 
