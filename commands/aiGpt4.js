@@ -4,7 +4,7 @@ async function gpt4Command(sock, chatId, message) {
     try {
         // Send reaction
         await sock.sendMessage(chatId, {
-            react: { text: '🤖', key: message.key }
+            react: { text: '💭', key: message.key }
         });
 
         const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
@@ -92,7 +92,7 @@ async function gpt4Command(sock, chatId, message) {
 
         // Format and send response
         await sock.sendMessage(chatId, {
-            text: `🤖 *GPT-4*\n\n📝 *Question:* ${query}\n\n💬 *Response:* ${aiResponse}\n\n📊 *Powered by OpenAI*`
+            text: `🤔 *GPT-4*\n\n📝 *Question:* ${query}\n\n💬 *Response:* ${aiResponse}\n\n📊 *Powered by OpenAI & Gpt-4*`
         }, { quoted: message });
 
     } catch (error) {
