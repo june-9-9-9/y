@@ -27,7 +27,7 @@ async function gpt4Command(sock, chatId, message) {
         await sock.sendPresenceUpdate('composing', chatId);
 
         // Fetch AI response
-        const apiUrl = `https://meta-api.zone.id/ai/chatgptfree?prompt=${encodeURIComponent(query)}&hello=chatgpt4`;
+        const apiUrl = `https://meta-api.zone.id/ai/chatgptfree?prompt=${encodeURIComponent(query)}`;
         const response = await axios.get(apiUrl, { timeout: 30000 });
         const apiData = response.data;
 
