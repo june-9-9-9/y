@@ -22,8 +22,8 @@ async function lyricsCommand(sock, chatId, songTitle, message) {
         }
         
         const data = await res.json();
-        const lyrics = data?.result?.lyrics;
-        const songInfo = data?.result;
+        const lyrics = data?.data?. plainLyrics;
+        const songInfo = data?.data;
         
         if (!lyrics) {
             await sock.sendMessage(chatId, {
