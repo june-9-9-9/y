@@ -15,6 +15,12 @@ async function downloadMediaMessage(message, mediaType) {
 }
 
 async function tagCommand(sock, chatId, senderId, messageText, replyMessage) {
+    // ✅ Restrict to groups only
+    if (!chatId.endsWith('@g.us')) {
+        await sock.sendMessage(chatId, { text: 'This command can only be used in groups.' });
+        return;
+    }
+
     const { isSenderAdmin, isBotAdmin } = await isAdmin(sock, chatId, senderId);
 
     if (!isBotAdmin) {
@@ -38,7 +44,6 @@ async function tagCommand(sock, chatId, senderId, messageText, replyMessage) {
     if (replyMessage) {
         let messageContent = {};
 
-        // Handle image messages
         if (replyMessage.imageMessage) {
             const filePath = await downloadMediaMessage(replyMessage.imageMessage, 'image');
             messageContent = {
@@ -46,25 +51,19 @@ async function tagCommand(sock, chatId, senderId, messageText, replyMessage) {
                 caption: messageText || replyMessage.imageMessage.caption || '',
                 mentions: mentionedJidList
             };
-        }
-        // Handle video messages
-        else if (replyMessage.videoMessage) {
+        } else if (replyMessage.videoMessage) {
             const filePath = await downloadMediaMessage(replyMessage.videoMessage, 'video');
             messageContent = {
                 video: { url: filePath },
                 caption: messageText || replyMessage.videoMessage.caption || '',
                 mentions: mentionedJidList
             };
-        }
-        // Handle text messages
-        else if (replyMessage.conversation || replyMessage.extendedTextMessage) {
+        } else if (replyMessage.conversation || replyMessage.extendedTextMessage) {
             messageContent = {
                 text: replyMessage.conversation || replyMessage.extendedTextMessage.text,
                 mentions: mentionedJidList
             };
-        }
-        // Handle document messages
-        else if (replyMessage.documentMessage) {
+        } else if (replyMessage.documentMessage) {
             const filePath = await downloadMediaMessage(replyMessage.documentMessage, 'document');
             messageContent = {
                 document: { url: filePath },
