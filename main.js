@@ -280,6 +280,7 @@ const pairCommand = require('./commands/pair');
 const addCommand = require('./commands/add');
 const tostatusCommand = require('./commands/tostatus');
 const mediafireCommand = require('./commands/mf');
+const deepseekCommand = require('./commands/deepseek');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -661,6 +662,10 @@ if (/^[1-9]$/.test(userMessage)) {
                 
             case userMessage.startsWith(`${prefix}ai`):
                 await gpt4Command(sock, chatId, message);
+                break;
+                
+            case userMessage.startsWith(`${prefix}deepseek`):
+                await deepseekCommand(sock, chatId, message);
                 break;
        
             case userMessage.startsWith(`${prefix}unban`):
