@@ -9,9 +9,8 @@ async function kickAllCommand(sock, chatId, message) {
             return;
         }
 
-        // Get group metadata
-        const chat = await sock.groupMetadata(chatId).catch(() => null);
-        if (!chat) {
+        // Check if it's a group chat
+        if (!chatId.includes('@g.us')) {
             await sock.sendMessage(chatId, { 
                 text: '❌ This command only works in groups!',
                 quoted: message
@@ -19,13 +18,33 @@ async function kickAllCommand(sock, chatId, message) {
             return;
         }
 
+        // Get group metadata
+        const chat = await sock.groupMetadata(chatId).catch(() => null);
+        if (!chat) {
+            await sock.sendMessage(chatId, { 
+                text: '❌ Failed to fetch group information. Make sure I am still in the group!',
+                quoted: message
+            });
+            return;
+        }
+
         // Check if user is group admin
-        const isAdmin = chat.participants.find(
-            p => p.id === (message.key.participant || message.key.remoteJid)
-        )?.admin;
-        if (!isAdmin) {
+        const senderId = message.key.participant || message.key.remoteJid;
+        const senderParticipant = chat.participants.find(p => p.id === senderId);
+        
+        if (!senderParticipant || !['admin', 'superadmin'].includes(senderParticipant.admin)) {
             await sock.sendMessage(chatId, { 
                 text: '❌ You need to be a group admin to use this command!',
+                quoted: message
+            });
+            return;
+        }
+
+        // Check if bot is admin
+        const botParticipant = chat.participants.find(p => p.id.includes(sock.user.id.split(':')[0]));
+        if (!botParticipant || !['admin', 'superadmin'].includes(botParticipant.admin)) {
+            await sock.sendMessage(chatId, { 
+                text: '❌ I need to be a group admin to kick members!',
                 quoted: message
             });
             return;
@@ -34,7 +53,7 @@ async function kickAllCommand(sock, chatId, message) {
         // Get all participants except the bot and the command sender
         const participants = chat.participants.filter(p => {
             if (p.id.includes(sock.user.id.split(':')[0])) return false; // exclude bot
-            if (p.id === (message.key.participant || message.key.remoteJid)) return false; // exclude sender
+            if (p.id === senderId) return false; // exclude sender
             return true;
         });
 
@@ -72,8 +91,18 @@ async function kickAllCommand(sock, chatId, message) {
             console.log(`✅ Kick All Complete: ${participants.length} kicked`);
         } catch (error) {
             console.error('❌ Failed to kick all:', error);
+            
+            let errorMessage = '❌ Failed to remove members!';
+            if (error.message.includes('not authorized')) {
+                errorMessage += '\nI may have lost admin privileges!';
+            } else if (error.message.includes('403')) {
+                errorMessage += '\nSome members may not be removable!';
+            } else {
+                errorMessage += `\nError: ${error.message}`;
+            }
+            
             await sock.sendMessage(chatId, { 
-                text: `❌ Failed to remove members!\nError: ${error.message}`,
+                text: errorMessage,
                 quoted: message
             });
         }
