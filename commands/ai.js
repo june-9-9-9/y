@@ -37,7 +37,7 @@ async function aiCommand(sock, chatId, message) {
         await sock.sendPresenceUpdate('composing', chatId);
 
         // Fetch AI response using GPT-4 API
-        const apiUrl = `https://meta-api.zone.id/ai/chatgptfree?prompt=${encodeURIComponent(query)}&hello=chatgpt4`;
+        const apiUrl = `https://meta-api.zone.id/ai/copilot?message=${encodeURIComponent(query)}`;
         const response = await axios.get(apiUrl, { timeout: 30000 });
         const apiData = response.data;
 
@@ -54,7 +54,7 @@ async function aiCommand(sock, chatId, message) {
         const aiResponse = apiData.answer.trim();
         
         await sock.sendMessage(chatId, {
-            text: `🤖 *AI Assistant*\n\n📝 *Question:* ${query}\n\n💬 *Response:* ${aiResponse}\n\n📊 *Powered by OpenAI*`
+            text: `🤖 *AI Assistant*\n\n📝 *Question:* ${query}\n\n💬 *Response:* ${aiResponse}\n\n ↘️ *Powered by Gpt5*`
         }, { quoted: message });
 
     } catch (error) {
