@@ -10,7 +10,7 @@ async function lyricsCommand(sock, chatId, songTitle, message) {
 
     try {
         // Use lyricsapi.fly.dev and return only the raw lyrics text
-        const apiUrl = `https://lyricsapi.fly.dev/api/lyrics?q=${encodeURIComponent(songTitle)}`;
+        const apiUrl = `https://iamtkm.vercel.app/search/lyrics?apikey=tkm&q=${encodeURIComponent(songTitle)}`;
         const res = await fetch(apiUrl);
         
         if (!res.ok) {
@@ -20,7 +20,9 @@ async function lyricsCommand(sock, chatId, songTitle, message) {
         
         const data = await res.json();
 
-        const lyrics = data && data.result && data.result.lyrics ? data.result.lyrics : null;
+        const lyrics = data && data.data&& data.data.songLyricsUrl ? data.data.lyrics : null;
+        const artist = data.data.artist;
+        const Tittle = data.data.songTitle;
         if (!lyrics) {
             await sock.sendMessage(chatId, {
                 text: `❌ Sorry, I couldn't find any lyrics for "${songTitle}".`
@@ -29,7 +31,7 @@ async function lyricsCommand(sock, chatId, songTitle, message) {
         }
 
         // Send the full lyrics without any truncation
-        await sock.sendMessage(chatId, { text: lyrics }, { quoted: message });
+        await sock.sendMessage(chatId, { text: `Artist: ${}\n Song: ${Title}\nLyrics\n: ${lyrics}` }, { quoted: message });
     } catch (error) {
         console.error('Error in lyrics command:', error);
         await sock.sendMessage(chatId, { 
