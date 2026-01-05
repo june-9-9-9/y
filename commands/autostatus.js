@@ -21,7 +21,7 @@ if (!fs.existsSync(configPath)) {
     fs.writeFileSync(configPath, JSON.stringify({ 
         enabled: false, 
         reactOn: false,
-        emoji: '💘' // Default emoji
+        emoji: '💙' // Default emoji
     }));
 }
 
@@ -44,7 +44,7 @@ async function autoStatusCommand(sock, chatId, msg, args) {
             const status = config.enabled ? 'ON ✅' : 'OFF 🚫';
             const reactStatus = config.reactOn ? 'ON' : 'OFF';
             await sock.sendMessage(chatId, { 
-                text: `*Auto Status Settings*\n\n*Auto Status View:* ${status}\n*Status Reactions:* ${reactStatus}\n*Reaction Emoji:* ${config.emoji || '💘'}\n\n*Commands:*\n.autostatus on/off - Enable/disable autostatus\n.autostatus react on/off - Enable/disable status reaction\n.autostatus emoji [emoji] - Set reaction emoji\n\nExample:.autostatus emoji <🖤>`,
+                text: `*Auto Status Settings*\n\n*Auto Status View:* ${status}\n*Status Reactions:* ${reactStatus}\n*Reaction Emoji:* ${config.emoji || '💙'}\n\n*Commands:*\n.autostatus on/off - Enable/disable autostatus\n.autostatus react on/off - Enable/disable status reaction\n.autostatus emoji [emoji] - Set reaction emoji\n\nExample:.autostatus emoji <🖤>`,
                 ...channelInfo
             }, { quoted: msg });
             return;
@@ -82,7 +82,7 @@ async function autoStatusCommand(sock, chatId, msg, args) {
                 config.reactOn = true;
                 fs.writeFileSync(configPath, JSON.stringify(config));
                 await sock.sendMessage(chatId, { 
-                    text: `Status reactions have been enabled!\n\nBot react to status updates with emoji: ${config.emoji || '💘'}`,
+                    text: `Status reactions have been enabled!\n\nBot react to status updates with emoji: ${config.emoji || '💙'}`,
                     ...channelInfo
                 });
             } else if (reactCommand === 'off') {
@@ -102,7 +102,7 @@ async function autoStatusCommand(sock, chatId, msg, args) {
             // Handle emoji subcommand
             if (!args[1]) {
                 await sock.sendMessage(chatId, { 
-                    text: `❌ Please specify an emoji!\nCurrent emoji: ${config.emoji || '💘'}\nUse: .autostatus emoji [emoji]\nExample: .autostatus emoji 💙`,
+                    text: `❌ Please specify an emoji!\nCurrent emoji: ${config.emoji || '💙'}\nUse: .autostatus emoji [emoji]\nExample: .autostatus emoji 💙`,
                     ...channelInfo
                 }, { quoted: msg });
                 return;
@@ -132,7 +132,7 @@ async function autoStatusCommand(sock, chatId, msg, args) {
             }, { quoted: msg });
         } else {
             await sock.sendMessage(chatId, { 
-                text: '❌ Invalid command! Use:\n.autostatus on/off - Enable/disable\n.autostatus react on/off - Enable/disable reactions\n.autostatus emoji [emoji] - reaction emoji\nExample: .autostatus emoji 🤍',
+                text: '❌ Invalid command! Use:\n.autostatus on/off - Enable/disable\n.autostatus react on/off - Enable/disable reactions\n.autostatus emoji [emoji] - reaction emoji\nExample: .autostatus emoji 💙',
                 ...channelInfo
             }, { quoted: msg });
         }
@@ -172,10 +172,10 @@ function isStatusReactionEnabled() {
 function getStatusEmoji() {
     try {
         const config = JSON.parse(fs.readFileSync(configPath));
-        return config.emoji || '💘'; // Default to green heart if not set
+        return config.emoji || '💙'; // Default to green heart if not set
     } catch (error) {
         console.error('Error getting status emoji:', error);
-        return '💘';
+        return '💙';
     }
 }
 
