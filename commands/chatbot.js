@@ -69,43 +69,7 @@ async function handleChatbotCommand(sock, chatId, message, match) {
     }
 
     const data = loadData();
-    const botNumber = sock.user.id.split(':')[0] + '@s.whatsapp.net';
-    const sender = message.key.participant || message.participant || message.key.remoteJid;
-    const isOwner = sender === botNumber;
     
-    // For private chats, only owner can control
-    if (!chatId.endsWith('@g.us')) {
-        if (!isOwner) {
-            await showTyping(sock, chatId);
-            return sock.sendMessage(chatId, {
-                text: '❌ Only the bot owner can control chatbot in private chats.',
-                quoted: message
-            });
-        }
-    } else {
-        // For groups, check admin status for non-owners
-        if (!isOwner) {
-            try {
-                const metadata = await sock.groupMetadata(chatId);
-                const isAdmin = metadata.participants.some(p => p.id === sender && p.admin);
-                if (!isAdmin) {
-                    await showTyping(sock, chatId);
-                    return sock.sendMessage(chatId, {
-                        text: '❌ Only admins or owner can use this.',
-                        quoted: message
-                    });
-                }
-            } catch (e) {
-                console.warn('⚠️ Group metadata fetch failed');
-                await showTyping(sock, chatId);
-                return sock.sendMessage(chatId, {
-                    text: '❌ Could not verify admin status.',
-                    quoted: message
-                });
-            }
-        }
-    }
-
     await showTyping(sock, chatId);
     
     const isOn = match === 'on';
@@ -144,45 +108,10 @@ async function handleChatbotResponse(sock, chatId, message, userMessage, senderI
     try {
         const botNum = sock.user.id.split(':')[0];
         const isGroup = chatId.endsWith('@g.us');
-        
-        // For private chats, respond to all messages when enabled
-        if (!isGroup) {
-            shouldRespond = true;
-        } else {
-            // For groups, check mentions/replies
-            const botJids = [
-                sock.user.id,
-                `${botNum}@s.whatsapp.net`,
-                sock.user.lid
-            ];
-            
-            let shouldRespond = false;
-            
-            if (message.message?.extendedTextMessage) {
-                const ctx = message.message.extendedTextMessage.contextInfo;
-                const mentioned = ctx?.mentionedJid || [];
-                const quoted = ctx?.participant;
-                
-                // Check mentions
-                shouldRespond = mentioned.some(jid => 
-                    botJids.some(botJid => 
-                        jid.split('@')[0].split(':')[0] === botJid.split('@')[0].split(':')[0]
-                    )
-                );
-                
-                // Check reply
-                if (!shouldRespond && quoted) {
-                    const cleanQuoted = quoted.replace(/[:@].*$/, '');
-                    shouldRespond = botJids.some(botJid => 
-                        botJid.replace(/[:@].*$/, '') === cleanQuoted
-                    );
-                }
-            } else if (userMessage.includes(`@${botNum}`)) {
-                shouldRespond = true;
-            }
-            
-            if (!shouldRespond) return;
-        }
+
+        // ✅ Always respond when chatbot is enabled
+        let shouldRespond = true;
+        if (!shouldRespond) return;
 
         // Clean message (remove mentions for groups)
         let cleanedMsg = userMessage;
