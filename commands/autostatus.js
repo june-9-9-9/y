@@ -44,7 +44,7 @@ async function autoStatusCommand(sock, chatId, msg, args) {
             const status = config.enabled ? 'ON ✅' : 'OFF 🚫';
             const reactStatus = config.reactOn ? 'ON' : 'OFF';
             await sock.sendMessage(chatId, { 
-                text: `*Auto Status Settings*\n\n*Auto Status View:* ${status}\n*Status Reactions:* ${reactStatus}\n*Reaction Emoji:* ${config.emoji || '💘'}\n\n*Commands:*\n.autostatus on/off - Enable/disable\n.autostatus react on/off - Enable/disable status reaction\n.autostatus emoji [emoji] - Set reaction emoji\n\nExample: .autostatus emoji 🤍`,
+                text: `*Auto Status Settings*\n\n*Auto Status View:* ${status}\n*Status Reactions:* ${reactStatus}\n*Reaction Emoji:* ${config.emoji || '💘'}\n\n*Commands:*\n.autostatus on/off - Enable/disable autostatus\n.autostatus react on/off - Enable/disable status reaction\n.autostatus emoji [emoji] - Set reaction emoji\n\nExample:.autostatus emoji <🖤>`,
                 ...channelInfo
             }, { quoted: msg });
             return;
@@ -102,7 +102,7 @@ async function autoStatusCommand(sock, chatId, msg, args) {
             // Handle emoji subcommand
             if (!args[1]) {
                 await sock.sendMessage(chatId, { 
-                    text: `❌ Please specify an emoji!\nCurrent emoji: ${config.emoji || '💚'}\nUse: .autostatus emoji [emoji]\nExample: .autostatus emoji 🤍`,
+                    text: `❌ Please specify an emoji!\nCurrent emoji: ${config.emoji || '💚'}\nUse: .autostatus emoji [emoji]\nExample: .autostatus emoji 💙`,
                     ...channelInfo
                 }, { quoted: msg });
                 return;
