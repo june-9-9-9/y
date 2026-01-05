@@ -82,7 +82,7 @@ async function autoStatusCommand(sock, chatId, msg, args) {
                 config.reactOn = true;
                 fs.writeFileSync(configPath, JSON.stringify(config));
                 await sock.sendMessage(chatId, { 
-                    text: `Status reactions have been enabled!\n\nBot react to status updates with emoji: ${config.emoji || '💚'}`,
+                    text: `Status reactions have been enabled!\n\nBot react to status updates with emoji: ${config.emoji || '💘'}`,
                     ...channelInfo
                 });
             } else if (reactCommand === 'off') {
@@ -102,7 +102,7 @@ async function autoStatusCommand(sock, chatId, msg, args) {
             // Handle emoji subcommand
             if (!args[1]) {
                 await sock.sendMessage(chatId, { 
-                    text: `❌ Please specify an emoji!\nCurrent emoji: ${config.emoji || '💚'}\nUse: .autostatus emoji [emoji]\nExample: .autostatus emoji 💙`,
+                    text: `❌ Please specify an emoji!\nCurrent emoji: ${config.emoji || '💘'}\nUse: .autostatus emoji [emoji]\nExample: .autostatus emoji 💙`,
                     ...channelInfo
                 }, { quoted: msg });
                 return;
