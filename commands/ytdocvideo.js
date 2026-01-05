@@ -1,37 +1,35 @@
 const fs = require("fs");
-const axios = require('axios');
-const yts = require('yt-search');
-const path = require('path');
+const axios = require("axios");
+const path = require("path");
 
 async function ytdocvideoCommand(sock, chatId, message) {
     try {
         await sock.sendMessage(chatId, {
-            react: { text: '🎬', key: message.key }
+            react: { text: "🎬", key: message.key }
         });
 
         const tempDir = path.join(__dirname, "temp");
         if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
         const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
-        const parts = text.split(' ');
-        const query = parts.slice(1).join(' ').trim();
+        const parts = text.split(" ");
+        const query = parts.slice(1).join(" ").trim();
 
-        if (!query) return await sock.sendMessage(chatId, {
-            text: '🎬 Provide a YouTube link or Name\nExample:\n\nytdocvideo Not Like Us Music Video\nytdocvideo Espresso '
-        }, { quoted: message });
+        if (!query) {
+            return await sock.sendMessage(chatId, {
+                text: "🎬 Provide a YouTube link\nExample:\n\nytdocvideo https://www.youtube.com/watch?v=abc123"
+            }, { quoted: message });
+        }
 
-        if (query.length > 100) return await sock.sendMessage(chatId, {
-            text: `📝 Video name too long! Max 100 chars.`
-        }, { quoted: message });
+        // Validate YouTube link
+        const ytRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/;
+        if (!ytRegex.test(query)) {
+            return await sock.sendMessage(chatId, {
+                text: "🚫 Invalid input! Please provide a valid YouTube link."
+            }, { quoted: message });
+        }
 
-        // Search for video
-        const searchResult = await (await yts(`${query}`)).videos[0];
-        if (!searchResult) return sock.sendMessage(chatId, {
-            text: " 🚫 Couldn't find that video. Try another one!"
-        }, { quoted: message });
-
-        const video = searchResult;
-        const apiUrl = `https://veron-apis.zone.id/downloader/youtube1?url=${encodeURIComponent(video.url)}`;
+        const apiUrl = `https://veron-apis.zone.id/downloader/youtube1?url=${encodeURIComponent(query)}`;
         const response = await axios.get(apiUrl);
         const apiData = response.data;
 
@@ -43,7 +41,6 @@ async function ytdocvideoCommand(sock, chatId, message) {
         const fileName = `video_${timestamp}.mp4`;
         const filePath = path.join(tempDir, fileName);
 
-
         // Download MP4 video
         const videoResponse = await axios({
             method: "get",
@@ -54,7 +51,7 @@ async function ytdocvideoCommand(sock, chatId, message) {
 
         const writer = fs.createWriteStream(filePath);
         videoResponse.data.pipe(writer);
-        
+
         await new Promise((resolve, reject) => {
             writer.on("finish", resolve);
             writer.on("error", reject);
@@ -72,8 +69,8 @@ async function ytdocvideoCommand(sock, chatId, message) {
         await sock.sendMessage(chatId, {
             document: { url: filePath },
             mimetype: "video/mp4",
-            fileName: `${video.title.substring(0, 100)}.mp4`,
-            caption:  `*🎞️ YouTube Video Downloaded*\n\n *Title:* ${video.title}\n *Duration:* ${video.timestamp}\n *Channel:* ${video.author.name}\n *Size:* ${fileSizeMB} MB`
+            fileName: `${apiData.result.title.substring(0, 100)}.mp4`,
+            caption: `*🎞️ YouTube Video Downloaded*\n\n *Title:* ${apiData.result.title}\n *Duration:* ${apiData.result.duration}\n *Channel:* ${apiData.result.channel}\n *Size:* ${fileSizeMB} MB`
         }, { quoted: message });
 
         // Cleanup
@@ -81,10 +78,8 @@ async function ytdocvideoCommand(sock, chatId, message) {
 
     } catch (error) {
         console.error("ytdocvideo command error:", error);
-        
-        // Provide specific error messages
+
         let errorMessage = `🚫 Error: ${error.message}`;
-        
         if (error.message.includes("timeout")) {
             errorMessage = "⏱️ Download timeout! Video might be too large.";
         } else if (error.message.includes("API failed")) {
@@ -92,10 +87,8 @@ async function ytdocvideoCommand(sock, chatId, message) {
         } else if (error.message.includes("empty file")) {
             errorMessage = "📭 Download failed! Video might not be available.";
         }
-        
-        return await sock.sendMessage(chatId, {
-            text: errorMessage
-        }, { quoted: message });
+
+        return await sock.sendMessage(chatId, { text: errorMessage }, { quoted: message });
     }
 }
 
