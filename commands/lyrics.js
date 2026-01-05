@@ -22,7 +22,7 @@ async function lyricsCommand(sock, chatId, songTitle, message) {
 
         const lyrics = data && data.data&& data.data.songLyricsUrl ? data.data.lyrics : null;
         const artist = data.data.artist;
-        const Tittle = data.data.songTitle;
+        const title = data.data.songTitle;
         if (!lyrics) {
             await sock.sendMessage(chatId, {
                 text: `❌ Sorry, I couldn't find any lyrics for "${songTitle}".`
@@ -31,7 +31,7 @@ async function lyricsCommand(sock, chatId, songTitle, message) {
         }
 
         // Send the full lyrics without any truncation
-        await sock.sendMessage(chatId, { text: `Artist: ${}\n Song: ${Title}\nLyrics\n: ${lyrics}` }, { quoted: message });
+        await sock.sendMessage(chatId, { text: `Artist: ${artist}\n Song: ${title}\nLyrics\n: ${lyrics}` }, { quoted: message });
     } catch (error) {
         console.error('Error in lyrics command:', error);
         await sock.sendMessage(chatId, { 
