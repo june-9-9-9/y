@@ -54,7 +54,7 @@ async function aiCommand(sock, chatId, message) {
         const aiResponse = apiData.answer.trim();
         
         await sock.sendMessage(chatId, {
-            text: `🤖 *AI Assistant*\n\n📝 *Question:* ${query}\n\n💬 *Response:* ${aiResponse}\n\n ↘️ *Powered by Gpt5*`
+            text: `🤖 *AI Assistant*\n\n📝 *Question:* ${query}\n\n💬 *Response:* ${aiResponse}\n\n ↘️ *Powered by Gpt-5*`
         }, { quoted: message });
 
     } catch (error) {
