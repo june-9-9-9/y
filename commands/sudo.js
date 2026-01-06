@@ -2,107 +2,76 @@ const settings = require('../settings');
 const { addSudo, removeSudo, getSudoList } = require('../lib/index');
 
 /**
- * Extracts a mentioned JID or number from a message.
- * @param {object} message - WhatsApp message object
- * @returns {string|null} JID string or null if not found
+ * Normalize and extract JID from mentions or raw text.
+ * @param {object} msg - WhatsApp message object
+ * @returns {string|null} JID string or null
  */
-function extractMentionedJid(message) {
-    try {
-        const mentioned = message.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
-        if (mentioned.length > 0) return mentioned[0];
+function getTargetJid(msg) {
+  try {
+    const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid;
+    if (mentioned?.length) return mentioned[0];
 
-        const text = message.message?.conversation || message.message?.extendedTextMessage?.text || '';
-        const match = text.match(/\b(\d{7,15})\b/);
-        if (match) return `${match[1]}@s.whatsapp.net`;
-
-        return null;
-    } catch (err) {
-        console.error('extractMentionedJid error:', err);
-        return null;
-    }
+    const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
+    const match = text.match(/\b(\d{7,15})\b/);
+    return match ? `${match[1]}@s.whatsapp.net` : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
- * Handles sudo commands (.sudo add/del/list).
- * @param {object} sock - WhatsApp socket instance
- * @param {string} chatId - Chat ID
- * @param {object} message - WhatsApp message object
+ * Handle sudo commands (.sudo add/del/list).
  */
-async function sudoCommand(sock, chatId, message) {
-    try {
-        const senderJid = message.key.participant || message.key.remoteJid;
-        const ownerJid = `${settings.ownerNumber}@s.whatsapp.net`;
-        const isOwner = message.key.fromMe || senderJid === ownerJid;
+async function sudoCommand(sock, chatId, msg) {
+  try {
+    const sender = msg.key.participant || msg.key.remoteJid;
+    const owner = `${settings.ownerNumber}@s.whatsapp.net`;
+    const isOwner = msg.key.fromMe || sender === owner;
 
-        const rawText = message.message?.conversation || message.message?.extendedTextMessage?.text || '';
-        const args = rawText.trim().split(/\s+/).slice(1);
-        const sub = (args[0] || '').toLowerCase();
+    const raw = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
+    const [ , action ] = raw.trim().split(/\s+/);
+    const sub = (action || '').toLowerCase();
 
-        // ✅ Defensive usage check
-        if (!sub || !['add', 'del', 'remove', 'list'].includes(sub)) {
-            await sock.sendMessage(chatId, {
-                text: [
-                    '⚙️ *Sudo Command Usage*',
-                    '🔹 .sudo add <@user|number>',
-                    '🔹 .sudo del <@user|number>',
-                    '🔹 .sudo list'
-                ].join('\n')
-            }, { quoted: message });
-            return;
-        }
-
-        // ✅ List sudo users
-        if (sub === 'list') {
-            const list = await getSudoList();
-            if (!list || list.length === 0) {
-                await sock.sendMessage(chatId, { text: '📭 No sudo users set.' }, { quoted: message });
-                return;
-            }
-            const text = list.map((j, i) => `${i + 1}. ${j}`).join('\n');
-            await sock.sendMessage(chatId, { text: `👑 *Sudo Users:*\n${text}` }, { quoted: message });
-            return;
-        }
-
-        // ✅ Owner-only restriction
-        if (!isOwner) {
-            await sock.sendMessage(chatId, {
-                text: '❌ Only the *owner* can add/remove sudo users.\nUse `.sudo list` to view current sudo users.'
-            }, { quoted: message });
-            return;
-        }
-
-        // ✅ Extract target JID
-        const targetJid = extractMentionedJid(message);
-        if (!targetJid) {
-            await sock.sendMessage(chatId, { text: '⚠️ Please *mention a user* or provide a valid number.' }, { quoted: message });
-            return;
-        }
-
-        // ✅ Add sudo
-        if (sub === 'add') {
-            const ok = await addSudo(targetJid);
-            await sock.sendMessage(chatId, {
-                text: ok ? `✅ Successfully added sudo: *${targetJid}*` : '❌ Failed to add sudo.'
-            }, { quoted: message });
-            return;
-        }
-
-        // ✅ Remove sudo
-        if (sub === 'del' || sub === 'remove') {
-            if (targetJid === ownerJid) {
-                await sock.sendMessage(chatId, { text: '⚠️ Owner cannot be removed from sudo list.' }, { quoted: message });
-                return;
-            }
-            const ok = await removeSudo(targetJid);
-            await sock.sendMessage(chatId, {
-                text: ok ? `✅ Successfully removed sudo: *${targetJid}*` : '❌ Failed to remove sudo.'
-            }, { quoted: message });
-            return;
-        }
-    } catch (err) {
-        console.error('sudoCommand error:', err);
-        await sock.sendMessage(chatId, { text: '⚠️ An unexpected error occurred while processing sudo command.' }, { quoted: message });
+    if (!['add','del','remove','list'].includes(sub)) {
+      return sock.sendMessage(chatId, {
+        text: '⚙️ *Usage*\n.sudo add <@user|number>\n.sudo del <@user|number>\n.sudo list'
+      }, { quoted: msg });
     }
+
+    if (sub === 'list') {
+      const list = await getSudoList();
+      return sock.sendMessage(chatId, {
+        text: list?.length ? `👑 *Sudo Users:*\n${list.map((j,i)=>`${i+1}. ${j}`).join('\n')}` : '📭 No sudo users set.'
+      }, { quoted: msg });
+    }
+
+    if (!isOwner) {
+      return sock.sendMessage(chatId, {
+        text: '❌ Only *owner* can add/remove sudo users.\nUse `.sudo list` to view.'
+      }, { quoted: msg });
+    }
+
+    const target = getTargetJid(msg);
+    if (!target) {
+      return sock.sendMessage(chatId, { text: '⚠️ Mention a user or provide a valid number.' }, { quoted: msg });
+    }
+
+    if (sub === 'add') {
+      const ok = await addSudo(target);
+      return sock.sendMessage(chatId, { text: ok ? `✅ Added sudo: *${target}*` : '❌ Failed to add sudo.' }, { quoted: msg });
+    }
+
+    if (['del','remove'].includes(sub)) {
+      if (target === owner) {
+        return sock.sendMessage(chatId, { text: '⚠️ Owner cannot be removed.' }, { quoted: msg });
+      }
+      const ok = await removeSudo(target);
+      return sock.sendMessage(chatId, { text: ok ? `✅ Removed sudo: *${target}*` : '❌ Failed to remove sudo.' }, { quoted: msg });
+    }
+  } catch (err) {
+    console.error('sudoCommand error:', err);
+    await sock.sendMessage(chatId, { text: '⚠️ Unexpected error while processing sudo command.' }, { quoted: msg });
+  }
 }
 
 module.exports = sudoCommand;
