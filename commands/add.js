@@ -8,9 +8,24 @@ async function addCommand(sock, chatId, message) {
       return sock.sendMessage(chatId, { text: "❌ Group only" }, { quoted: message });
 
     const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
-    const target = text ? text.replace(/\D/g, '') + '@s.whatsapp.net' : message.quoted?.sender;
-    if (!target) 
-      return sock.sendMessage(chatId, { text: "📌 Usage: .add 2547xxxxxxx or reply" }, { quoted: message });
+    
+    // Check if text exists and contains numbers for phone extraction
+    let target;
+    if (text) {
+      const extractedNumber = text.replace(/\D/g, '');
+      if (extractedNumber.length === 0) {
+        return sock.sendMessage(chatId, { 
+          text: "📌 Usage: `.add 2547xxxxxxx` or reply to a user's message\n\n⚠️ *Please provide a phone number* (e.g., .add 254712345678)" 
+        }, { quoted: message });
+      }
+      target = extractedNumber + '@s.whatsapp.net';
+    } else if (message.quoted?.sender) {
+      target = message.quoted.sender;
+    } else {
+      return sock.sendMessage(chatId, { 
+        text: "📌 Usage: `.add 2547xxxxxxx` or reply to a user's message\n\n⚠️ *Please provide a phone number* (e.g., .add 254712345678)" 
+      }, { quoted: message });
+    }
 
     // Admin checks
     if (!await isAdmin(sock, chatId, sock.user.id)) 
