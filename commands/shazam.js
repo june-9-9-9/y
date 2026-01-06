@@ -124,7 +124,7 @@ async function shazamCommand(sock, chatId, message) {
         if (!media) {
             debugLog('No media found - sending instructions');
             await sock.sendMessage(chatId, {
-                text: 'Send or reply to an audio/voice note, video, or image to identify the song.\n\nSupported media:\n• Audio/Voice notes\n• Videos with audio.'
+                text: 'Send or reply to\naudio/voice note\nvideo identify the song.\n\nSupported media:\n• Audio/Voice notes\n• Videos with audio.'
             }, { quoted: message });
             return;
         }
