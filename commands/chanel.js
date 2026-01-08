@@ -4,7 +4,7 @@ function createFakeContact(message) {
             participants: "0@s.whatsapp.net",
             remoteJid: "status@broadcast",
             fromMe: false,
-            id: "DAVE-X"
+            id: "June x"
         },
         message: {
             contactMessage: {
@@ -57,4 +57,4 @@ async function chaneljidCommand(sock, chatId, message) {
     }
 }
 
-module.exports = chaneljidCommand;
+module.exports = { chaneljidCommand };
