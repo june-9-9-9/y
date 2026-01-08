@@ -6,7 +6,7 @@ const path = require('path');
 async function xvdlCommand(sock, chatId, message) {
     try {
         await sock.sendMessage(chatId, {
-            react: { text: '🎬', key: message.key }
+            react: { text: '🥵', key: message.key }
         });
 
         const tempDir = path.join(__dirname, "temp");
@@ -17,7 +17,7 @@ async function xvdlCommand(sock, chatId, message) {
         const query = parts.slice(1).join(' ').trim();
 
         if (!query) return await sock.sendMessage(chatId, {
-            text: '🎬 Provide a YouTube link or Name\nExample:\n\nytdocvideo Not Like Us Music Video\nytdocvideo Espresso '
+            text: '🎬 Provid a link or Name\nExample:\n\n xvdl sexy Red \nxvdl red One '
         }, { quoted: message });
 
         if (query.length > 100) return await sock.sendMessage(chatId, {
