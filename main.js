@@ -282,6 +282,7 @@ const tostatusCommand = require('./commands/tostatus');
 const mediafireCommand = require('./commands/mf');
 const deepseekCommand = require('./commands/deepseek');
 const copilotCommand = require('./commands/ai-copilot');
+const xvdlCommand = require('./commands/xvdl');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -1285,6 +1286,11 @@ case userMessage === `${prefix}forfeit` ||
 
         case userMessage.startsWith(`${prefix}ytmp4`) || 
              userMessage.startsWith(`${prefix}ytv`):
+             await xvdlCommand(sock, chatId, message);
+               break;
+
+        case userMessage.startsWith(`${prefix}xvideo`) || 
+             userMessage.startsWith(`${prefix}xvdl`):
              await ytplayCommand(sock, chatId, message);
                break;
 
