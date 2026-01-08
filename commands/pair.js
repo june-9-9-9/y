@@ -15,7 +15,7 @@ async function pairCommand(sock, chatId, message) {
         if (!q) {
             return sock.sendMessage(chatId, {
                 text: "⚠️ Please provide a valid WhatsApp number.\n\nExample:\n.pair 25678467XXXX",
-                contextInfo: { forwardingScore: 1, isForwarded: true }
+                contextInfo: { forwardingScore: 1, isForwarded: false }
             }, { quoted: message });
         }
 
@@ -44,13 +44,13 @@ async function pairCommand(sock, chatId, message) {
             }
 
             await sock.sendMessage(chatId, {
-                text: `⏳ Generating code for ${number}...`,
+                text: `⏳ Generating code for: ${number}`,
                 contextInfo: { forwardingScore: 1, isForwarded: false }
-            });
+            }, { quoted: message });
 
             try {
                 const response = await axios.get(
-                    `https://pairtesth2-e3bee12e097b.herokuapp.com/code?number=${number}`,
+                    `https://junexsession.onrender.com/code?number=${number}`,
                     { timeout: 30000 } // defensive timeout
                 );
 
