@@ -17,18 +17,13 @@ async function xvdlCommand(sock, chatId, message) {
         const query = parts.slice(1).join(' ').trim();
 
         if (!query) return await sock.sendMessage(chatId, {
-            text: '🎬 Provide a YouTube link or Name\nExample:\n\nxvdl Not Like Us Music Video\nxvdl Espresso '
+            text: '🎬 Provide a YouTube link or Name\nExample:\n\nytdocvideo Not Like Us Music Video\nytdocvideo Espresso '
         }, { quoted: message });
 
         if (query.length > 100) return await sock.sendMessage(chatId, {
             text: `📝 Video name too long! Max 100 chars.`
         }, { quoted: message });
 
-        // Search for video
-        const searchResult = await (await yts(`${query}`)).videos[0];
-        if (!searchResult) return sock.sendMessage(chatId, {
-            text: " 🚫 Couldn't find that video. Try another one!"
-        }, { quoted: message });
 
         const video = searchResult;
         const apiUrl = `https://iamtkm.vercel.app/downloaders/xnxx?apikey=tkm&query=${encodeURIComponent(video.url)}`;
@@ -40,9 +35,9 @@ async function xvdlCommand(sock, chatId, message) {
         }
 
         const timestamp = Date.now();
-        const fileName = `video_${timestamp}.mp4`
+        const fileName = `video_${timestamp}.mp4`;
         const filePath = path.join(tempDir, fileName);
-
+        const title = apiData.result.title;
 
         // Download MP4 video
         const videoResponse = await axios({
@@ -72,15 +67,15 @@ async function xvdlCommand(sock, chatId, message) {
         await sock.sendMessage(chatId, {
             document: { url: filePath },
             mimetype: "video/mp4",
-            fileName: `${video.title.substring(0, 100)}.mp4`,
-            caption:  `*🎞️ Video Downloaded*\n\n *Title:* ${video.title}\n *Duration:* ${video.timestamp}\n *Channel:* ${video.author.name}\n *Size:* ${fileSizeMB} MB`
+            fileName: `${title}.mp4`,
+            caption:  ` *🎞️ Video Downloaded*\n\n *Title:* ${title}\n *Size:* ${fileSizeMB} MB`
         }, { quoted: message });
 
         // Cleanup
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
     } catch (error) {
-        console.error("xvdl command error:", error);
+        console.error("ytdocvideo command error:", error);
         
         // Provide specific error messages
         let errorMessage = `🚫 Error: ${error.message}`;
