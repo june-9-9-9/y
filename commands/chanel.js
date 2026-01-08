@@ -25,7 +25,7 @@ async function chaneljidCommand(sock, chatId, message) {
 
     if (!url) {
         return sock.sendMessage(chatId, { 
-            text: 'Example: .chaneljid https://whatsapp.com/channel/xxxxxxxx'
+            text: 'Example: chjid https://whatsapp.com/chanel/...'
         }, { quoted: message });
     }
 
