@@ -26,7 +26,7 @@ async function chaneljidCommand(sock, chatId, message) {
     if (!url) {
         return sock.sendMessage(chatId, { 
             text: 'Example: .chaneljid https://whatsapp.com/channel/xxxxxxxx'
-        }, { quoted: fake });
+        }, { quoted: message });
     }
 
     if (!url.includes("https://whatsapp.com/channel/")) {
@@ -45,15 +45,12 @@ async function chaneljidCommand(sock, chatId, message) {
             text: `${res.id}`
         }, { quoted: message });
         
-              await sock.sendMessage(chatId, { 
-            text: info
-        }, { quoted: message });
 
     } catch (error) {
         console.error('ChannelJID Error:', error);
         await sock.sendMessage(chatId, { 
             text: 'Failed to get channel info'
-        }, { quoted: fake });
+        }, { quoted: message });
     }
 }
 
