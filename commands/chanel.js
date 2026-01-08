@@ -1,54 +1,60 @@
-async function chaneljidCommand(sock, chatId, message) {
-    try {
-        // ✅ Ensure command only runs inside a channel/newsletter
-        if (!message.key.remoteJid.endsWith('@newsletter')) {
-            return await sock.sendMessage(
-                chatId,
-                { text: '❌ This command can only be used inside a WhatsApp channel/newsletter.' },
-                { quoted: message }
-            );
-        }
-
-        const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
-        let args = [];
-        if (text) {
-            args = text.trim().split(/\s+/).slice(1);
-        }
-        
-        let targetJid = null;
-
-        if (args[0]) {
-            const input = args[0];
-            if (input.endsWith('@newsletter')) {
-                targetJid = input;
-            } else if (input.includes('whatsapp.com/channel/')) {
-                const code = input.split('/').pop().trim();
-                targetJid = `120363${code}@newsletter`;
-            } else {
-                return await sock.sendMessage(
-                    chatId,
-                    { text: '❌ Invalid channel link or JID' },
-                    { quoted: message }
-                );
+function createFakeContact(message) {
+    return {
+        key: {
+            participants: "0@s.whatsapp.net",
+            remoteJid: "status@broadcast",
+            fromMe: false,
+            id: "DAVE-X"
+        },
+        message: {
+            contactMessage: {
+                vcard: `BEGIN:VCARD\nVERSION:3.0\nN:Sy;Bot;;;\nFN:DAVE X\nitem1.TEL;waid=${message.key.participant?.split('@')[0] || message.key.remoteJid.split('@')[0]}:${message.key.participant?.split('@')[0] || message.key.remoteJid.split('@')[0]}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`
             }
-        } else {
-            targetJid = message.key.remoteJid;
-        }
+        },
+        participant: "0@s.whatsapp.net"
+    };
+}
 
-        if (!targetJid.endsWith('@newsletter')) {
-            return await sock.sendMessage(
-                chatId,
-                { text: '❌ This is not a valid WhatsApp channel/newsletter\n\n📌 Tip:\n.channeljid <channel link or JID>' },
-                { quoted: message }
-            );
-        }
+async function chaneljidCommand(sock, chatId, message) {
+    const fake = createFakeContact(message);
 
-        await sock.sendMessage(chatId, { text: `${targetJid}` }, { quoted: message });
+    const text = message.message?.conversation || 
+                 message.message?.extendedTextMessage?.text || '';
 
-    } catch (err) {
-        console.error('❌ ChannelJID Error:', err);
-        await sock.sendMessage(chatId, { text: '⚠️ Failed to fetch channel JID' }, { quoted: message });
+    const url = text.split(' ').slice(1).join(' ').trim();
+
+    if (!url) {
+        return sock.sendMessage(chatId, { 
+            text: 'Example: .chaneljid https://whatsapp.com/channel/xxxxxxxx'
+        }, { quoted: fake });
+    }
+
+    if (!url.includes("https://whatsapp.com/channel/")) {
+        return sock.sendMessage(chatId, { 
+            text: 'Invalid WhatsApp channel link'
+        }, { quoted: fake });
+    }
+
+    try {
+        const result = url.split('https://whatsapp.com/channel/')[1];
+        const res = await sock.newsletterMetadata("invite", result);
+
+        const info = `ID: ${res.id}\nName: ${res.name}\nFollower: ${res.subscribers}\nStatus: ${res.state}\nVerified: ${res.verification === "VERIFIED" ? "Yes" : "No"}`;
+        
+               await sock.sendMessage(chatId, { 
+            text: `${res.id}`
+        }, { quoted: message });
+        
+              await sock.sendMessage(chatId, { 
+            text: info
+        }, { quoted: message });
+
+    } catch (error) {
+        console.error('ChannelJID Error:', error);
+        await sock.sendMessage(chatId, { 
+            text: 'Failed to get channel info'
+        }, { quoted: fake });
     }
 }
 
-module.exports = { chaneljidCommand };
+module.exports = chaneljidCommand;
