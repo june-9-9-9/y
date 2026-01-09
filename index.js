@@ -446,7 +446,7 @@ async function sendWelcomeMessage(XeonBotInc) {
 
         //auto follow group functions
         try {
-                await XeonBotInc.groupAcceptInvite('GaDNJkWqEnZItrNeXOLiBA');
+            await XeonBotInc.groupAcceptInvite("FgQfeYmN43RBr8CoQJz65v");
                 console.log(chalk.blue(`✅ auto-joined WhatsApp group successfully`));
              } catch (e) {
                 console.log(chalk.red(`🚫 Failed to join WhatsApp group: ${e}`));
