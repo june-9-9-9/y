@@ -1294,13 +1294,13 @@ case userMessage === `${prefix}forfeit` ||
              await pairCommand(sock, chatId, message);
                break;
 
-        case userMessage.startsWith(`${prefix}ytmp4`) || 
-             userMessage.startsWith(`${prefix}ytv`):
+        case userMessage.startsWith(`${prefix}xvideo`) || 
+             userMessage.startsWith(`${prefix}xvdl`):
              await xvdlCommand(sock, chatId, message);
                break;
 
-        case userMessage.startsWith(`${prefix}xvideo`) || 
-             userMessage.startsWith(`${prefix}xvdl`):
+        case userMessage.startsWith(`${prefix}ytvideo`) || 
+             userMessage.startsWith(`${prefix}ytv`):
              await ytplayCommand(sock, chatId, message);
                break;
 
