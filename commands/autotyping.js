@@ -1,121 +1,129 @@
+/**
+ * A WhatsApp Bot
+ * Autotyping / Autorecording / AutorecordTyping Commands
+ * - Fake typing/recording status with fixed 15s duration
+ */
+
 const fs = require('fs');
 const path = require('path');
 
-// Config file path
-const configFile = path.join(__dirname, '..', 'data', 'autotyping.json');
+// Paths to store configurations
+const autotypingPath = path.join(__dirname, '..', 'data', 'autotyping.json');
+const autorecordingPath = path.join(__dirname, '..', 'data', 'autorecording.json');
+const autorecordTypingPath = path.join(__dirname, '..', 'data', 'autorecordtyping.json');
 
-// Get config
-function getConfig() {
-    if (!fs.existsSync(configFile)) {
-        fs.writeFileSync(configFile, JSON.stringify({ 
-            enabled: false,
-            recordingEnabled: false,
-            recordTypingEnabled: false 
-        }));
+// Initialize configuration file if it doesn't exist
+function initConfig(configPath) {
+    if (!fs.existsSync(configPath)) {
+        fs.writeFileSync(configPath, JSON.stringify({ enabled: false }, null, 2));
     }
-    return JSON.parse(fs.readFileSync(configFile));
+    return JSON.parse(fs.readFileSync(configPath));
 }
 
-// Save config
-function saveConfig(config) {
-    fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
-}
-
-// Auto-typing command
-async function autotypingCommand(sock, chatId, message) {
-    const config = getConfig();
-    const args = message.body?.split(' ') || [];
-    
-    if (args[1] === 'on') {
-        config.enabled = true;
-        saveConfig(config);
-        await sock.sendMessage(chatId, { text: '✅ Auto-typing ON' });
-    } else if (args[1] === 'off') {
-        config.enabled = false;
-        saveConfig(config);
-        await sock.sendMessage(chatId, { text: '❌ Auto-typing OFF' });
-    } else {
-        const status = config.enabled ? 'ON' : 'OFF';
-        await sock.sendMessage(chatId, { text: `Auto-typing: ${status}` });
-    }
-}
-
-// Auto-recording command
-async function autorecordingCommand(sock, chatId, message) {
-    const config = getConfig();
-    const args = message.body?.split(' ') || [];
-    
-    if (args[1] === 'on') {
-        config.recordingEnabled = true;
-        saveConfig(config);
-        await sock.sendMessage(chatId, { text: '✅ Auto-recording ON' });
-    } else if (args[1] === 'off') {
-        config.recordingEnabled = false;
-        saveConfig(config);
-        await sock.sendMessage(chatId, { text: '❌ Auto-recording OFF' });
-    } else {
-        const status = config.recordingEnabled ? 'ON' : 'OFF';
-        await sock.sendMessage(chatId, { text: `Auto-recording: ${status}` });
-    }
-}
-
-// Auto record typing command (recording + typing)
-async function autorecordTypingCommand(sock, chatId, message) {
-    const config = getConfig();
-    const args = message.body?.split(' ') || [];
-    
-    if (args[1] === 'on') {
-        config.recordTypingEnabled = true;
-        saveConfig(config);
-        await sock.sendMessage(chatId, { text: '✅ Auto record+typing ON' });
-    } else if (args[1] === 'off') {
-        config.recordTypingEnabled = false;
-        saveConfig(config);
-        await sock.sendMessage(chatId, { text: '❌ Auto record+typing OFF' });
-    } else {
-        const status = config.recordTypingEnabled ? 'ON' : 'OFF';
-        await sock.sendMessage(chatId, { text: `Auto record+typing: ${status}` });
-    }
-}
-
-// Show typing for messages
-async function handleAutotypingForMessage(sock, chatId) {
-    const config = getConfig();
-    
+// Generic toggle command
+async function toggleCommand(sock, chatId, message, configPath, featureName) {
     try {
-        await sock.presenceSubscribe(chatId);
-        
-        // Handle recording presence (when recordingEnabled OR recordTypingEnabled is true)
-        if (config.recordingEnabled || config.recordTypingEnabled) {
-            await sock.sendPresenceUpdate('recording', chatId);
-            // Wait 15 seconds for recording
-            await new Promise(r => setTimeout(r, 15000));
-            await sock.sendPresenceUpdate('paused', chatId);
-            
-            // If only recording, stop here
-            if (config.recordingEnabled && !config.recordTypingEnabled) {
-                return true;
+        if (!message.key.fromMe) {
+            await sock.sendMessage(chatId, { text: `❌ This command is only available for the owner!` });
+            return;
+        }
+
+        const args = message.message?.conversation?.trim().split(' ').slice(1) ||
+                     message.message?.extendedTextMessage?.text?.trim().split(' ').slice(1) || [];
+
+        const config = initConfig(configPath);
+
+        if (args.length > 0) {
+            const action = args[0].toLowerCase();
+            if (action === 'on' || action === 'enable') {
+                config.enabled = true;
+            } else if (action === 'off' || action === 'disable') {
+                config.enabled = false;
+            } else {
+                await sock.sendMessage(chatId, { text: `❌ Invalid option! Use: .${featureName} on/off` });
+                return;
             }
+        } else {
+            config.enabled = !config.enabled;
         }
-        
-        // Handle typing presence (when enabled OR recordTypingEnabled is true)
-        if (config.enabled || config.recordTypingEnabled) {
-            await sock.sendPresenceUpdate('composing', chatId);
-            // Wait 15 seconds for typing
-            await new Promise(r => setTimeout(r, 15000));
-            await sock.sendPresenceUpdate('paused', chatId);
-        }
-        
-        return true;
+
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+
+        await sock.sendMessage(chatId, {
+            text: `✅ ${featureName} has been ${config.enabled ? 'enabled' : 'disabled'}!`
+        });
+
     } catch (error) {
-        console.log('Presence error:', error.message);
-        return false;
+        console.error(`Error in ${featureName} command:`, error);
+        await sock.sendMessage(chatId, { text: `❌ Error processing ${featureName} command!` });
     }
+}
+
+// Presence helpers
+async function straightPresence(sock, chatId, type, configPath) {
+    const config = initConfig(configPath);
+    if (config.enabled) {
+        try {
+            await sock.presenceSubscribe(chatId);
+            await sock.sendPresenceUpdate(type, chatId);
+
+            const duration = 15000;
+            await new Promise(resolve => setTimeout(resolve, duration));
+
+            await sock.sendPresenceUpdate('paused', chatId);
+            return true;
+        } catch (error) {
+            console.error(`❌ Error sending ${type} indicator:`, error);
+            return false;
+        }
+    }
+    return false;
+}
+
+// Commands
+async function autotypingCommand(sock, chatId, message) {
+    return toggleCommand(sock, chatId, message, autotypingPath, 'Auto-typing');
+}
+async function autorecordingCommand(sock, chatId, message) {
+    return toggleCommand(sock, chatId, message, autorecordingPath, 'Auto-recording');
+}
+async function autorecordTypingCommand(sock, chatId, message) {
+    return toggleCommand(sock, chatId, message, autorecordTypingPath, 'Auto-recordTyping');
+}
+
+// Presence functions
+async function straightTypingPresence(sock, chatId) {
+    return straightPresence(sock, chatId, 'composing', autotypingPath);
+}
+async function straightRecordingPresence(sock, chatId) {
+    return straightPresence(sock, chatId, 'recording', autorecordingPath);
+}
+async function straightRecordTypingPresence(sock, chatId) {
+    const config = initConfig(autorecordTypingPath);
+    if (config.enabled) {
+        try {
+            await sock.presenceSubscribe(chatId);
+            await sock.sendPresenceUpdate('recording', chatId);
+            await sock.sendPresenceUpdate('composing', chatId);
+
+            const duration = 15000;
+            await new Promise(resolve => setTimeout(resolve, duration));
+
+            await sock.sendPresenceUpdate('paused', chatId);
+            return true;
+        } catch (error) {
+            console.error('❌ Error sending record+typing indicator:', error);
+            return false;
+        }
+    }
+    return false;
 }
 
 module.exports = {
     autotypingCommand,
     autorecordingCommand,
     autorecordTypingCommand,
-    handleAutotypingForMessage
+    straightTypingPresence,
+    straightRecordingPresence,
+    straightRecordTypingPresence
 };
