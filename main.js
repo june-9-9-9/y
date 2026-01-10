@@ -1653,14 +1653,11 @@ case userMessage === `${prefix}forfeit` ||
 
             case userMessage.startsWith(`${prefix}autotyping`):
                 await autotypingCommand(sock, chatId, message);
-                commandExecuted = true;
                 break;
 
             case userMessage.startsWith(`${prefix}autorecording`):
-                await autorecordingCommand(sock, chatId, message);
-                
-            await handleAutorecordingForMessage(sock, chatId, message);
-                commandExecuted = true;
+                await autorecordingCommand(sock, chatId, message);                
+                await handleAutorecordingForMessage(sock, chatId, message);
                 break;
                 
 
