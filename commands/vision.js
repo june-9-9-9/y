@@ -119,19 +119,19 @@ async function visionCommand(sock, chatId, message) {
             );
             
             // Call the Gemini Vision API
-            const apiUrl = `https://apiskeith.vercel.app/ai/gemini-vision?image=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(text)}`;
+            const apiUrl = `https://api.bk9.dev/ai/geminiimg?url=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(text)}`;
             const response = await axios.get(apiUrl);
             const data = response.data;
             
             // Check if response is valid
-            if (!data.status) {
+            if (!data.BK9) {
                 throw new Error('API returned an empty response');
             }
             
             // Send the analysis result
             await sock.sendMessage(
                 chatId,
-                { text: data.result },
+                { text: data.BK9 },
                 { quoted: message }
             );
             
