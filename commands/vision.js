@@ -3,63 +3,22 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const FormData = require('form-data');
-const { UploadFileUgu } = require('../lib/uploader');
 
 // =======================
-// Helpers
+// Helpers (Same as urlCommand)
 // =======================
 
 // Upload to Catbox (permanent for any file)
 async function uploadToCatbox(filePath) {
-    try {
-        const form = new FormData();
-        form.append("reqtype", "fileupload");
-        form.append("fileToUpload", fs.createReadStream(filePath));
+    const form = new FormData();
+    form.append("reqtype", "fileupload");
+    form.append("fileToUpload", fs.createReadStream(filePath));
 
-        const res = await axios.post("https://catbox.moe/user/api.php", form, {
-            headers: form.getHeaders(),
-            timeout: 30000
-        });
+    const res = await axios.post("https://catbox.moe/user/api.php", form, {
+        headers: form.getHeaders()
+    });
 
-        return res.data.trim(); // permanent URL
-    } catch (error) {
-        console.error('[Catbox] Upload failed:', error.message);
-        throw error;
-    }
-}
-
-// Upload to Ugu as backup
-async function uploadToUgu(filePath) {
-    try {
-        const result = await UploadFileUgu(filePath);
-        return result.url || result.link || result;
-    } catch (error) {
-        console.error('[Ugu] Upload failed:', error?.message || error);
-        throw error;
-    }
-}
-
-// Try multiple upload services with fallback
-async function uploadImageWithFallback(filePath) {
-    try {
-        // Try Catbox first
-        console.log('[Upload] Trying Catbox...');
-        const catboxUrl = await uploadToCatbox(filePath);
-        console.log('[Upload] Success with Catbox');
-        return catboxUrl;
-    } catch (catboxError) {
-        console.log('[Upload] Catbox failed, trying Ugu...');
-        
-        try {
-            // Try Ugu as backup
-            const uguUrl = await uploadToUgu(filePath);
-            console.log('[Upload] Success with Ugu');
-            return uguUrl;
-        } catch (uguError) {
-            console.error('[Upload] Both services failed');
-            throw new Error(`Upload failed: ${catboxError.message}`);
-        }
-    }
+    return res.data; // permanent URL
 }
 
 // Extract buffer + extension from different media types
@@ -105,8 +64,8 @@ async function extractQuotedMedia(message) {
 // =======================
 async function visionCommand(sock, chatId, message) {
     try {
-        const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
-        
+    
+      const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
         // React to message
         await sock.sendMessage(chatId, { react: { text: '👀', key: message.key } });
 
@@ -114,7 +73,7 @@ async function visionCommand(sock, chatId, message) {
         if (!text) {
             return sock.sendMessage(
                 chatId,
-                { text: '𝗤𝘂𝗼𝘁𝗲 𝗮𝗻 𝗶𝗺𝗮𝗴𝗲 𝗮𝗻𝗱 𝗴𝗶𝘃𝗲 𝘀𝗼𝗺𝗲 𝗶𝗻𝘀𝘁𝗿𝘂𝗰𝘁𝗶𝗼𝗻𝘀 𝘂𝘀𝗲 𝗕𝗮𝗿𝗱 𝘁𝗼 𝗮𝗻𝗮𝗹𝘆𝘇𝗲 𝗶𝗺𝗮𝗴𝗲𝘀.' },
+                { text: '𝗤𝘂𝗼𝘁𝗲 𝗮𝗻 𝗶𝗺𝗮𝗴𝗲 𝗮𝗻𝗱 𝗴𝗶𝘃𝗲 𝘀𝗼𝗺𝗲 𝗶𝗻𝘀𝘁𝗿𝘂𝗰𝘁𝗶𝗼𝗻𝘀 𝗲𝗵. 𝘁𝗼 𝗮𝗻𝗮𝗹𝘆𝘇𝗲 𝗶𝗺𝗮𝗴𝗲𝘀.' },
                 { quoted: message }
             );
         }
@@ -149,66 +108,44 @@ async function visionCommand(sock, chatId, message) {
 
         let imageUrl;
         try {
-            // Upload image using fallback strategy
-            
-            imageUrl = await uploadImageWithFallback(tempPath);
+            // Upload image to Catbox
+            imageUrl = await uploadToCatbox(tempPath);
             
             // Notify user that analysis is in progress
             await sock.sendMessage(
                 chatId,
-                { text: '_𝗔 𝗺𝗼𝗺𝗲𝗻𝘁, 𝗟𝗲𝗺𝗺𝗲 𝗮𝗻𝗮𝗹𝘆𝘇𝗲 𝘁𝗵𝗲 𝗰𝗼𝗻𝘁𝗲𝗻𝘁𝘀 𝗼𝗳 𝘁𝗵𝗲 𝗶𝗺𝗮𝗴𝗲_' },
+                { text: '𝗔 𝗺𝗼𝗺𝗲𝗻𝘁, 𝗟𝗲𝗺𝗺𝗲 𝗮𝗻𝗮𝗹𝘆𝘇𝗲 𝘁𝗵𝗲 𝗰𝗼𝗻𝘁𝗲𝗻𝘁𝘀 𝗼𝗳 𝘁𝗵𝗲 𝗶𝗺𝗮𝗴𝗲...' },
                 { quoted: message }
             );
             
             // Call the Gemini Vision API
-            const apiUrl = `https://api.bk9.dev/ai/geminiimg?url=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(text)}`;
-            const response = await axios.get(apiUrl, { timeout: 60000 });
+            const apiUrl = `https://apiskeith.vercel.app/ai/gemini-vision?image=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(text)}`;
+            const response = await axios.get(apiUrl);
             const data = response.data;
             
             // Check if response is valid
-            if (!data.BK9) {
+            if (!data.status) {
                 throw new Error('API returned an empty response');
             }
             
             // Send the analysis result
             await sock.sendMessage(
                 chatId,
-                { text: data.BK9 },
+                { text: data.result },
                 { quoted: message }
             );
             
         } catch (apiError) {
             console.error('[Vision] API error:', apiError?.message || apiError);
-            
-            let errorMsg = `❌ Failed to analyze the image:\n`;
-            
-            if (apiError.message.includes('Upload failed')) {
-                errorMsg += 'Could not upload image to any service. Please try again.';
-            } else if (apiError.response?.status === 500) {
-                errorMsg += 'Gemini API server error (500). Please try again later.';
-            } else if (apiError.code === 'ECONNREFUSED') {
-                errorMsg += 'Cannot connect to Gemini API. Service might be down.';
-            } else if (apiError.code === 'ETIMEDOUT') {
-                errorMsg += 'Request timed out. Please try again.';
-            } else {
-                errorMsg += apiError.message;
-            }
-            
             await sock.sendMessage(
                 chatId,
-                { text: errorMsg },
+                { text: `❌ Failed to analyze the image:\n${apiError.message}` },
                 { quoted: message }
             );
         } finally {
             // Cleanup temp file
             setTimeout(() => {
-                if (fs.existsSync(tempPath)) {
-                    try {
-                        fs.unlinkSync(tempPath);
-                    } catch (e) {
-                        console.error('[Vision] Cleanup error:', e.message);
-                    }
-                }
+                if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
             }, 2000);
         }
 
