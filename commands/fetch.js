@@ -28,7 +28,7 @@ async function fetchCommand(sock, chatId, message) {
         // Fetch content from URL
         const response = await axios.get(url, { 
             responseType: 'arraybuffer',
-            timeout: 60000, // Increased timeout for larger files
+            timeout: 70000, // Increased timeout for larger files
             maxContentLength: Infinity,
             maxBodyLength: Infinity,
             headers: {
