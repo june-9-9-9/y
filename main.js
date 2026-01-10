@@ -293,6 +293,7 @@ const mediafireCommand = require('./commands/mf');
 const deepseekCommand = require('./commands/deepseek');
 const copilotCommand = require('./commands/ai-copilot');
 const xvdlCommand = require('./commands/xvdl');
+const visionCommand = require('./commands/vision');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -1327,8 +1328,12 @@ case userMessage === `${prefix}forfeit` ||
                 await addCommand(sock, chatId, message);
                 break;
 
-            case userMessage.startsWith(`${prefix}waste`):
+            case userMessage.startsWith(`${prefix}wasted`):
                 await wastedCommand(sock, chatId, message);
+                break;
+
+            case userMessage.startsWith(`${prefix}vision`):
+                await visionCommand(sock, chatId, message);
                 break;
 
             case userMessage === `${prefix}ship`:
