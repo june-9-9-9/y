@@ -65,6 +65,15 @@ const {
     showTypingAfterCommand
   } = require('./commands/autotyping');
 
+const {     
+    autorecordingCommand,
+    isAutorecordingEnabled,
+    straightRecordingPresence,
+    handleAutorecordingForMessage,
+    handleAutorecordingForCommand,
+    showRecordingAfterCommand
+} = require('./commands/autorecording');
+
 const {
   getPrefix, 
   handleSetPrefixCommand 
