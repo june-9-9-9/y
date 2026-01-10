@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const FormData = require('form-data');
+const { UploadFileUgu } = require('../lib/uploader');
 
 // =======================
 // Helpers
@@ -19,6 +20,39 @@ async function uploadToCatbox(filePath) {
     });
 
     return res.data; // permanent URL
+}
+
+// Upload to Ugu as fallback
+async function uploadToUgu(filePath) {
+    try {
+        const result = await UploadFileUgu(filePath);
+        return result.url || result.link || result;
+    } catch (error) {
+        console.error('[Ugu Upload] error:', error?.message || error);
+        throw error;
+    }
+}
+
+// Upload to any available service with fallback
+async function uploadToAnyService(filePath) {
+    try {
+        // Try Catbox first
+        const catboxUrl = await uploadToCatbox(filePath);
+        console.log('[Upload] Success with Catbox');
+        return catboxUrl;
+    } catch (catboxError) {
+        console.log('[Upload] Catbox failed, trying Ugu...');
+        
+        // Try Ugu as fallback
+        try {
+            const uguUrl = await uploadToUgu(filePath);
+            console.log('[Upload] Success with Ugu');
+            return uguUrl;
+        } catch (uguError) {
+            console.error('[Upload] Both services failed');
+            throw new Error(`Catbox failed: ${catboxError.message}, Ugu failed: ${uguError.message}`);
+        }
+    }
 }
 
 // Extract buffer + extension from different media types
@@ -64,7 +98,8 @@ async function extractQuotedMedia(message) {
 // =======================
 async function visionCommand(sock, chatId, message) {
     try {
-      const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
+        const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
+        
         // React to message
         await sock.sendMessage(chatId, { react: { text: '👀', key: message.key } });
 
@@ -107,8 +142,8 @@ async function visionCommand(sock, chatId, message) {
 
         let imageUrl;
         try {
-            // Upload image to Catbox
-            imageUrl = await uploadToCatbox(tempPath);
+            // Upload image to any available service (Catbox first, then Ugu as fallback)
+            imageUrl = await uploadToAnyService(tempPath);
             
             // Notify user that analysis is in progress
             await sock.sendMessage(
