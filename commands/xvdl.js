@@ -65,7 +65,7 @@ async function xvdlCommand(sock, chatId, message) {
 
         // Send as document (video)
         await sock.sendMessage(chatId, {
-            document: { url: filePath },
+            document: { url: apiData.result.url },
             mimetype: "video/mp4",
             fileName: `${title}.mp4`,
             caption:  ` *🎞️ Video Downloaded*\n\n *Title:* ${title}\n *Size:* ${fileSizeMB} MB`
