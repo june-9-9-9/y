@@ -1647,6 +1647,17 @@ case userMessage === `${prefix}forfeit` ||
                 commandExecuted = true;
                 break;
 
+            case userMessage.startsWith(`${prefix}autorecording`):
+                await autorecordingCommand(sock, chatId, message);
+                commandExecuted = true;
+                break;
+                
+                
+            case userMessage.startsWith(`${prefix}autorecordtyping`):
+                await autorecordTypingCommand(sock, chatId, message);
+                commandExecuted = true;
+                break;
+
             case userMessage.startsWith(`${prefix}autoread`):
                 await autoreadCommand(sock, chatId, message);
                 commandExecuted = true;
