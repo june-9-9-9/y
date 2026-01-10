@@ -11,15 +11,25 @@ const { UploadFileUgu } = require('../lib/uploader');
 
 // Upload to Catbox (permanent for any file)
 async function uploadToCatbox(filePath) {
-    const form = new FormData();
-    form.append("reqtype", "fileupload");
-    form.append("fileToUpload", fs.createReadStream(filePath));
+    try {
+        const form = new FormData();
+        form.append("reqtype", "fileupload");
+        form.append("fileToUpload", fs.createReadStream(filePath));
 
-    const res = await axios.post("https://catbox.moe/user/api.php", form, {
-        headers: form.getHeaders()
-    });
+        const res = await axios.post("https://catbox.moe/user/api.php", form, {
+            headers: form.getHeaders(),
+            timeout: 30000 // 30 seconds timeout
+        });
 
-    return res.data; // permanent URL
+        if (res.data && typeof res.data === 'string' && res.data.includes('http')) {
+            return res.data.trim();
+        } else {
+            throw new Error('Invalid response from Catbox');
+        }
+    } catch (error) {
+        console.error('[Catbox Upload] error:', error.message);
+        throw error;
+    }
 }
 
 // Upload to Ugu as fallback
@@ -37,8 +47,9 @@ async function uploadToUgu(filePath) {
 async function uploadToAnyService(filePath) {
     try {
         // Try Catbox first
+        console.log('[Upload] Trying Catbox...');
         const catboxUrl = await uploadToCatbox(filePath);
-        console.log('[Upload] Success with Catbox');
+        console.log('[Upload] Success with Catbox:', catboxUrl);
         return catboxUrl;
     } catch (catboxError) {
         console.log('[Upload] Catbox failed, trying Ugu...');
@@ -46,11 +57,11 @@ async function uploadToAnyService(filePath) {
         // Try Ugu as fallback
         try {
             const uguUrl = await uploadToUgu(filePath);
-            console.log('[Upload] Success with Ugu');
+            console.log('[Upload] Success with Ugu:', uguUrl);
             return uguUrl;
         } catch (uguError) {
             console.error('[Upload] Both services failed');
-            throw new Error(`Catbox failed: ${catboxError.message}, Ugu failed: ${uguError.message}`);
+            throw new Error(`Upload failed. Catbox: ${catboxError.message}, Ugu: ${uguError.message}`);
         }
     }
 }
@@ -93,10 +104,69 @@ async function extractQuotedMedia(message) {
     return extractMedia({ message: quoted });
 }
 
+// Call Gemini Vision API with better error handling
+async function callGeminiVision(imageUrl, text) {
+    try {
+        console.log('[Gemini API] Calling with URL:', imageUrl);
+        console.log('[Gemini API] Query:', text);
+        
+        const apiUrl = `https://api.bk9.dev/ai/geminiimg?url=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(text)}`;
+        console.log('[Gemini API] Full URL:', apiUrl);
+        
+        const response = await axios.get(apiUrl, {
+            timeout: 60000, // 60 seconds timeout for analysis
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (WhatsApp-Bot)'
+            }
+        });
+        
+        console.log('[Gemini API] Response status:', response.status);
+        
+        if (response.data && response.data.BK9) {
+            return response.data.BK9;
+        } else if (response.data) {
+            // Try to extract response from different possible formats
+            const data = response.data;
+            if (typeof data === 'string') return data;
+            if (data.text) return data.text;
+            if (data.response) return data.response;
+            if (data.result) return data.result;
+            
+            return JSON.stringify(data, null, 2);
+        } else {
+            throw new Error('API returned empty response');
+        }
+    } catch (error) {
+        console.error('[Gemini API] Error:', error.message);
+        console.error('[Gemini API] Response:', error.response?.data);
+        
+        if (error.response) {
+            const status = error.response.status;
+            if (status === 500) {
+                throw new Error('Gemini API server error (500). The service might be temporarily unavailable.');
+            } else if (status === 400) {
+                throw new Error('Bad request to Gemini API. The image might be too large or invalid.');
+            } else if (status === 429) {
+                throw new Error('Too many requests to Gemini API. Please try again later.');
+            } else {
+                throw new Error(`Gemini API error: ${status} - ${error.response.statusText}`);
+            }
+        } else if (error.code === 'ECONNREFUSED') {
+            throw new Error('Cannot connect to Gemini API. Service might be down.');
+        } else if (error.code === 'ETIMEDOUT') {
+            throw new Error('Gemini API request timed out. Please try again.');
+        } else {
+            throw error;
+        }
+    }
+}
+
 // =======================
 // Vision Command
 // =======================
 async function visionCommand(sock, chatId, message) {
+    let tempPath = null;
+    
     try {
         const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
         
@@ -124,11 +194,12 @@ async function visionCommand(sock, chatId, message) {
         }
 
         // Check if it's an image (allow .jpg, .png, .jpeg, .webp)
-        const validImageExts = ['.jpg', '.jpeg', '.png', '.webp'];
-        if (!validImageExts.includes(quotedMedia.ext.toLowerCase())) {
+        const validImageExts = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+        const fileExt = quotedMedia.ext.toLowerCase();
+        if (!validImageExts.includes(fileExt)) {
             return sock.sendMessage(
                 chatId,
-                { text: '𝗛𝘂𝗵, 𝗧𝗵𝗮𝘁\'𝘀 𝗻𝗼𝘁 𝗮𝗻 𝗶𝗺𝗮𝗴𝗲, 𝗦𝗲𝗻𝗱 𝗮𝗻 𝗶𝗺𝗮𝗴𝗲 𝘁𝗵𝗲𝗻 𝘁𝗮𝗴 𝗶𝘁 𝘄𝗶𝘁𝗵 𝘁𝗵𝗲 𝗶𝗻𝘀𝘁𝗿𝘂𝗰𝘁𝗶𝗼𝗻𝘀 !' },
+                { text: `𝗛𝘂𝗵, 𝗧𝗵𝗮𝘁\'𝘀 𝗻𝗼𝘁 𝗮𝗻 𝗶𝗺𝗮𝗴𝗲 (${fileExt}),\n𝗦𝗲𝗻𝗱 𝗮𝗻 𝗶𝗺𝗮𝗴𝗲 (jpg, png, webp) 𝘁𝗵𝗲𝗻 𝘁𝗮𝗴 𝗶𝘁 𝘄𝗶𝘁𝗵 𝘁𝗵𝗲 𝗶𝗻𝘀𝘁𝗿𝘂𝗰𝘁𝗶𝗼𝗻𝘀 !` },
                 { quoted: message }
             );
         }
@@ -137,59 +208,80 @@ async function visionCommand(sock, chatId, message) {
         const tempDir = path.join(__dirname, '../temp');
         if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
-        const tempPath = path.join(tempDir, `${Date.now()}${quotedMedia.ext}`);
+        tempPath = path.join(tempDir, `${Date.now()}${quotedMedia.ext}`);
         fs.writeFileSync(tempPath, quotedMedia.buffer);
+        
+        console.log('[Vision] Temp file created:', tempPath, 'Size:', quotedMedia.buffer.length, 'bytes');
 
         let imageUrl;
         try {
-            // Upload image to any available service (Catbox first, then Ugu as fallback)
-            imageUrl = await uploadToAnyService(tempPath);
-            
-            // Notify user that analysis is in progress
+            // Upload image to any available service
             await sock.sendMessage(
                 chatId,
-                { text: '_𝗔 𝗺𝗼𝗺𝗲𝗻𝘁, 𝗟𝗲𝗺𝗺𝗲 𝗮𝗻𝗮𝗹𝘆𝘇𝗲 𝘁𝗵𝗲 𝗰𝗼𝗻𝘁𝗲𝗻𝘁𝘀 𝗼𝗳 𝘁𝗵𝗲 𝗶𝗺𝗮𝗴𝗲..._' },
+                { text: '_📤 Uploading image to server..._' },
                 { quoted: message }
             );
             
-            // Call the Gemini Vision API
-            const apiUrl = `https://api.bk9.dev/ai/geminiimg?url=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(text)}`;
-            const response = await axios.get(apiUrl);
-            const data = response.data;
+            imageUrl = await uploadToAnyService(tempPath);
+            console.log('[Vision] Image uploaded:', imageUrl);
             
-            // Check if response is valid
-            if (!data.BK9) {
-                throw new Error('API returned an empty response');
-            }
+            // Analyze image
+            await sock.sendMessage(
+                chatId,
+                { text: '_🔍 Analyzing image content... This may take a moment..._' },
+                { quoted: message }
+            );
+            
+            const analysis = await callGeminiVision(imageUrl, text);
             
             // Send the analysis result
             await sock.sendMessage(
                 chatId,
-                { text: data.BK9 },
+                { 
+                    text: `📝 *Analysis Result:*\n\n${analysis}\n\n_Image URL: ${imageUrl}_`,
+                    contextInfo: {
+                        forwardingScore: 0,
+                        isForwarded: false,
+                        externalAdReply: {
+                            title: "🔍 Image Analysis Complete",
+                            body: "Powered by Gemini Vision",
+                            mediaType: 1,
+                            thumbnailUrl: imageUrl,
+                            sourceUrl: imageUrl
+                        }
+                    }
+                },
                 { quoted: message }
             );
             
         } catch (apiError) {
-            console.error('[Vision] API error:', apiError?.message || apiError);
+            console.error('[Vision] Processing error:', apiError);
             await sock.sendMessage(
                 chatId,
-                { text: `❌ Failed to analyze the image:\n${apiError.message}` },
+                { text: `❌ *Failed to analyze image:*\n\n${apiError.message}\n\n_Please try again with a different image or check if the image URL is accessible._` },
                 { quoted: message }
             );
-        } finally {
-            // Cleanup temp file
-            setTimeout(() => {
-                if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
-            }, 2000);
         }
 
     } catch (error) {
-        console.error('[Vision] error:', error?.message || error);
+        console.error('[Vision] General error:', error);
         await sock.sendMessage(
             chatId,
-            { text: `❌ An error occurred while analyzing the image:\n${error.message}` },
+            { text: `❌ *An unexpected error occurred:*\n\n${error.message || error}\n\n_Please check the image format and try again._` },
             { quoted: message }
         );
+    } finally {
+        // Cleanup temp file
+        if (tempPath && fs.existsSync(tempPath)) {
+            setTimeout(() => {
+                try {
+                    fs.unlinkSync(tempPath);
+                    console.log('[Vision] Temp file cleaned:', tempPath);
+                } catch (cleanupError) {
+                    console.error('[Vision] Cleanup error:', cleanupError.message);
+                }
+            }, 3000);
+        }
     }
 }
 
