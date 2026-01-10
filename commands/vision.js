@@ -215,12 +215,7 @@ async function visionCommand(sock, chatId, message) {
 
         let imageUrl;
         try {
-            // Upload image to any available service
-            await sock.sendMessage(
-                chatId,
-                { text: '_📤 Uploading image to server..._' },
-                { quoted: message }
-            );
+            
             
             imageUrl = await uploadToAnyService(tempPath);
             console.log('[Vision] Image uploaded:', imageUrl);
