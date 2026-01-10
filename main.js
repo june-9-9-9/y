@@ -59,11 +59,16 @@ const { tictactoeCommand, handleTicTacToeMove } = require('./commands/tictactoe'
 const { 
     autotypingCommand,
     autorecordingCommand,
-    autorecordTypingCommand,
+    isAutotypingEnabled,
+    isAutorecordingEnabled,
     straightTypingPresence,
     straightRecordingPresence,
-    straightRecordTypingPresence
-} = require('./commands/autotyping');
+    handleAutotypingForMessage,
+    handleAutotypingForCommand,
+    handleAutorecordingForMessage,
+    showTypingAfterCommand,
+    showRecordingAfterAudioCommand
+  } = require('./commands/autotyping');
 
 const {
   getPrefix, 
@@ -510,6 +515,7 @@ if (/^[1-9]$/.test(userMessage)) {
         if (!userMessage.startsWith(prefix)) {
             // Show typing indicator if autotyping is enabled
             await handleAutotypingForMessage(sock, chatId, userMessage);
+            await handleAutorecordingForMessage(sock, chatId, userMessage);
 
             if (isGroup) {
                 // Process non-command messages first
@@ -1652,11 +1658,6 @@ case userMessage === `${prefix}forfeit` ||
                 commandExecuted = true;
                 break;
                 
-                
-            case userMessage.startsWith(`${prefix}autorecordtyping`):
-                await autorecordTypingCommand(sock, chatId, message);
-                commandExecuted = true;
-                break;
 
             case userMessage.startsWith(`${prefix}autoread`):
                 await autoreadCommand(sock, chatId, message);
