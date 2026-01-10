@@ -519,7 +519,6 @@ if (/^[1-9]$/.test(userMessage)) {
         if (!userMessage.startsWith(prefix)) {
             // Show typing indicator if autotyping is enabled
             await handleAutotypingForMessage(sock, chatId, userMessage);
-            await handleAutorecordingForMessage(sock, chatId, userMessage);
 
             if (isGroup) {
                 // Process non-command messages first
@@ -1659,6 +1658,8 @@ case userMessage === `${prefix}forfeit` ||
 
             case userMessage.startsWith(`${prefix}autorecording`):
                 await autorecordingCommand(sock, chatId, message);
+                
+            await handleAutorecordingForMessage(sock, chatId, message);
                 commandExecuted = true;
                 break;
                 
