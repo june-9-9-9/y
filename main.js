@@ -56,18 +56,13 @@ const { tictactoeCommand, handleTicTacToeMove } = require('./commands/tictactoe'
 /*━━━━━━━━━━━━━━━━━━━━*/
 // -----Command imports - Handlers-----
 /*━━━━━━━━━━━━━━━━━━━━*/
-const { 
+const {    
     autotypingCommand,
-    autorecordingCommand,
     isAutotypingEnabled,
-    isAutorecordingEnabled,
     straightTypingPresence,
-    straightRecordingPresence,
     handleAutotypingForMessage,
     handleAutotypingForCommand,
-    handleAutorecordingForMessage,
-    showTypingAfterCommand,
-    showRecordingAfterAudioCommand
+    showTypingAfterCommand
   } = require('./commands/autotyping');
 
 const {
