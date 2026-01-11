@@ -294,6 +294,7 @@ const deepseekCommand = require('./commands/deepseek');
 const copilotCommand = require('./commands/ai-copilot');
 const xvdlCommand = require('./commands/xvdl');
 const visionCommand = require('./commands/vision');
+const metaiCommand = require('./commands/ai-meta');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -1331,9 +1332,15 @@ case userMessage === `${prefix}forfeit` ||
             case userMessage.startsWith(`${prefix}wasted`):
                 await wastedCommand(sock, chatId, message);
                 break;
-
-            case userMessage.startsWith(`${prefix}vision`):
+                
+        case userMessage.startsWith(`${prefix}analyse`) || 
+             userMessage.startsWith(`${prefix}vision`):
                 await visionCommand(sock, chatId, message);
+                break;
+
+        case userMessage.startsWith(`${prefix}meta`) || 
+             userMessage.startsWith(`${prefix}metai`):
+                await metaiCommand(sock, chatId, message);
                 break;
 
             case userMessage === `${prefix}ship`:
