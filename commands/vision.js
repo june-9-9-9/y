@@ -167,6 +167,7 @@ const fs = require("fs");
 const axios = require("axios");
 const path = require("path");
 const FormData = require("form-data");
+const { downloadContentFromMessage } = require("@whiskeysockets/baileys");
 
 async function visionCommand(sock, chatId, message) {
   try {
@@ -186,19 +187,46 @@ async function visionCommand(sock, chatId, message) {
     if (fileSize > 10 * 1024 * 1024) 
       return sock.sendMessage(chatId, { text: "❌ Max 10MB image size exceeded!" }, { quoted: message });
 
-    const tempFile = path.join(__dirname, "temp", `vision_${Date.now()}.jpg`);
-    const stream = await sock.downloadMediaMessage(img);
-    fs.writeFileSync(tempFile, stream);
+    let stream;
+    if (img.imageMessage) {
+      stream = await downloadContentFromMessage(img, 'image');
+    } else if (img.documentMessage) {
+      stream = await downloadContentFromMessage(img, 'document');
+    } else {
+      return sock.sendMessage(chatId, { text: "❌ Unsupported message type!" }, { quoted: message });
+    }
+
+    const tempDir = path.join(__dirname, "temp");
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    
+    const tempFile = path.join(tempDir, `vision_${Date.now()}.jpg`);
+    
+    const bufferChunks = [];
+    for await (const chunk of stream) {
+      bufferChunks.push(chunk);
+    }
+    const buffer = Buffer.concat(bufferChunks);
+    fs.writeFileSync(tempFile, buffer);
 
     const formData = new FormData();
     formData.append("reqtype", "fileupload");
-    formData.append("fileToUpload", fs.createReadStream(tempFile));
-    let imageUrl = await axios.post("https://catbox.moe/user/api.php", formData, { headers: formData.getHeaders() })
-      .then(res => res.data.startsWith("http") ? res.data : null);
+    formData.append("fileToUpload", fs.createReadStream(tempFile), { 
+      filename: `vision_${Date.now()}.jpg`,
+      contentType: img.mimetype || 'image/jpeg'
+    });
+    
+    let imageUrl = await axios.post("https://catbox.moe/user/api.php", formData, { 
+      headers: formData.getHeaders(),
+      timeout: 10000
+    })
+      .then(res => res.data.startsWith("http") ? res.data : null)
+      .catch(() => null);
 
     if (!imageUrl) {
       const base64 = fs.readFileSync(tempFile).toString("base64");
-      imageUrl = `data:${img.mimetype};base64,${base64}`;
+      imageUrl = `data:${img.mimetype || 'image/jpeg'};base64,${base64}`;
     }
 
     const apiUrl = `https://apiskeith.vercel.app/ai/gemini-vision?image=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(query)}`;
@@ -208,9 +236,20 @@ async function visionCommand(sock, chatId, message) {
       text: `*🔍 Vision Result*\n\n*Query:* ${query}\n\n*Analysis:*\n${res.data?.result || "No result"}\n\n_Powered by Gemini Vision AI_`
     }, { quoted: message });
 
-    setTimeout(() => fs.existsSync(tempFile) && fs.unlinkSync(tempFile), 5000);
+    setTimeout(() => {
+      if (fs.existsSync(tempFile)) {
+        try {
+          fs.unlinkSync(tempFile);
+        } catch (e) {
+          console.error("Error deleting temp file:", e.message);
+        }
+      }
+    }, 5000);
   } catch (e) {
-    await sock.sendMessage(chatId, { text: `❌ Error: ${e.message}` }, { quoted: message });
+    console.error("Vision command error:", e);
+    await sock.sendMessage(chatId, { 
+      text: `❌ Error: ${e.message || "Failed to process vision request"}` 
+    }, { quoted: message });
   }
 }
 
