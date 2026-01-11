@@ -67,16 +67,16 @@ async function ytplayCommand(sock, chatId, message) {
         }
 
         // Fetch video data from API
-        const response = await axios.get(`https://veron-apis.zone.id/downloader/youtube1?url=${videoUrl}`);
+        const response = await axios.get(`https://iamtkm.vercel.app/downloaders/ytmp4?apikey=tkm&url=${videoUrl}`);
         const ApiData = response.data;
 
-        if (!ApiData || !ApiData.success || !ApiData.result || !ApiData.result.downloadUrl) {
+        if (!ApiData || !ApiData.status || !ApiData.data || !ApiData.data.url) {
             return await sock.sendMessage(chatId, { 
                 text: "Failed to fetch video from the API. Please try again later." 
             }, { quoted: message });
         }
 
-        const downloadUrl = ApiData.result.downloadUrl;
+        const downloadUrl = ApiData.data.url;
         const title = videoInfo.title;
         const thumbnail = videoInfo.thumbnail;
         const duration = videoInfo.timestamp || "Unknown";
@@ -93,7 +93,7 @@ async function ytplayCommand(sock, chatId, message) {
         }
 
         // Create video info text as caption
-        const infoText = `*📹 YouTube Video*\n\n` +
+        const infoText = `*YouTube Video*\n\n` +
                         `*Title:* ${title}\n` +
                         `*Duration:* ${duration}\n` +
                         `*Views:* ${views}\n` +
@@ -101,7 +101,7 @@ async function ytplayCommand(sock, chatId, message) {
 
         // Send the video with info as caption
         await sock.sendMessage(chatId, {
-            video: { url: downloadUrl },
+            video: { url: url },
             mimetype: "video/mp4",
             caption: infoText,
             thumbnail: thumbBuffer
