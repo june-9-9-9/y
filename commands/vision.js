@@ -5,7 +5,7 @@ const axios = require('axios');
 const FormData = require('form-data');
 
 // =======================
-// Helpers
+// Helpers (Same as urlCommand)
 // =======================
 
 // Upload to Catbox (permanent for any file)
@@ -15,8 +15,7 @@ async function uploadToCatbox(filePath) {
     form.append("fileToUpload", fs.createReadStream(filePath));
 
     const res = await axios.post("https://catbox.moe/user/api.php", form, {
-        headers: form.getHeaders(),
-        timeout: 15000 // prevent hanging forever
+        headers: form.getHeaders()
     });
 
     return res.data; // permanent URL
@@ -65,26 +64,38 @@ async function extractQuotedMedia(message) {
 // =======================
 async function visionCommand(sock, chatId, message) {
     try {
-        const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
-
+      const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
         // React to message
         await sock.sendMessage(chatId, { react: { text: '👀', key: message.key } });
 
         // Validate input
         if (!text) {
-            return sock.sendMessage(chatId, { text: 'Quote an image and give instructions eh.' }, { quoted: message });
+            return sock.sendMessage(
+                chatId,
+                { text: '𝗤𝘂𝗼𝘁𝗲 𝗮𝗻 𝗶𝗺𝗮𝗴𝗲 𝗮𝗻𝗱 𝗴𝗶𝘃𝗲 𝘀𝗼𝗺𝗲 𝗶𝗻𝘀𝘁𝗿𝘂𝗰𝘁𝗶𝗼𝗻𝘀 𝗲𝗵. 𝗜\'𝗺 𝗣𝗘𝗔𝗖𝗘 𝗔𝗶, 𝗶 𝘂𝘀𝗲 𝗕𝗮𝗿𝗱 𝘁𝗼 𝗮𝗻𝗮𝗹𝘆𝘇𝗲 𝗶𝗺𝗮𝗴𝗲𝘀.' },
+                { quoted: message }
+            );
         }
 
         // Extract quoted media (only image allowed)
         const quotedMedia = await extractQuotedMedia(message);
+        
         if (!quotedMedia) {
-            return sock.sendMessage(chatId, { text: 'No image found. Reply to an image with instructions!' }, { quoted: message });
+            return sock.sendMessage(
+                chatId,
+                { text: '𝗛𝘂𝗵, 𝗧𝗵𝗮𝘁\'𝘀 𝗻𝗼𝘁 𝗮𝗻 𝗶𝗺𝗮𝗴𝗲, 𝗦𝗲𝗻𝗱 𝗮𝗻 𝗶𝗺𝗮𝗴𝗲 𝘁𝗵𝗲𝗻 𝘁𝗮𝗴 𝗶𝘁 𝘄𝗶𝘁𝗵 𝘁𝗵𝗲 𝗶𝗻𝘀𝘁𝗿𝘂𝗰𝘁𝗶𝗼𝗻𝘀 !' },
+                { quoted: message }
+            );
         }
 
-        // Check if it's an image
+        // Check if it's an image (allow .jpg, .png, .jpeg, .webp)
         const validImageExts = ['.jpg', '.jpeg', '.png', '.webp'];
         if (!validImageExts.includes(quotedMedia.ext.toLowerCase())) {
-            return sock.sendMessage(chatId, { text: 'That’s not a valid image format.' }, { quoted: message });
+            return sock.sendMessage(
+                chatId,
+                { text: '𝗛𝘂𝗵, 𝗧𝗵𝗮𝘁\'𝘀 𝗻𝗼𝘁 𝗮𝗻 𝗶𝗺𝗮𝗴𝗲, 𝗦𝗲𝗻𝗱 𝗮𝗻 𝗶𝗺𝗮𝗴𝗲 𝘁𝗵𝗲𝗻 𝘁𝗮𝗴 𝗶𝘁 𝘄𝗶𝘁𝗵 𝘁𝗵𝗲 𝗶𝗻𝘀𝘁𝗿𝘂𝗰𝘁𝗶𝗼𝗻𝘀 !' },
+                { quoted: message }
+            );
         }
 
         // Temp file handling
@@ -94,30 +105,42 @@ async function visionCommand(sock, chatId, message) {
         const tempPath = path.join(tempDir, `${Date.now()}${quotedMedia.ext}`);
         fs.writeFileSync(tempPath, quotedMedia.buffer);
 
+        let imageUrl;
         try {
             // Upload image to Catbox
-            const imageUrl = await uploadToCatbox(tempPath);
-
-            await sock.sendMessage(chatId, { text: 'Analyzing the image, hold on...' }, { quoted: message });
-
-            // Call Gemini Vision API with timeout + error handling
-            const apiUrl = `https://apiskeith.vercel.app/ai/gemini-vision?image=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(text)}`;
-            const response = await axios.get(apiUrl, { timeout: 20000 }).catch(err => {
-                throw new Error(`API unreachable: ${err.code || err.message}`);
-            });
-
+            imageUrl = await uploadToCatbox(tempPath);
+            
+            // Notify user that analysis is in progress
+            await sock.sendMessage(
+                chatId,
+                { text: '𝗔 𝗺𝗼𝗺𝗲𝗻𝘁, 𝗟𝗲𝗺𝗺𝗲 𝗮𝗻𝗮𝗹𝘆𝘇𝗲 𝘁𝗵𝗲 𝗰𝗼𝗻𝘁𝗲𝗻𝘁𝘀 𝗼𝗳 𝘁𝗵𝗲 𝗶𝗺𝗮𝗴𝗲. . .' },
+                { quoted: message }
+            );
+            
+            // Call the Gemini Vision API
+            const apiUrl = `https://api.bk9.dev/ai/geminiimg?url=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(text)}`;
+            const response = await axios.get(apiUrl);
             const data = response.data;
-
-            if (!data || !data.status) {
-                throw new Error('Empty response from Vision API');
+            
+            // Check if response is valid
+            if (!data.BK9) {
+                throw new Error('API returned an empty response');
             }
-
+            
             // Send the analysis result
-            await sock.sendMessage(chatId, { text: data.result }, { quoted: message });
-
+            await sock.sendMessage(
+                chatId,
+                { text: data.BK9 },
+                { quoted: message }
+            );
+            
         } catch (apiError) {
-            console.error('[Vision] API error:', apiError);
-            await sock.sendMessage(chatId, { text: `❌ Could not analyze the image.\nReason: ${apiError.message}` }, { quoted: message });
+            console.error('[Vision] API error:', apiError?.message || apiError);
+            await sock.sendMessage(
+                chatId,
+                { text: `❌ Failed to analyze the image:\n${apiError.message}` },
+                { quoted: message }
+            );
         } finally {
             // Cleanup temp file
             setTimeout(() => {
@@ -126,8 +149,12 @@ async function visionCommand(sock, chatId, message) {
         }
 
     } catch (error) {
-        console.error('[Vision] error:', error);
-        await sock.sendMessage(chatId, { text: `❌ Unexpected error:\n${error.message}` }, { quoted: message });
+        console.error('[Vision] error:', error?.message || error);
+        await sock.sendMessage(
+            chatId,
+            { text: `❌ An error occurred while analyzing the image:\n${error.message}` },
+            { quoted: message }
+        );
     }
 }
 
