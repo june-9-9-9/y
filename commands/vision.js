@@ -1,4 +1,4 @@
-const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+/*const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
@@ -157,6 +157,61 @@ async function visionCommand(sock, chatId, message) {
             { quoted: message }
         );
     }
+}
+
+module.exports = visionCommand;
+
+*/
+
+const fs = require("fs");
+const axios = require("axios");
+const path = require("path");
+const FormData = require("form-data");
+
+async function visionCommand(sock, chatId, message) {
+  try {
+    await sock.sendMessage(chatId, { react: { text: "👁️", key: message.key } });
+
+    const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
+    const query = text?.split(" ").slice(1).join(" ").trim();
+    const quoted = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+
+    if (!quoted) return sock.sendMessage(chatId, { text: "📌 Reply to an image with a query!" }, { quoted: message });
+
+    const img = quoted.imageMessage || quoted.documentMessage;
+    if (!img || !(img.mimetype || "").startsWith("image/")) 
+      return sock.sendMessage(chatId, { text: "❌ Only images supported!" }, { quoted: message });
+
+    const fileSize = Number(img.fileLength || 0);
+    if (fileSize > 10 * 1024 * 1024) 
+      return sock.sendMessage(chatId, { text: "❌ Max 10MB image size exceeded!" }, { quoted: message });
+
+    const tempFile = path.join(__dirname, "temp", `vision_${Date.now()}.jpg`);
+    const stream = await sock.downloadMediaMessage(img);
+    fs.writeFileSync(tempFile, stream);
+
+    const formData = new FormData();
+    formData.append("reqtype", "fileupload");
+    formData.append("fileToUpload", fs.createReadStream(tempFile));
+    let imageUrl = await axios.post("https://catbox.moe/user/api.php", formData, { headers: formData.getHeaders() })
+      .then(res => res.data.startsWith("http") ? res.data : null);
+
+    if (!imageUrl) {
+      const base64 = fs.readFileSync(tempFile).toString("base64");
+      imageUrl = `data:${img.mimetype};base64,${base64}`;
+    }
+
+    const apiUrl = `https://apiskeith.vercel.app/ai/gemini-vision?image=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(query)}`;
+    const res = await axios.get(apiUrl, { timeout: 60000 });
+
+    await sock.sendMessage(chatId, {
+      text: `*🔍 Vision Result*\n\n*Query:* ${query}\n\n*Analysis:*\n${res.data?.result || "No result"}\n\n_Powered by Gemini Vision AI_`
+    }, { quoted: message });
+
+    setTimeout(() => fs.existsSync(tempFile) && fs.unlinkSync(tempFile), 5000);
+  } catch (e) {
+    await sock.sendMessage(chatId, { text: `❌ Error: ${e.message}` }, { quoted: message });
+  }
 }
 
 module.exports = visionCommand;
