@@ -101,19 +101,19 @@ async function visionCommand(sock, chatId, message) {
             await sock.sendMessage(chatId, { text: 'Analyzing the image, hold on...' }, { quoted: message });
 
             // Call Gemini Vision API with timeout + error handling
-            const apiUrl = `https://api.bk9.dev/ai/geminiimg?url=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(text)}`;
+            const apiUrl = `https://apiskeith.vercel.app/ai/gemini-vision?image=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(text)}`;
             const response = await axios.get(apiUrl, { timeout: 20000 }).catch(err => {
                 throw new Error(`API unreachable: ${err.code || err.message}`);
             });
 
             const data = response.data;
 
-            if (!data || !data.BK9) {
+            if (!data || !data.status) {
                 throw new Error('Empty response from Vision API');
             }
 
             // Send the analysis result
-            await sock.sendMessage(chatId, { text: data.BK9 }, { quoted: message });
+            await sock.sendMessage(chatId, { text: data.result }, { quoted: message });
 
         } catch (apiError) {
             console.error('[Vision] API error:', apiError);
