@@ -2,121 +2,215 @@ const fs = require('fs');
 const path = require('path');
 const isAdmin = require('../lib/isAdmin');
 
-const DATA_FILE = path.join(__dirname, '../data/antimention.json');
-let settings = [];
+const dataDir = path.join(__dirname, '..', 'data');
+const configPath = path.join(dataDir, 'antigroupmention.json');
 
-// Ensure file exists and load settings
-(function init() {
-  fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
-  if (!fs.existsSync(DATA_FILE)) fs.writeFileSync(DATA_FILE, '[]');
-  try { settings = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); }
-  catch { settings = []; fs.writeFileSync(DATA_FILE, '[]'); }
-})();
-
-const save = () => fs.writeFileSync(DATA_FILE, JSON.stringify(settings, null, 2));
-const cleanJid = jid => jid ? jid.split(':')[0].replace(/\D/g, '') + '@s.whatsapp.net' : jid;
-
-// Enhanced: detect WhatsApp mentions OR raw text starting with '@'
-const hasMentions = m => {
-  const text = m?.conversation || m?.extendedTextMessage?.text || '';
-  const rawMention = /@\w+/.test(text); // any @word
-  const metaMention = ['extendedTextMessage','imageMessage','videoMessage','documentMessage','audioMessage']
-    .some(k => m?.[k]?.contextInfo?.mentionedJid?.length);
-  return rawMention || metaMention;
-};
-
-async function antimentionCommand(sock, chatId, msg) {
-  try {
-    if (!chatId.endsWith('@g.us')) return sock.sendMessage(chatId,{text:'❌ Group only'},{quoted:msg});
-    const sender = cleanJid(msg.key.participant || sock.user.id);
-    if (!await isAdmin(sock, chatId, sender)) return sock.sendMessage(chatId,{text:'❌ Admins only'},{quoted:msg});
-    
-    const [cmd,arg] = (msg.message?.conversation || msg.message?.extendedTextMessage?.text || '').split(' ').slice(1);
-    if (cmd==='on') return enable(sock, chatId, msg, arg);
-    if (cmd==='off') return disable(sock, chatId, msg);
-    if (cmd==='status') return status(sock, chatId, msg);
-    return help(sock, chatId, msg);
-  } catch(e){ sock.sendMessage(chatId,{text:'❌ Error: '+e.message},{quoted:msg}); }
-}
-
-async function enable(sock, chatId, msg, mode) {
-  const modes = {warn:'Warning users',delete:'Deleting messages',kick:'Kicking users'};
-  if (!modes[mode]) return sock.sendMessage(chatId,{text:`Usage: .antimention on [${Object.keys(modes).join('|')}]`},{quoted:msg});
-  if ((mode!=='warn') && !await isAdmin(sock, chatId, cleanJid(sock.user.id)))
-    return sock.sendMessage(chatId,{text:'⚠️ Bot needs admin rights'},{quoted:msg});
-  
-  const s = {chatId,enabled:true,mode,exemptAdmins:true,warnings:{}};
-  const existingIndex = settings.findIndex(g=>g.chatId===chatId);
-  if (existingIndex >= 0) {
-    settings[existingIndex] = s;
-  } else {
-    settings.push(s);
-  }
-  save();
-  sock.sendMessage(chatId,{text:`✅ Anti-Mention Enabled\nMode: ${mode} (${modes[mode]})\nAdmins exempted.`},{quoted:msg});
-}
-
-function disable(sock, chatId, msg) {
-  const i = settings.findIndex(g=>g.chatId===chatId);
-  if (i>=0){ settings.splice(i,1); save(); sock.sendMessage(chatId,{text:'❌ Disabled'},{quoted:msg}); }
-  else sock.sendMessage(chatId,{text:'ℹ️ Already off'},{quoted:msg});
-}
-
-function status(sock, chatId, msg) {
-  const g = settings.find(x=>x.chatId===chatId);
-  if (!g?.enabled) return sock.sendMessage(chatId,{text:'❌ Off\nUse: .antimention on [mode]'},{quoted:msg});
-  let txt=`📊 Enabled\nMode: ${g.mode}\n\n`;
-  // Only show user numbers, not full JIDs
-  txt+=Object.entries(g.warnings).slice(0,5).map(([jid,count])=>`${jid.split('@')[0]}: ${count} warning${count>1?'s':''}`).join('\n')||'No warnings yet.';
-  sock.sendMessage(chatId,{text:txt},{quoted:msg});
-}
-
-const help = (sock,chatId,msg)=>sock.sendMessage(chatId,{text:`👥 Anti-Mention\n.on [warn|delete|kick]\n.off\n.status\nExample: .antimention on delete`},{quoted:msg});
-
-function setupAntimentionListener(sock){
-  sock.ev.on('messages.upsert',async({messages})=>{
-    const m=messages[0],chatId=m?.key.remoteJid;
-    if(!chatId?.endsWith('@g.us')||m.key.fromMe) return;
-    const g=settings.find(x=>x.chatId===chatId);
-    if(!g?.enabled||!hasMentions(m.message)) return;
-    
-    const sender=cleanJid(m.key.participant||chatId);
-    const userNumber = sender.split('@')[0];
-    
-    try{
-      const meta=await sock.groupMetadata(chatId);
-      const p=meta.participants.find(x=>cleanJid(x.id)===sender);
-      if(g.exemptAdmins&&(p?.admin==='admin'||p?.admin==='superadmin')) return;
-
-      switch(g.mode){
-        case 'warn':
-          // Only show the user number, not full JID
-          sock.sendMessage(chatId,{text:`⚠️ @${userNumber} - No mentions allowed!`});
-          break;
-        case 'delete':
-          // Delete the message with mention
-          sock.sendMessage(chatId,{
-            delete: {
-              remoteJid: chatId,
-              fromMe: false,
-              id: m.key.id,
-              participant: sender
+function createFakeContact(message) {
+    return {
+        key: {
+            participants: "0@s.whatsapp.net",
+            remoteJid: "0@s.whatsapp.net",
+            fromMe: false
+        },
+        message: {
+            contactMessage: {
+                displayName: "JUNE OFFICIAL",
+                vcard: `BEGIN:VCARD\nVERSION:3.0\nN:Sy;Bot;;;\nFN:KOLOLI\nitem1.TEL;waid=${message?.key?.participant?.split('@')[0] || message?.key?.remoteJid?.split('@')[0] || '0'}:${message?.key?.participant?.split('@')[0] || message?.key?.remoteJid?.split('@')[0] || '0'}\nitem1.X-ABLabel:Phone\nEND:VCARD`
             }
-          }).then(() => {
-            // Optionally send a warning message
-            sock.sendMessage(chatId,{text:`🚫 @${userNumber} - Message deleted due to mention`});
-          }).catch(console.error);
-          break;
-        case 'kick':
-          const bot=meta.participants.find(x=>cleanJid(x.id)===cleanJid(sock.user.id));
-          if(bot?.admin==='superadmin'){
-            sock.sendMessage(chatId,{text:`🚫 @${userNumber} - Kicked for mentioning`});
-            setTimeout(()=>sock.groupParticipantsUpdate(chatId,[sender],'remove'),1000);
-          }
-          break;
-      }
-    }catch(e){ console.error('Listener error:',e); }
-  });
+        },
+        participant: "0@s.whatsapp.net"
+    };
 }
 
-module.exports={antimentionCommand,setupAntimentionListener};
+function initConfig() {
+    try {
+        // Create data directory if it doesn't exist
+        if (!fs.existsSync(dataDir)) {
+            fs.mkdirSync(dataDir, { recursive: true });
+            console.log(`📁 Created data directory: ${dataDir}`);
+        }
+
+        // Create config file if it doesn't exist
+        if (!fs.existsSync(configPath)) {
+            const defaultConfig = {};
+            fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2));
+            console.log(`📄 Created config file: ${configPath}`);
+            return defaultConfig;
+        }
+
+        // Read existing config
+        const configData = fs.readFileSync(configPath, 'utf8');
+        
+        // If file exists but is empty, initialize with default config
+        if (!configData.trim()) {
+            const defaultConfig = {};
+            fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2));
+            return defaultConfig;
+        }
+        
+        return JSON.parse(configData);
+    } catch (error) {
+        console.error('Error initializing config:', error);
+        
+        // If reading fails, create a fresh config
+        const defaultConfig = {};
+        fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2));
+        return defaultConfig;
+    }
+}
+
+function saveConfig(config) {
+    try {
+        // Ensure data directory exists
+        if (!fs.existsSync(dataDir)) {
+            fs.mkdirSync(dataDir, { recursive: true });
+        }
+        
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    } catch (error) {
+        console.error('Error saving config:', error);
+        // Try to create file if it doesn't exist
+        const defaultConfig = config || {};
+        fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2));
+    }
+}
+
+function getGroupConfig(chatId) {
+    const config = initConfig(); // This will auto-create if needed
+    return config[chatId] || { enabled: false, action: 'delete' };
+}
+
+function setGroupConfig(chatId, groupConfig) {
+    const config = initConfig(); // This will auto-create if needed
+    config[chatId] = groupConfig;
+    saveConfig(config);
+}
+
+async function antigroupmentionCommand(sock, chatId, message, senderId) {
+    try {
+        const fake = createFakeContact(message);
+        const isSenderAdmin = await isAdmin(sock, chatId, senderId);
+
+        if (!isSenderAdmin) {
+            await sock.sendMessage(chatId, { text: '❌ For Group Admins Only' }, { quoted: fake });
+            return;
+        }
+
+        const text = message.message?.conversation || message.message?.extendedTextMessage?.text || '';
+        const args = text.trim().split(' ').slice(1);
+        const action = args[0]?.toLowerCase();
+
+        const groupConfig = getGroupConfig(chatId);
+
+        if (!action) {
+            const usage = `👥 *ANTIGROUPMENTION SETUP*\n\n.antigroupmention on\n.antigroupmention set delete | kick | warn\n.antigroupmention off\n.antigroupmention get\n.antigroupmention reset`;
+            await sock.sendMessage(chatId, { text: usage }, { quoted: fake });
+            return;
+        }
+
+        switch (action) {
+            case 'on':
+                groupConfig.enabled = true;
+                setGroupConfig(chatId, groupConfig);
+                await sock.sendMessage(chatId, { text: '👥 Antigroupmention has been turned ON - Blocking group mentions...' }, { quoted: fake });
+                break;
+
+            case 'off':
+                groupConfig.enabled = false;
+                setGroupConfig(chatId, groupConfig);
+                await sock.sendMessage(chatId, { text: '👥 Antigroupmention has been turned OFF' }, { quoted: fake });
+                break;
+
+            case 'set':
+                const setAction = args[1]?.toLowerCase();
+                if (!['delete', 'kick', 'warn'].includes(setAction)) {
+                    await sock.sendMessage(chatId, { text: '❌ Invalid action. Choose delete, kick, or warn.' }, { quoted: fake });
+                    return;
+                }
+                groupConfig.action = setAction;
+                groupConfig.enabled = true;
+                setGroupConfig(chatId, groupConfig);
+                await sock.sendMessage(chatId, { text: `👥 Antigroupmention action set to ${setAction}` }, { quoted: message });
+                break;
+
+            case 'get':
+                const statusText = `👥 *Antigroupmention Configuration*\nStatus: ${groupConfig.enabled ? 'ON' : 'OFF'}\nAction: ${groupConfig.action || 'delete'}\nConfig Path: data/antigroupmention.json`;
+                await sock.sendMessage(chatId, { text: statusText }, { quoted: fake });
+                break;
+
+            case 'reset':
+                const config = initConfig();
+                if (config[chatId]) {
+                    delete config[chatId];
+                    saveConfig(config);
+                    await sock.sendMessage(chatId, { text: '👥 Antigroupmention configuration reset to default' }, { quoted: fake });
+                } else {
+                    await sock.sendMessage(chatId, { text: '👥 No configuration found for this group' }, { quoted: fake });
+                }
+                break;
+
+            default:
+                await sock.sendMessage(chatId, { text: '❌ Invalid command. Use .antigroupmention on/off/set/get/reset' }, { quoted: message });
+        }
+    } catch (error) {
+        console.error('Error in antigroupmention command:', error);
+    }
+}
+
+async function handleGroupMentionDetection(sock, chatId, message, senderId) {
+    try {
+        // Initialize config on first use (will auto-create if needed)
+        const groupConfig = getGroupConfig(chatId);
+        if (!groupConfig.enabled) return;
+
+        const text = message.message?.conversation || 
+                    message.message?.extendedTextMessage?.text || '';
+
+        const hasTagAll = text.includes('@everyone') || text.includes('@all');
+        if (!hasTagAll) return;
+
+        const senderIsAdmin = await isAdmin(sock, chatId, senderId);
+        if (senderIsAdmin) return;
+
+        const quotedMessageId = message.key.id;
+        const quotedParticipant = message.key.participant || senderId;
+
+        try {
+            switch (groupConfig.action) {
+                case 'delete':
+                    await sock.sendMessage(chatId, {
+                        delete: { remoteJid: chatId, fromMe: false, id: quotedMessageId, participant: quotedParticipant }
+                    });
+                    break;
+
+                case 'warn':
+                    const fake = createFakeContact(message);
+                    await sock.sendMessage(chatId, {
+                        text: `⚠️ Warning! @${senderId.split('@')[0]}, using @everyone/@all is not allowed here.`,
+                        mentions: [senderId]
+                    }, { quoted: fake });
+                    break;
+
+                case 'kick':
+                    await sock.sendMessage(chatId, {
+                        delete: { remoteJid: chatId, fromMe: false, id: quotedMessageId, participant: quotedParticipant }
+                    });
+                    await sock.groupParticipantsUpdate(chatId, [senderId], 'remove');
+                    break;
+            }
+        } catch (error) {
+            console.error('Failed to enforce antigroupmention action:', error);
+        }
+    } catch (error) {
+        console.error('Error in group mention detection:', error);
+    }
+}
+
+// Auto-initialize on module load
+console.log('📁 Initializing antigroupmention configuration...');
+initConfig();
+
+module.exports = {
+    antigroupmentionCommand,
+    handleGroupMentionDetection
+};
