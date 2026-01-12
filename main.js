@@ -337,7 +337,6 @@ async function handleMessages(sock, messageUpdate, printLog) {
         //handle devReact
         await handleDevReact(sock, message);
         
-        await handleGroupMentionDetection(sock, message);
 
         // Store message for antidelete feature
         if (message.message) {
@@ -1316,6 +1315,7 @@ case userMessage === `${prefix}forfeit` ||
                 
             case userMessage.startsWith(`${prefix}antistatusmention`):
                 await antigroupmentionCommand(sock, chatId, senderId, message);
+                await handleGroupMentionDetection(sock, message, senderId, chatId);
                 break;
 
             case userMessage.startsWith(`${prefix}take`):
