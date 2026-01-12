@@ -295,7 +295,7 @@ const copilotCommand = require('./commands/ai-copilot');
 const xvdlCommand = require('./commands/xvdl');
 const visionCommand = require('./commands/vision');
 const metaiCommand = require('./commands/ai-meta');
-const { antimentionCommand, setupAntimentionListener } = require('./commands/antimention.js');
+const {     antigroupmentionCommand, handleGroupMentionDetection } = require('./commands/antimention.js');
 
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
@@ -337,8 +337,7 @@ async function handleMessages(sock, messageUpdate, printLog) {
         //handle devReact
         await handleDevReact(sock, message);
         
-        //setupAntimentionListener
-        await setupAntimentionListener(sock);
+        await handleGroupMentionDetection(sock, message);
 
         // Store message for antidelete feature
         if (message.message) {
@@ -1316,7 +1315,7 @@ case userMessage === `${prefix}forfeit` ||
 
                 
             case userMessage.startsWith(`${prefix}antistatusmention`):
-                await antimentionCommand(sock, chatId, message);
+                await antigroupmentionCommand(sock, chatId, senderId, message);
                 break;
 
             case userMessage.startsWith(`${prefix}take`):
