@@ -48,71 +48,74 @@ function cleanJid(jid) {
     return jid.split(':')[0].replace(/\D/g, '') + '@s.whatsapp.net';
 }
 
-function hasEveryoneMention(text) {
-    if (!text) return false;
-    
-    // Patterns to detect @everyone and @all mentions
-    const patterns = [
-        /@everyone/i,
-        /@all/i,
-        /@channel/i,
-        /@here/i,
-        /@group/i,
-        /@todos/i, // Spanish/Portuguese
-        /@semua/i, // Indonesian
-        /@すべて/i, // Japanese
-        /@전체/i, // Korean
-        /@tutti/i // Italian
-    ];
-    
-    return patterns.some(pattern => pattern.test(text));
-}
-
 function hasMentions(msg) {
     if (!msg) return false;
     
-    // Extract text from message
-    let text = '';
-    if (msg.conversation) {
-        text = msg.conversation;
-    } else if (msg.extendedTextMessage?.text) {
-        text = msg.extendedTextMessage.text;
-    } else if (msg.imageMessage?.caption) {
-        text = msg.imageMessage.caption;
-    } else if (msg.videoMessage?.caption) {
-        text = msg.videoMessage.caption;
-    } else if (msg.documentMessage?.caption) {
-        text = msg.documentMessage.caption;
+    // Check for mentionedJid in any message type (official mentions)
+    const checkOfficial = (m) => m?.contextInfo?.mentionedJid?.length > 0;
+    
+    const hasOfficialMention = checkOfficial(msg.extendedTextMessage) || 
+                               checkOfficial(msg.imageMessage) || 
+                               checkOfficial(msg.videoMessage) || 
+                               checkOfficial(msg.documentMessage) || 
+                               checkOfficial(msg.audioMessage);
+    
+    // Check for manual @mentions in text
+    let hasManualMention = false;
+    let detectedNumbers = [];
+    
+    // Get message text from various message types
+    const messageText = msg.message?.conversation || 
+                       msg.message?.extendedTextMessage?.text || 
+                       msg.message?.imageMessage?.caption || 
+                       msg.message?.videoMessage?.caption || 
+                       msg.message?.documentMessage?.caption || 
+                       msg.message?.audioMessage?.caption || '';
+    
+    // Manual mention detection patterns
+    if (messageText) {
+        // Pattern 1: @ followed by numbers (e.g., @1234567890)
+        const atPattern = /@(\d+)/g;
+        const atMatches = [...messageText.matchAll(atPattern)];
+        detectedNumbers = [...detectedNumbers, ...atMatches.map(m => m[1])];
+        
+        // Pattern 2: Standalone phone numbers (10+ digits)
+        const numberPattern = /\b\d{10,15}\b/g;
+        const numberMatches = [...messageText.matchAll(numberPattern)];
+        detectedNumbers = [...detectedNumbers, ...numberMatches.map(m => m[0])];
+        
+        // Pattern 3: Common mention formats like: mention @user, tagging @123, etc.
+        const mentionKeywords = ['mention', 'tagging', 'tag', '@', 'at'];
+        const containsMentionKeyword = mentionKeywords.some(keyword => 
+            messageText.toLowerCase().includes(keyword.toLowerCase())
+        );
+        
+        if (containsMentionKeyword) {
+            // Extract any numbers near mention keywords
+            const keywordPattern = /(?:mention|tagging|tag|at)\s*[@]?\s*(\d+)/gi;
+            const keywordMatches = [...messageText.matchAll(keywordPattern)];
+            detectedNumbers = [...detectedNumbers, ...keywordMatches.map(m => m[1])];
+        }
+        
+        // Remove duplicates and filter valid phone numbers
+        detectedNumbers = [...new Set(detectedNumbers)]
+            .filter(num => num.length >= 10 && num.length <= 15)
+            .map(num => num.replace(/\D/g, '')) // Ensure only digits
+            .filter(num => {
+                // Basic phone number validation (not starting with 0, length check)
+                return num.length >= 10 && !num.startsWith('0');
+            });
+        
+        hasManualMention = detectedNumbers.length > 0;
+        
+        // If we found manual mentions, add them to the message context
+        if (hasManualMention && !msg.message.contextInfo) {
+            msg.message.contextInfo = msg.message.contextInfo || {};
+            msg.message.contextInfo.mentionedJid = detectedNumbers.map(num => num + '@s.whatsapp.net');
+        }
     }
     
-    // Check for @everyone/@all mentions in text
-    if (hasEveryoneMention(text)) {
-        return true;
-    }
-    
-    // Check for mentionedJid in any message type
-    const check = (m) => {
-        if (!m) return false;
-        // If mentionedJid exists and has multiple mentions (more than 2), treat as mass mention
-        if (m.contextInfo?.mentionedJid?.length > 2) {
-            return true;
-        }
-        // Also check quoted message for mentions
-        if (m.contextInfo?.quotedMessage) {
-            const quotedText = m.contextInfo.quotedMessage.conversation || 
-                              m.contextInfo.quotedMessage.extendedTextMessage?.text || '';
-            if (hasEveryoneMention(quotedText)) {
-                return true;
-            }
-        }
-        return false;
-    };
-    
-    return check(msg.extendedTextMessage) || 
-           check(msg.imageMessage) || 
-           check(msg.videoMessage) || 
-           check(msg.documentMessage) || 
-           check(msg.audioMessage);
+    return hasOfficialMention || hasManualMention;
 }
 
 async function antimentionCommand(sock, chatId, message) {
@@ -128,8 +131,7 @@ async function antimentionCommand(sock, chatId, message) {
         }
 
         // Parse command
-        const text = message.message?.conversation || 
-                    message.message?.extendedTextMessage?.text || '';
+        const text = message.message?.conversation || message.message?.extendedTextMessage?.text || '';
         const args = text.split(' ').slice(1);
         const cmd = args[0]?.toLowerCase();
 
@@ -141,8 +143,8 @@ async function antimentionCommand(sock, chatId, message) {
                 return disableAntimention(sock, chatId, message);
             case 'status':
                 return showStatus(sock, chatId, message);
-            case 'strict':
-                return toggleStrictMode(sock, chatId, message);
+            case 'test':
+                return testDetection(sock, chatId, message, args.slice(1).join(' '));
             default:
                 return showHelp(sock, chatId, message);
         }
@@ -157,7 +159,7 @@ async function enableAntimention(sock, chatId, message, mode) {
     
     if (!validModes.includes(mode)) {
         return sock.sendMessage(chatId, { 
-            text: `Usage: .antimention on [${validModes.join('|')}]`
+            text: `Usage: .antimention on [${validModes.join('|')}]` 
         }, { quoted: message });
     }
 
@@ -176,10 +178,14 @@ async function enableAntimention(sock, chatId, message, mode) {
         chatId,
         enabled: true,
         mode,
-        strictMode: false, // Strict mode for mass mentions
         exemptAdmins: true,
         warnings: {},
-        lastActionTime: {}
+        detectionTypes: {
+            officialMentions: true,
+            atSymbol: true,
+            phoneNumbers: true,
+            mentionKeywords: true
+        }
     };
 
     if (index >= 0) {
@@ -198,7 +204,7 @@ async function enableAntimention(sock, chatId, message, mode) {
     }[mode];
 
     sock.sendMessage(chatId, { 
-        text: `✅ Anti-Mention Enabled\nMode: ${mode} (${modeText})\nAdmins are exempted.\n\nDetects: @everyone, @all, mass mentions` 
+        text: `✅ Anti-Mention Enabled\nMode: ${mode} (${modeText})\nAdmins are exempted.\n\nDetection includes:\n• Official mentions\n• @symbol mentions\n• Phone numbers\n• Mention keywords` 
     }, { quoted: message });
 }
 
@@ -214,23 +220,6 @@ function disableAntimention(sock, chatId, message) {
     }
 }
 
-function toggleStrictMode(sock, chatId, message) {
-    const group = settings.find(g => g.chatId === chatId);
-    
-    if (!group) {
-        return sock.sendMessage(chatId, { 
-            text: '❌ Enable anti-mention first with .antimention on [mode]' 
-        }, { quoted: message });
-    }
-    
-    group.strictMode = !group.strictMode;
-    saveSettings();
-    
-    sock.sendMessage(chatId, { 
-        text: `✅ Strict mode ${group.strictMode ? 'ENABLED' : 'DISABLED'}\n${group.strictMode ? 'Will detect any mention of more than 1 person' : 'Will only detect @everyone/@all mentions'}` 
-    }, { quoted: message });
-}
-
 function showStatus(sock, chatId, message) {
     const group = settings.find(g => g.chatId === chatId);
     
@@ -240,30 +229,49 @@ function showStatus(sock, chatId, message) {
         }, { quoted: message });
     }
 
-    let status = `📊 Anti-Mention Status\n`;
-    status += `Status: ✅ Enabled\n`;
-    status += `Mode: ${group.mode.toUpperCase()}\n`;
-    status += `Strict Mode: ${group.strictMode ? '✅ ON' : '❌ OFF'}\n`;
-    status += `Admins Exempted: ${group.exemptAdmins ? '✅ Yes' : '❌ No'}\n\n`;
+    let status = `📊 Status: Enabled\nMode: ${group.mode}\n\n`;
     
-    status += `🚫 Detects:\n`;
-    status += `• @everyone, @all, @here, @channel\n`;
-    status += `• Mass mentions (${group.strictMode ? '1+ person' : '3+ people'})\n`;
-    status += `• All languages variations\n\n`;
-
     if (group.warnings && Object.keys(group.warnings).length > 0) {
-        status += '⚠️ Warning Counts:\n';
-        Object.entries(group.warnings)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 5)
-            .forEach(([jid, count]) => {
-                status += `• ${jid.split('@')[0]}: ${count} warning${count > 1 ? 's' : ''}\n`;
-            });
+        status += '⚠️ Warnings:\n';
+        Object.entries(group.warnings).slice(0, 5).forEach(([jid, count]) => {
+            status += `${jid.split('@')[0]}: ${count} warning${count > 1 ? 's' : ''}\n`;
+        });
     } else {
-        status += 'No warnings recorded.';
+        status += 'No warnings yet.';
     }
 
     sock.sendMessage(chatId, { text: status }, { quoted: message });
+}
+
+async function testDetection(sock, chatId, message, testText) {
+    if (!testText) {
+        return sock.sendMessage(chatId, { 
+            text: 'Usage: .antimention test [text]\nExample: .antimention test @1234567890' 
+        }, { quoted: message });
+    }
+    
+    const mockMessage = {
+        message: {
+            conversation: testText
+        }
+    };
+    
+    const hasMention = hasMentions(mockMessage);
+    const detectedNumbers = mockMessage.message.contextInfo?.mentionedJid || [];
+    
+    let result = `🔍 Detection Test:\nText: "${testText}"\n\n`;
+    result += `✅ Mentions Detected: ${hasMention ? 'YES' : 'NO'}\n`;
+    
+    if (detectedNumbers.length > 0) {
+        result += `📱 Detected Numbers:\n`;
+        detectedNumbers.forEach(num => {
+            result += `• ${num}\n`;
+        });
+    } else {
+        result += `No phone numbers detected.`;
+    }
+    
+    sock.sendMessage(chatId, { text: result }, { quoted: message });
 }
 
 function showHelp(sock, chatId, message) {
@@ -279,19 +287,17 @@ function showHelp(sock, chatId, message) {
 .antimention status
   Show current status
 
-.antimention strict
-  Toggle strict mode
-
-📝 Features:
-• Blocks @everyone, @all, @here, @channel
-• Blocks mass mentions (3+ people)
-• Strict mode: blocks any mention of 1+ person
-• Supports multiple languages
-• Admin exemption available
+.antimention test [text]
+  Test mention detection
 
 Example:
 .antimention on delete
-.antimention strict`;
+
+📌 Detects:
+• Official WhatsApp mentions
+• @symbol mentions (@1234567890)
+• Phone numbers in text
+• Mention keywords (mention, tag, etc.)`;
 
     sock.sendMessage(chatId, { text: help }, { quoted: message });
 }
@@ -309,7 +315,6 @@ function setupAntimentionListener(sock) {
 
         const sender = cleanJid(msg.key.participant || msg.key.remoteJid);
         const senderNum = sender.split('@')[0];
-        const now = Date.now();
         
         try {
             const metadata = await sock.groupMetadata(chatId);
@@ -320,52 +325,28 @@ function setupAntimentionListener(sock) {
                 return;
             }
 
-            // Rate limiting: prevent spam actions on the same user
-            const lastAction = group.lastActionTime[sender] || 0;
-            if (now - lastAction < 30000) { // 30 seconds cooldown
-                return;
-            }
-            group.lastActionTime[sender] = now;
-
-            // Extract message text for reporting
-            let messageText = '';
-            if (msg.message?.conversation) {
-                messageText = msg.message.conversation;
-            } else if (msg.message?.extendedTextMessage?.text) {
-                messageText = msg.message.extendedTextMessage.text;
-            }
-
             // Handle based on mode
             switch(group.mode) {
                 case 'warn':
                     group.warnings[sender] = (group.warnings[sender] || 0) + 1;
                     saveSettings();
                     
-                    const warningCount = group.warnings[sender];
-                    let warningMsg = `⚠️ @${senderNum} - No mass mentions allowed!\n`;
-                    warningMsg += `Warning #${warningCount}\n`;
-                    warningMsg += `Violation: ${messageText.substring(0, 50)}${messageText.length > 50 ? '...' : ''}`;
-                    
                     sock.sendMessage(chatId, { 
-                        text: warningMsg,
+                        text: `⚠️ @${senderNum} - No mentions allowed! (Warning #${group.warnings[sender]})`,
                         mentions: [sender]
                     });
                     break;
                     
                 case 'delete':
                     sock.sendMessage(chatId, { 
-                        text: `🚫 @${senderNum} - Message deleted\nReason: Mass mention (@everyone/@all)`,
+                        text: `🚫 @${senderNum} - Message deleted (mention detected)`,
                         mentions: [sender]
                     });
                     
                     setTimeout(() => {
-                        try {
-                            sock.sendMessage(chatId, { 
-                                delete: msg.key
-                            });
-                        } catch (error) {
-                            console.log('Delete failed:', error.message);
-                        }
+                        sock.sendMessage(chatId, { 
+                            delete: msg.key
+                        });
                     }, 500);
                     break;
                     
@@ -373,30 +354,15 @@ function setupAntimentionListener(sock) {
                     const botJid = cleanJid(sock.user.id);
                     const bot = metadata.participants.find(p => cleanJid(p.id) === botJid);
                     
-                    if (bot?.admin === 'superadmin' || bot?.admin === 'admin') {
+                    if (bot?.admin === 'superadmin') {
                         sock.sendMessage(chatId, { 
-                            text: `🚫 @${senderNum} - Kicked for mass mention\nViolation: ${messageText.substring(0, 30)}...`,
+                            text: `🚫 @${senderNum} - Kicked for mentioning`,
                             mentions: [sender]
                         });
                         
-                        setTimeout(async () => {
-                            try {
-                                await sock.groupParticipantsUpdate(chatId, [sender], 'remove');
-                                // Remove from warnings after kick
-                                delete group.warnings[sender];
-                                saveSettings();
-                            } catch (error) {
-                                console.log('Kick failed:', error.message);
-                                sock.sendMessage(chatId, { 
-                                    text: `⚠️ Failed to kick @${senderNum}. Bot needs admin rights.`,
-                                    mentions: [sender]
-                                });
-                            }
+                        setTimeout(() => {
+                            sock.groupParticipantsUpdate(chatId, [sender], 'remove');
                         }, 1000);
-                    } else {
-                        sock.sendMessage(chatId, { 
-                            text: '⚠️ Bot needs admin rights to kick users'
-                        });
                     }
                     break;
             }
@@ -408,5 +374,6 @@ function setupAntimentionListener(sock) {
 
 module.exports = {
     antimentionCommand,
-    setupAntimentionListener
+    setupAntimentionListener,
+    hasMentions // Export for testing
 };
