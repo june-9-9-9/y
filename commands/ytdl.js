@@ -1,77 +1,104 @@
 const yts = require('yt-search');
 const axios = require('axios');
-const fetch = require('node-fetch');
 
-const ytRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/;
+async function ytplayCommand(sock, chatId, message) {
+    try {
+        // Initial reaction 📺
+        await sock.sendMessage(chatId, { react: { text: "📺", key: message.key } });
 
-async function getVideoInfo(input) {
-  if (ytRegex.test(input)) {
-    const id = input.match(/(?:v=|\/)([0-9A-Za-z_-]{11})/)?.[1];
-    if (!id) throw new Error("Invalid YouTube URL");
-    return await yts({ videoId: id });
-  }
-  const { videos } = await yts(input);
-  if (!videos?.length) throw new Error("No results found");
-  return videos[0];
+        const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
+        const input = text.split(' ').slice(1).join(' ').trim();
+        if (!input) {
+            await sock.sendMessage(chatId, { text: "Give me a YouTube link or title!" }, { quoted: message });
+            return;
+        }
+
+        let videoUrl, videoInfo;
+        if (/youtu\.?be|youtube\.com/.test(input)) {
+            videoUrl = input;
+            const { videos } = await yts({ videoId: input.split("v=")[1] });
+            videoInfo = videos[0];
+        } else {
+            const { videos } = await yts(input);
+            if (!videos.length) {
+                await sock.sendMessage(chatId, { text: "No video found!" }, { quoted: message });
+                return;
+            }
+            videoInfo = videos[0];
+            videoUrl = videoInfo.url;
+        }
+
+        const res = await axios.get(`https://veron-apis.zone.id/downloader/youtube1?url=${videoUrl}`);
+        const dl = res.data?.result?.downloadUrl;
+        if (!dl) {
+            await sock.sendMessage(chatId, { text: "Download failed." }, { quoted: message });
+            await sock.sendMessage(chatId, { react: { text: "❌", key: message.key } });
+            return;
+        }
+
+        await sock.sendMessage(chatId, {
+            video: { url: dl },
+            mimetype: "video/mp4",
+            caption: `🎬 ${videoInfo.title}`
+        }, { quoted: message });
+
+        // Success reaction ✅
+        await sock.sendMessage(chatId, { react: { text: "✅", key: message.key } });
+
+    } catch (err) {
+        await sock.sendMessage(chatId, { text: "Error occurred while processing video." }, { quoted: message });
+        await sock.sendMessage(chatId, { react: { text: "❌", key: message.key } });
+    }
 }
 
-async function fetchThumb(url) {
-  try {
-    const res = await fetch(url);
-    return Buffer.from(await res.arrayBuffer());
-  } catch { return null; }
-}
+async function ytsongCommand(sock, chatId, message) {
+    try {
+        // Initial reaction 🎵
+        await sock.sendMessage(chatId, { react: { text: "🎵", key: message.key } });
 
-async function ytplayCommand(sock, chatId, msg) {
-  try {
-    await sock.sendMessage(chatId, { react: { text: "📺", key: msg.key } });
-    const input = (msg.message?.conversation || msg.message?.extendedTextMessage?.text)?.split(' ').slice(1).join(' ').trim();
-    if (!input) return sock.sendMessage(chatId, { text: "Provide a YouTube link or title!" }, { quoted: msg });
+        const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
+        const input = text.split(' ').slice(1).join(' ').trim();
+        if (!input) {
+            await sock.sendMessage(chatId, { text: "Give me a YouTube link or song name!" }, { quoted: message });
+            return;
+        }
 
-    const info = await getVideoInfo(input);
-    const { data } = await axios.get(`https://veron-apis.zone.id/downloader/youtube1?url=${info.url}`);
-    if (!data?.result?.downloadUrl) throw new Error("API failed");
+        let videoUrl, videoInfo;
+        if (/youtu\.?be|youtube\.com/.test(input)) {
+            videoUrl = input;
+            const { videos } = await yts({ videoId: input.split("v=")[1] });
+            videoInfo = videos[0];
+        } else {
+            const { videos } = await yts(input);
+            if (!videos.length) {
+                await sock.sendMessage(chatId, { text: "No song found!" }, { quoted: message });
+                return;
+            }
+            videoInfo = videos[0];
+            videoUrl = videoInfo.url;
+        }
 
-    const caption = `*📹 YouTube Video*\n\n*Title:* ${info.title}\n*Duration:* ${info.timestamp || "?"}\n*Views:* ${info.views || "?"}\n*Uploaded:* ${info.ago || "?"}`;
-    await sock.sendMessage(chatId, {
-      video: { url: data.result.downloadUrl },
-      mimetype: "video/mp4",
-      caption,
-      thumbnail: await fetchThumb(info.thumbnail)
-    }, { quoted: msg });
+        const res = await axios.get(`https://api.privatezia.biz.id/api/downloader/ytmp3?url=${videoUrl}`);
+        const dl = res.data?.result?.downloadUrl;
+        if (!dl) {
+            await sock.sendMessage(chatId, { text: "Download failed." }, { quoted: message });
+            await sock.sendMessage(chatId, { react: { text: "❌", key: message.key } });
+            return;
+        }
 
-    await sock.sendMessage(chatId, { react: { text: "✅", key: msg.key } });
-  } catch (e) {
-    await sock.sendMessage(chatId, { text: e.message || "Download failed" }, { quoted: msg });
-    await sock.sendMessage(chatId, { react: { text: "❌", key: msg.key } });
-  }
-}
+        await sock.sendMessage(chatId, {
+            audio: { url: dl },
+            mimetype: "audio/mpeg",
+            fileName: `${videoInfo.title}.mp3`
+        }, { quoted: message });
 
-async function ytsongCommand(sock, chatId, msg) {
-  try {
-    await sock.sendMessage(chatId, { react: { text: "🎵", key: msg.key } });
-    const input = (msg.message?.conversation || msg.message?.extendedTextMessage?.text)?.split(' ').slice(1).join(' ').trim();
-    if (!input) return sock.sendMessage(chatId, { text: "Provide a YouTube link or song name!" }, { quoted: msg });
+        // Success reaction ✅
+        await sock.sendMessage(chatId, { react: { text: "✅", key: message.key } });
 
-    const info = await getVideoInfo(input);
-    const { data } = await axios.get(`https://api.privatezia.biz.id/api/downloader/ytmp3?url=${info.url}`);
-    if (!data?.result?.downloadUrl) throw new Error("API failed");
-
-    const caption = `*🎵 YouTube Song*\n\n*Title:* ${data.result.title || info.title}\n*Duration:* ${info.timestamp || "?"}\n*Size:* ${data.result.size || "?"}\n*Views:* ${info.views || "?"}\n*Uploaded:* ${info.ago || "?"}`;
-    await sock.sendMessage(chatId, {
-      audio: { url: data.result.downloadUrl },
-      mimetype: "audio/mpeg",
-      fileName: `${(data.result.title || info.title).replace(/[^\w\s]/g, '')}.mp3`,
-      caption,
-      thumbnail: await fetchThumb(info.thumbnail),
-      contextInfo: { externalAdReply: { title: info.title, body: `Duration: ${info.timestamp} • Views: ${info.views}`, mediaUrl: info.url, sourceUrl: info.url } }
-    }, { quoted: msg });
-
-    await sock.sendMessage(chatId, { react: { text: "✅", key: msg.key } });
-  } catch (e) {
-    await sock.sendMessage(chatId, { text: e.message || "Download failed" }, { quoted: msg });
-    await sock.sendMessage(chatId, { react: { text: "❌", key: msg.key } });
-  }
+    } catch (err) {
+        await sock.sendMessage(chatId, { text: "Error occurred while processing song." }, { quoted: message });
+        await sock.sendMessage(chatId, { react: { text: "❌", key: message.key } });
+    }
 }
 
 module.exports = { ytplayCommand, ytsongCommand };
