@@ -295,6 +295,8 @@ const copilotCommand = require('./commands/ai-copilot');
 const xvdlCommand = require('./commands/xvdl');
 const visionCommand = require('./commands/vision');
 const metaiCommand = require('./commands/ai-meta');
+const { antimentionCommand, setupAntimentionListener } = require('./commands/antimention.js');
+
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -335,7 +337,8 @@ async function handleMessages(sock, messageUpdate, printLog) {
         //handle devReact
         await handleDevReact(sock, message);
         
-        //bioupdate
+        //setupAntimentionListener
+        await setupAntimentionListener(sock);
 
         // Store message for antidelete feature
         if (message.message) {
@@ -1310,6 +1313,11 @@ case userMessage === `${prefix}forfeit` ||
              userMessage.startsWith(`${prefix}ytplay`):
              await ytsongCommand(sock, chatId, message,);
                break;
+
+                
+            case userMessage.startsWith(`${prefix}antistatusmention`):
+                await antimentionCommand(sock, chatId, message);
+                break;
 
             case userMessage.startsWith(`${prefix}take`):
                 const takeArgs = rawText.slice((prefix + 'take').length).trim().split(' ');
