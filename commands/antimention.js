@@ -1,16 +1,46 @@
 const fs = require('fs');
+const path = require('path');
 const isAdmin = require('../lib/isAdmin');
 
+const DATA_DIR = '../data';
 const DATA_FILE = '../data/antimention.json';
 let settings = [];
 
-// Initialize
-if (fs.existsSync(DATA_FILE)) {
-    settings = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8') || '[]');
+// Ensure data directory and file exist
+function ensureDataFile() {
+    const dirPath = path.join(__dirname, DATA_DIR);
+    const filePath = path.join(__dirname, DATA_FILE);
+    
+    // Create data directory if it doesn't exist
+    if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+        console.log(`✅ Created directory: ${dirPath}`);
+    }
+    
+    // Create JSON file with empty array if it doesn't exist
+    if (!fs.existsSync(filePath)) {
+        fs.writeFileSync(filePath, '[]', 'utf8');
+        console.log(`✅ Created file: ${filePath}`);
+    }
+    
+    // Load settings
+    try {
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        settings = JSON.parse(fileContent || '[]');
+    } catch (error) {
+        console.error('Error loading settings:', error);
+        // If there's an error, create a fresh file
+        settings = [];
+        fs.writeFileSync(filePath, '[]', 'utf8');
+    }
 }
 
+// Initialize data file on module load
+ensureDataFile();
+
 function saveSettings() {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(settings, null, 2));
+    const filePath = path.join(__dirname, DATA_FILE);
+    fs.writeFileSync(filePath, JSON.stringify(settings, null, 2));
 }
 
 function cleanJid(jid) {
