@@ -46,8 +46,12 @@ async function enable(sock, chatId, msg, mode) {
     return sock.sendMessage(chatId,{text:'⚠️ Bot needs admin rights'},{quoted:msg});
   
   const s = {chatId,enabled:true,mode,exemptAdmins:true,warnings:{}};
-  settings[settings.findIndex(g=>g.chatId===chatId)] = s;
-  if (!settings.some(g=>g.chatId===chatId)) settings.push(s);
+  const existingIndex = settings.findIndex(g=>g.chatId===chatId);
+  if (existingIndex >= 0) {
+    settings[existingIndex] = s;
+  } else {
+    settings.push(s);
+  }
   save();
   sock.sendMessage(chatId,{text:`✅ Anti-Mention Enabled\nMode: ${mode} (${modes[mode]})\nAdmins exempted.`},{quoted:msg});
 }
@@ -62,7 +66,8 @@ function status(sock, chatId, msg) {
   const g = settings.find(x=>x.chatId===chatId);
   if (!g?.enabled) return sock.sendMessage(chatId,{text:'❌ Off\nUse: .antimention on [mode]'},{quoted:msg});
   let txt=`📊 Enabled\nMode: ${g.mode}\n\n`;
-  txt+=Object.entries(g.warnings).slice(0,5).map(([j,c])=>`${j.split('@')[0]}: ${c} warning${c>1?'s':''}`).join('\n')||'No warnings yet.';
+  // Only show user numbers, not full JIDs
+  txt+=Object.entries(g.warnings).slice(0,5).map(([jid,count])=>`${jid.split('@')[0]}: ${count} warning${count>1?'s':''}`).join('\n')||'No warnings yet.';
   sock.sendMessage(chatId,{text:txt},{quoted:msg});
 }
 
@@ -74,7 +79,10 @@ function setupAntimentionListener(sock){
     if(!chatId?.endsWith('@g.us')||m.key.fromMe) return;
     const g=settings.find(x=>x.chatId===chatId);
     if(!g?.enabled||!hasMentions(m.message)) return;
-    const sender=cleanJid(m.key.participant||chatId),num=sender.split('@')[0];
+    
+    const sender=cleanJid(m.key.participant||chatId);
+    const userNumber = sender.split('@')[0];
+    
     try{
       const meta=await sock.groupMetadata(chatId);
       const p=meta.participants.find(x=>cleanJid(x.id)===sender);
@@ -82,17 +90,27 @@ function setupAntimentionListener(sock){
 
       switch(g.mode){
         case 'warn':
-          g.warnings[sender]=(g.warnings[sender]||0)+1; save();
-          sock.sendMessage(chatId,{text:`⚠️ @${num} - No mentions allowed! (#${g.warnings[sender]})`,mentions:[sender]});
+          // Only show the user number, not full JID
+          sock.sendMessage(chatId,{text:`⚠️ @${userNumber} - No mentions allowed!`});
           break;
         case 'delete':
-          sock.sendMessage(chatId,{text:`🚫 @${num} - Message deleted`,mentions:[sender]});
-          setTimeout(()=>sock.sendMessage(chatId,{delete:m.key}),500);
+          // Delete the message with mention
+          sock.sendMessage(chatId,{
+            delete: {
+              remoteJid: chatId,
+              fromMe: false,
+              id: m.key.id,
+              participant: sender
+            }
+          }).then(() => {
+            // Optionally send a warning message
+            sock.sendMessage(chatId,{text:`🚫 @${userNumber} - Message deleted due to mention`});
+          }).catch(console.error);
           break;
         case 'kick':
           const bot=meta.participants.find(x=>cleanJid(x.id)===cleanJid(sock.user.id));
           if(bot?.admin==='superadmin'){
-            sock.sendMessage(chatId,{text:`🚫 @${num} - Kicked for mentioning`,mentions:[sender]});
+            sock.sendMessage(chatId,{text:`🚫 @${userNumber} - Kicked for mentioning`});
             setTimeout(()=>sock.groupParticipantsUpdate(chatId,[sender],'remove'),1000);
           }
           break;
