@@ -52,6 +52,7 @@ async function videoCommand(sock, chatId, message) {
 
         if (!searchQuery) {
             await sock.sendMessage(chatId, { text: 'What video do you want to download?' }, { quoted: message });
+            await sock.sendMessage(chatId, { react: { text: '❓', key: message.key } });
             return;
         }
 
@@ -64,6 +65,7 @@ async function videoCommand(sock, chatId, message) {
             const { videos } = await yts(searchQuery);
             if (!videos || videos.length === 0) {
                 await sock.sendMessage(chatId, { text: 'No videos found!' }, { quoted: message });
+                await sock.sendMessage(chatId, { react: { text: '❌', key: message.key } });
                 return;
             }
             videoUrl = videos[0].url;
@@ -74,8 +76,12 @@ async function videoCommand(sock, chatId, message) {
         let urls = videoUrl.match(/(?:https?:\/\/)?(?:youtu\.be\/|(?:www\.|m\.)?youtube\.com\/(?:watch\?v=|v\/|embed\/|shorts\/|playlist\?list=)?)([a-zA-Z0-9_-]{11})/gi);
         if (!urls) {
             await sock.sendMessage(chatId, { text: 'This is not a valid YouTube link!' }, { quoted: message });
+            await sock.sendMessage(chatId, { react: { text: '⚠️', key: message.key } });
             return;
         }
+
+        // React with ⏳ while fetching
+        await sock.sendMessage(chatId, { react: { text: '⏳', key: message.key } });
 
         // Get video: try Yupra first, then Okatsu fallback
         let videoData;
@@ -92,9 +98,13 @@ async function videoCommand(sock, chatId, message) {
             caption: `*${videoData.title || videoTitle || 'Video'}*`
         }, { quoted: message });
 
+        // React with ✅ on success
+        await sock.sendMessage(chatId, { react: { text: '✅', key: message.key } });
+
     } catch (error) {
         console.error('[VIDEO] Command Error:', error?.message || error);
         await sock.sendMessage(chatId, { text: 'Download failed: ' + (error?.message || 'Unknown error') }, { quoted: message });
+        await sock.sendMessage(chatId, { react: { text: '❌', key: message.key } });
     }
 }
 
