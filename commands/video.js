@@ -1,11 +1,6 @@
 const axios = require('axios');
 const yts = require('yt-search');
 
-// Izumi API configuration
-const izumi = {
-    baseURL: "https://izumiiiiiiii.dpdns.org"
-};
-
 const AXIOS_DEFAULTS = {
     timeout: 60000,
     headers: {
@@ -29,17 +24,22 @@ async function tryRequest(getter, attempts = 3) {
     throw lastError;
 }
 
-async function getIzumiVideoByUrl(youtubeUrl) {
-    const apiUrl = `${izumi.baseURL}/downloader/youtube?url=${encodeURIComponent(youtubeUrl)}&format=720`;
+async function getYupraVideoByUrl(youtubeUrl) {
+    const apiUrl = `https://api.yupra.my.id/api/downloader/ytmp4?url=${encodeURIComponent(youtubeUrl)}`;
     const res = await tryRequest(() => axios.get(apiUrl, AXIOS_DEFAULTS));
-    if (res?.data?.result?.download) return res.data.result; // { download, title, ... }
-    throw new Error('Izumi video api returned no download');
+    if (res?.data?.success && res?.data?.data?.download_url) {
+        return {
+            download: res.data.data.download_url,
+            title: res.data.data.title,
+            thumbnail: res.data.data.thumbnail
+        };
+    }
+    throw new Error('Yupra returned no download');
 }
 
 async function getOkatsuVideoByUrl(youtubeUrl) {
     const apiUrl = `https://okatsu-rolezapiiz.vercel.app/downloader/ytmp4?url=${encodeURIComponent(youtubeUrl)}`;
     const res = await tryRequest(() => axios.get(apiUrl, AXIOS_DEFAULTS));
-    // shape: { status, creator, url, result: { status, title, mp4 } }
     if (res?.data?.result?.mp4) {
         return { download: res.data.result.mp4, title: res.data.result.title };
     }
@@ -50,13 +50,9 @@ async function videoCommand(sock, chatId, message) {
     try {
         const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
         const searchQuery = text.split(' ').slice(1).join(' ').trim();
-        
-        
+
         if (!searchQuery) {
             await sock.sendMessage(chatId, { text: 'What video do you want to download?' }, { quoted: message });
-            await sock.sendMessage(chatId, {
-            react: { text: '🎥', key: message.key }
-        });
             return;
         }
 
@@ -67,7 +63,6 @@ async function videoCommand(sock, chatId, message) {
         if (searchQuery.startsWith('http://') || searchQuery.startsWith('https://')) {
             videoUrl = searchQuery;
         } else {
-            // Search YouTube for the video
             const { videos } = await yts(searchQuery);
             if (!videos || videos.length === 0) {
                 await sock.sendMessage(chatId, { text: 'No videos found!' }, { quoted: message });
@@ -78,21 +73,18 @@ async function videoCommand(sock, chatId, message) {
             videoThumbnail = videos[0].thumbnail;
         }
 
-        // Send thumbnail immediately
+        // Optional: send thumbnail preview (can remove if you want *only* the video)
         try {
             const ytId = (videoUrl.match(/(?:youtu\.be\/|v=)([a-zA-Z0-9_-]{11})/) || [])[1];
             const thumb = videoThumbnail || (ytId ? `https://i.ytimg.com/vi/${ytId}/sddefault.jpg` : undefined);
             const captionTitle = videoTitle || searchQuery;
             if (thumb) {
                 await sock.sendMessage(chatId, {
-                    image: { url: null },
-                    caption: `_🏂searching video data..._`
+                    image: { url: thumb },
+                    caption: `*${captionTitle}*\nDownloading...`
                 }, { quoted: message });
-
-           
             }
         } catch (e) { console.error('[VIDEO] thumb error:', e?.message || e); }
-        
 
         // Validate YouTube URL
         let urls = videoUrl.match(/(?:https?:\/\/)?(?:youtu\.be\/|(?:www\.|m\.)?youtube\.com\/(?:watch\?v=|v\/|embed\/|shorts\/|playlist\?list=)?)([a-zA-Z0-9_-]{11})/gi);
@@ -101,31 +93,19 @@ async function videoCommand(sock, chatId, message) {
             return;
         }
 
-        // Get video: try Izumi first, then Okatsu fallback
+        // Get video: try Yupra first, then Okatsu fallback
         let videoData;
         try {
-        await sock.sendMessage(chatId, {
-            react: { text: '🎥', key: message.key }
-        });
-            videoData = await getIzumiVideoByUrl(videoUrl);
+            videoData = await getYupraVideoByUrl(videoUrl);
         } catch (e1) {
             videoData = await getOkatsuVideoByUrl(videoUrl);
         }
-       
 
-        // Send video directly using the download URL
+        // Send clean video (no caption, no watermark)
         await sock.sendMessage(chatId, {
             video: { url: videoData.download },
-            mimetype: 'video/mp4',
-            fileName: `${videoData.title || videoTitle || 'video'}.mp4`,
-            caption: `${videoData.title || videoTitle || 'Video'}\n\n> 📌By Humans, For Humans!`
+            mimetype: 'video/mp4'
         }, { quoted: message });
-
-        //react sucess
-        await sock.sendMessage(chatId, {
-            react: { text: '☑️', key: message.key }
-        });
-
 
     } catch (error) {
         console.error('[VIDEO] Command Error:', error?.message || error);
@@ -133,4 +113,4 @@ async function videoCommand(sock, chatId, message) {
     }
 }
 
-module.exports = videoCommand; 
+module.exports = videoCommand;
