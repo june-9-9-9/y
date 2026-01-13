@@ -30,8 +30,7 @@ async function getYupraVideoByUrl(youtubeUrl) {
     if (res?.data?.success && res?.data?.data?.download_url) {
         return {
             download: res.data.data.download_url,
-            title: res.data.data.title,
-            thumbnail: res.data.data.thumbnail
+            title: res.data.data.title
         };
     }
     throw new Error('Yupra returned no download');
@@ -59,7 +58,6 @@ async function videoCommand(sock, chatId, message) {
         // Determine if input is a YouTube link
         let videoUrl = '';
         let videoTitle = '';
-        let videoThumbnail = '';
         if (searchQuery.startsWith('http://') || searchQuery.startsWith('https://')) {
             videoUrl = searchQuery;
         } else {
@@ -70,21 +68,7 @@ async function videoCommand(sock, chatId, message) {
             }
             videoUrl = videos[0].url;
             videoTitle = videos[0].title;
-            videoThumbnail = videos[0].thumbnail;
         }
-
-        // Optional: send thumbnail preview (can remove if you want *only* the video)
-        try {
-            const ytId = (videoUrl.match(/(?:youtu\.be\/|v=)([a-zA-Z0-9_-]{11})/) || [])[1];
-            const thumb = videoThumbnail || (ytId ? `https://i.ytimg.com/vi/${ytId}/sddefault.jpg` : undefined);
-            const captionTitle = videoTitle || searchQuery;
-            if (thumb) {
-                await sock.sendMessage(chatId, {
-                    image: { url: thumb },
-                    caption: `*${captionTitle}*\nDownloading...`
-                }, { quoted: message });
-            }
-        } catch (e) { console.error('[VIDEO] thumb error:', e?.message || e); }
 
         // Validate YouTube URL
         let urls = videoUrl.match(/(?:https?:\/\/)?(?:youtu\.be\/|(?:www\.|m\.)?youtube\.com\/(?:watch\?v=|v\/|embed\/|shorts\/|playlist\?list=)?)([a-zA-Z0-9_-]{11})/gi);
@@ -101,10 +85,11 @@ async function videoCommand(sock, chatId, message) {
             videoData = await getOkatsuVideoByUrl(videoUrl);
         }
 
-        // Send clean video (no caption, no watermark)
+        // Send video with title as caption
         await sock.sendMessage(chatId, {
             video: { url: videoData.download },
-            mimetype: 'video/mp4'
+            mimetype: 'video/mp4',
+            caption: `*${videoData.title || videoTitle || 'Video'}*`
         }, { quoted: message });
 
     } catch (error) {
