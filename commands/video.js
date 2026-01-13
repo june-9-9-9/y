@@ -121,6 +121,14 @@ async function videoCommand(sock, chatId, message) {
         // Sending 📤
         await sock.sendMessage(chatId, { react: { text: '📤', key: message.key } });
 
+
+        await sock.sendMessage(chatId, {
+            video: { url: apiData.downloadUrl },
+            mimetype: 'video/mp4',
+            caption: `${ apiData.title }`,      
+            contextInfo
+        }, { quoted: message });
+        
         await sock.sendMessage(chatId, { 
             document: { url: filePath }, 
             mimetype: "video/mp4", 
@@ -129,12 +137,6 @@ async function videoCommand(sock, chatId, message) {
             contextInfo
         }, { quoted: message });
 
-        await sock.sendMessage(chatId, {
-            video: { url: apiData.downloadUrl },
-            mimetype: 'video/mp4',
-            caption: `${ apiData.title }`,      
-            contextInfo
-        }, { quoted: message });
 
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
