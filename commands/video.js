@@ -131,6 +131,14 @@ async function videoCommand(sock, chatId, message) {
             contextInfo
         }, { quoted: message });
 
+ 
+        // Send video with title as caption
+        await sock.sendMessage(chatId, {
+            video: { url: apiData.downloadUrl },
+            mimetype: 'video/mp4',
+            caption: `*${ apiData.title }*`
+        }, { quoted: message });
+
         // Cleanup
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
