@@ -132,7 +132,8 @@ async function videoCommand(sock, chatId, message) {
         await sock.sendMessage(chatId, {
             video: { url: apiData.downloadUrl },
             mimetype: 'video/mp4',
-            caption: `*${ apiData.title }*`
+            caption: `${ apiData.title }`,      
+            contextInfo
         }, { quoted: message });
 
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
