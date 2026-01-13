@@ -5,9 +5,8 @@ const path = require('path');
 
 async function videoCommand(sock, chatId, message) {
     try {
-        await sock.sendMessage(chatId, {
-            react: { text: '🎬', key: message.key }
-        });
+        // Initial reaction 🎬
+        await sock.sendMessage(chatId, { react: { text: '🎬', key: message.key } });
 
         const tempDir = path.join(__dirname, "temp");
         if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
@@ -16,49 +15,52 @@ async function videoCommand(sock, chatId, message) {
         const parts = text.split(' ');
         const query = parts.slice(1).join(' ').trim();
 
-        if (!query) return await sock.sendMessage(chatId, { text: '🎥 Provide a video name or YouTube URL!\nExample: .video Not Like Us' }, { quoted: message });
+        if (!query) {
+            await sock.sendMessage(chatId, { react: { text: '❌', key: message.key } });
+            return await sock.sendMessage(chatId, { text: '🎥 Provide a video name or YouTube URL!\nExample: .video Not Like Us' }, { quoted: message });
+        }
 
-        if (query.length > 100) return await sock.sendMessage(chatId, { text: `📝 Input too long! Max 100 chars.` }, { quoted: message });
+        if (query.length > 100) {
+            await sock.sendMessage(chatId, { react: { text: '📝', key: message.key } });
+            return await sock.sendMessage(chatId, { text: `📝 Input too long! Max 100 chars.` }, { quoted: message });
+        }
 
-        let videoUrl;
-        let videoTitle;
-        let videoThumbnail;
+        let videoUrl, videoTitle, videoThumbnail;
 
-        // Check if input is a YouTube URL
+        // Searching 🔍
+        await sock.sendMessage(chatId, { react: { text: '🔍', key: message.key } });
+
         if (query.match(/(youtube\.com|youtu\.be)/i)) {
             videoUrl = query;
             const videoId = videoUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i)?.[1];
-            if (!videoId) return await sock.sendMessage(chatId, { text: "❌ Invalid YouTube URL!" }, { quoted: message });
-            
+            if (!videoId) {
+                await sock.sendMessage(chatId, { react: { text: '❌', key: message.key } });
+                return await sock.sendMessage(chatId, { text: "❌ Invalid YouTube URL!" }, { quoted: message });
+            }
             videoTitle = "YouTube Video";
             videoThumbnail = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
         } else {
-            // Search for videos
             const searchResult = await (await yts(query)).videos[0];
-            if (!searchResult) return await sock.sendMessage(chatId, { text: "😕 Couldn't find that video. Try another one!" }, { quoted: message });
-
+            if (!searchResult) {
+                await sock.sendMessage(chatId, { react: { text: '😕', key: message.key } });
+                return await sock.sendMessage(chatId, { text: "😕 Couldn't find that video. Try another one!" }, { quoted: message });
+            }
             videoUrl = searchResult.url;
             videoTitle = searchResult.title;
             videoThumbnail = searchResult.thumbnail;
         }
 
-        // Try multiple APIs with fallback
+        // Downloading ⏳
+        await sock.sendMessage(chatId, { react: { text: '⏳', key: message.key } });
+
         let apiData;
-        
-        // Try Keith API first
         try {
             const keithApiUrl = `https://apiskeith.vercel.app/download/video?url=${encodeURIComponent(videoUrl)}`;
             const response = await axios.get(keithApiUrl);
             if (response.data?.result) {
-                apiData = {
-                    downloadUrl: response.data.result,
-                    title: videoTitle
-                };
-            } else {
-                throw new Error("Keith API failed");
-            }
-        } catch (keithError) {
-            // Try Yupra API as fallback
+                apiData = { downloadUrl: response.data.result, title: videoTitle };
+            } else throw new Error("Keith API failed");
+        } catch {
             try {
                 const yupraApiUrl = `https://api.yupra.my.id/api/downloader/ytmp4?url=${encodeURIComponent(videoUrl)}`;
                 const response = await axios.get(yupraApiUrl);
@@ -67,11 +69,8 @@ async function videoCommand(sock, chatId, message) {
                         downloadUrl: response.data.data.download_url,
                         title: response.data.data.title || videoTitle
                     };
-                } else {
-                    throw new Error("Yupra API failed");
-                }
-            } catch (yupraError) {
-                // Try Okatsu API as final fallback
+                } else throw new Error("Yupra API failed");
+            } catch {
                 const okatsuApiUrl = `https://okatsu-rolezapiiz.vercel.app/downloader/ytmp4?url=${encodeURIComponent(videoUrl)}`;
                 const response = await axios.get(okatsuApiUrl);
                 if (response?.data?.result?.mp4) {
@@ -79,9 +78,7 @@ async function videoCommand(sock, chatId, message) {
                         downloadUrl: response.data.result.mp4,
                         title: response.data.result.title || videoTitle
                     };
-                } else {
-                    throw new Error("All APIs failed to fetch video!");
-                }
+                } else throw new Error("All APIs failed to fetch video!");
             }
         }
 
@@ -91,7 +88,6 @@ async function videoCommand(sock, chatId, message) {
         const fileName = `video_${timestamp}.mp4`;
         const filePath = path.join(tempDir, fileName);
 
-        // Download video
         const videoResponse = await axios({
             method: "get",
             url: apiData.downloadUrl,
@@ -108,9 +104,10 @@ async function videoCommand(sock, chatId, message) {
 
         if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) throw new Error("Download failed or empty file!");
 
+        // Download success ✅
+        await sock.sendMessage(chatId, { react: { text: '✅', key: message.key } });
         await sock.sendMessage(chatId, { text: `_🎥 Playing:_\n _${apiData.title}_` });
 
-        // Context info for video message
         const contextInfo = {
             externalAdReply: {
                 title: apiData.title,
@@ -118,32 +115,32 @@ async function videoCommand(sock, chatId, message) {
                 mediaType: 2,
                 sourceUrl: videoUrl,
                 thumbnailUrl: videoThumbnail,
-                renderLargerThumbnail: false
+                renderLargerThumbnail: true
             }
         };
 
-        // Send video as document (matching playCommand pattern)
+        // Sending 📤
+        await sock.sendMessage(chatId, { react: { text: '📤', key: message.key } });
+
         await sock.sendMessage(chatId, { 
             document: { url: filePath }, 
             mimetype: "video/mp4", 
             fileName: `${apiData.title.substring(0, 100)}.mp4`,
-            caption: `*${apiData.title}*`,
+            caption: ``,
             contextInfo
         }, { quoted: message });
 
- 
-        // Send video with title as caption
         await sock.sendMessage(chatId, {
             video: { url: apiData.downloadUrl },
             mimetype: 'video/mp4',
             caption: `*${ apiData.title }*`
         }, { quoted: message });
 
-        // Cleanup
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
     } catch (error) {
         console.error("Video command error:", error);
+        await sock.sendMessage(chatId, { react: { text: '🚫', key: message.key } });
         return await sock.sendMessage(chatId, { text: `🚫 Error: ${error.message}` }, { quoted: message });
     }
 }
