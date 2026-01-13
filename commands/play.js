@@ -49,7 +49,7 @@ const text = message.message?.conversation || message.message?.extendedTextMessa
 
                     if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) throw new Error("Download failed or empty file!");
                     
-                    await sock.sendMessage(chatId, { document: { url: filePath }, mimetype: "audio/mpeg", fileName: `${(apiData.result.title || video.title).substring(0, 100)}.mp3` }, { quoted: message });
+                    await sock.sendMessage(chatId, { document: { url: filePath }, mimetype: "audio/mpeg", fileName: `${(apiData.data.title || video.title).substring(0, 100)}.mp3` }, { quoted: message });
 
                     // Cleanup
                     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
