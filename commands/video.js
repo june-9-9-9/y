@@ -106,7 +106,6 @@ async function videoCommand(sock, chatId, message) {
 
         // Download success ✅
         await sock.sendMessage(chatId, { react: { text: '✅', key: message.key } });
-        await sock.sendMessage(chatId, { text: `_🎥 Playing:_\n _${apiData.title}_` });
 
         const contextInfo = {
             externalAdReply: {
@@ -115,7 +114,7 @@ async function videoCommand(sock, chatId, message) {
                 mediaType: 2,
                 sourceUrl: videoUrl,
                 thumbnailUrl: videoThumbnail,
-                renderLargerThumbnail: true
+                renderLargerThumbnail: false
             }
         };
 
