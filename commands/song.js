@@ -82,14 +82,6 @@ async function songCommand(sock, chatId, message) {
             }
         };
 
-        // Send as audio in opus/ogg format
-        await sock.sendMessage(chatId, {
-            audio: fs.readFileSync(filePath),
-            mimetype: "audio/ogg; codecs=opus",
-            ptt: false, // Set to false for music/audio files
-            fileName: `${videoTitle.substring(0, 100)}.ogg`,
-            contextInfo
-        }, { quoted: message });
 
         // Send as MP3 for better quality
         await sock.sendMessage(chatId, {
