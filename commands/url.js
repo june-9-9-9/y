@@ -267,9 +267,7 @@ async function urlCommand(sock, chatId, message) {
         // Format the response
         const responseText = `📎 *Media URL* 📎\n\n` +
                             `🔗 *Link:* ${result.url}\n` +
-                            `📤 *Via:* ${result.service}\n` +
-                            `📄 *Extension:* ${media.ext}\n` +
-                            `${media.mimeType ? `📝 *Type:* ${media.mimeType}\n` : ''}`;
+                            `📤 *Via:* ${result.service}`;
 
         // Send success response
         await sock.sendMessage(
