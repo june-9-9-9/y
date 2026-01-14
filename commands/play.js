@@ -70,38 +70,18 @@ async function playCommand(sock, chatId, message) {
 
         if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) throw new Error("Download failed or empty file!");
 
-        // Context info for audio message
-        const contextInfo = {
-            externalAdReply: {
-                title: videoTitle,
-                body: 'Powered by Keith API',
-                mediaType: 1,
-                sourceUrl: videoUrl,
-                thumbnailUrl: videoThumbnail,
-                renderLargerThumbnail: false
-            }
-        };
-
-        // Send as audio
+        // Send as audio (clean version without context info)
         await sock.sendMessage(chatId, {
             audio: { url: downloadUrl },
             mimetype: "audio/mpeg",
-            fileName: `${videoTitle.substring(0, 100)}.mp3`,
-            contextInfo
+            fileName: `${videoTitle.substring(0, 100)}.mp3`
         }, { quoted: message });
 
-        // Send as document
+        // Send as document (clean version without context info)
         await sock.sendMessage(chatId, {
             document: { url: filePath },
             mimetype: "audio/mpeg",
-            fileName: `${videoTitle.substring(0, 100)}.mp3`,
-            contextInfo: {
-                ...contextInfo,
-                externalAdReply: {
-                    ...contextInfo.externalAdReply,
-                    body: 'Document version - Powered by Keith API'
-                }
-            }
+            fileName: `${videoTitle.substring(0, 100)}.mp3`
         }, { quoted: message });
 
         // Cleanup
