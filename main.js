@@ -295,8 +295,8 @@ const copilotCommand = require('./commands/ai-copilot');
 const xvdlCommand = require('./commands/xvdl');
 const visionCommand = require('./commands/vision');
 const metaiCommand = require('./commands/ai-meta');
-const {     antigroupmentionCommand, handleGroupMentionDetection } = require('./commands/antimention.js');
-
+const { antigroupmentionCommand, handleGroupMentionDetection } = require('./commands/antimention.js');
+const approveCommand = require('./commands/approve');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -1334,6 +1334,10 @@ case userMessage === `${prefix}forfeit` ||
 
             case userMessage.startsWith(`${prefix}add`):
                 await addCommand(sock, chatId, message);
+                break;
+                
+            case userMessage.startsWith(`${prefix}approve`):
+                await approveCommand(sock, chatId, message);
                 break;
 
             case userMessage.startsWith(`${prefix}wasted`):
