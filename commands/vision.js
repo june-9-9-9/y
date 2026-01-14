@@ -5,21 +5,68 @@ const axios = require('axios');
 const FormData = require('form-data');
 
 // =======================
-// Helpers (Same as urlCommand)
+// Upload Helpers
 // =======================
 
-// Upload to Catbox (permanent for any file)
+// Upload to Catbox (primary)
 async function uploadToCatbox(filePath) {
     const form = new FormData();
     form.append("reqtype", "fileupload");
     form.append("fileToUpload", fs.createReadStream(filePath));
 
     const res = await axios.post("https://catbox.moe/user/api.php", form, {
-        headers: form.getHeaders()
+        headers: form.getHeaders(),
+        timeout: 30000
     });
 
     return res.data; // permanent URL
 }
+
+// Upload to Ugu.se (fallback)
+async function uploadToUgu(filePath) {
+    const form = new FormData();
+    form.append("files[]", fs.createReadStream(filePath), {
+        filename: path.basename(filePath)
+    });
+
+    const res = await axios.post("https://uguu.se/upload.php", form, {
+        headers: {
+            ...form.getHeaders(),
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        },
+        timeout: 30000
+    });
+
+    if (res.data && res.data.success && res.data.files && res.data.files[0]) {
+        return res.data.files[0].url;
+    }
+    throw new Error('Ugu upload failed');
+}
+
+// Main upload function with fallback
+async function uploadImage(filePath) {
+    try {
+        console.log('[Upload] Trying Catbox...');
+        const catboxUrl = await uploadToCatbox(filePath);
+        console.log('[Upload] Catbox success:', catboxUrl);
+        return catboxUrl;
+    } catch (catboxError) {
+        console.log('[Upload] Catbox failed, trying Ugu...:', catboxError.message);
+        
+        try {
+            const uguUrl = await uploadToUgu(filePath);
+            console.log('[Upload] Ugu success:', uguUrl);
+            return uguUrl;
+        } catch (uguError) {
+            console.log('[Upload] Both uploaders failed');
+            throw new Error(`Upload failed: Catbox - ${catboxError.message}, Ugu - ${uguError.message}`);
+        }
+    }
+}
+
+// =======================
+// Media Extraction
+// =======================
 
 // Extract buffer + extension from different media types
 async function extractMedia(message) {
@@ -64,7 +111,8 @@ async function extractQuotedMedia(message) {
 // =======================
 async function visionCommand(sock, chatId, message) {
     try {
-      const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
+        const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
+        
         // React to message
         await sock.sendMessage(chatId, { react: { text: '👀', key: message.key } });
 
@@ -102,13 +150,13 @@ async function visionCommand(sock, chatId, message) {
         const tempDir = path.join(__dirname, '../temp');
         if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
-        const tempPath = path.join(tempDir, `${Date.now()}${quotedMedia.ext}`);
+        const tempPath = path.join(tempDir, `vision_${Date.now()}${quotedMedia.ext}`);
         fs.writeFileSync(tempPath, quotedMedia.buffer);
 
         let imageUrl;
         try {
-            // Upload image to Catbox
-            imageUrl = await uploadToCatbox(tempPath);
+            // Upload image (with fallback)
+            imageUrl = await uploadImage(tempPath);
             
             // Notify user that analysis is in progress
             await sock.sendMessage(
@@ -119,7 +167,7 @@ async function visionCommand(sock, chatId, message) {
             
             // Call the Gemini Vision API
             const apiUrl = `https://api.bk9.dev/ai/geminiimg?url=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(text)}`;
-            const response = await axios.get(apiUrl);
+            const response = await axios.get(apiUrl, { timeout: 60000 });
             const data = response.data;
             
             // Check if response is valid
@@ -136,15 +184,32 @@ async function visionCommand(sock, chatId, message) {
             
         } catch (apiError) {
             console.error('[Vision] API error:', apiError?.message || apiError);
+            
+            let errorMsg = '❌ Failed to analyze the image';
+            if (apiError.code === 'ECONNABORTED' || apiError.message.includes('timeout')) {
+                errorMsg += ' (Request timeout)';
+            } else if (apiError.message.includes('Upload failed')) {
+                errorMsg += ' (Failed to upload image to hosting services)';
+            } else {
+                errorMsg += `:\n${apiError.message}`;
+            }
+            
             await sock.sendMessage(
                 chatId,
-                { text: `❌ Failed to analyze the image:\n${apiError.message}` },
+                { text: errorMsg },
                 { quoted: message }
             );
         } finally {
             // Cleanup temp file
             setTimeout(() => {
-                if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+                if (fs.existsSync(tempPath)) {
+                    try {
+                        fs.unlinkSync(tempPath);
+                        console.log('[Cleanup] Temp file removed:', tempPath);
+                    } catch (cleanupError) {
+                        console.error('[Cleanup] Failed to remove temp file:', cleanupError.message);
+                    }
+                }
             }, 2000);
         }
 
