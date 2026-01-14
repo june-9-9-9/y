@@ -75,7 +75,7 @@ async function kickAllCommand(sock, chatId, message) {
         await sock.sendMessage(chatId, { 
             text: warningMessage,
             mentions: participants.map(p => p.id)
-        });
+        },{ quoted: message });
 
         // Wait 3 seconds before kicking
         await new Promise(resolve => setTimeout(resolve, 3000));
