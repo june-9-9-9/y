@@ -1,57 +1,81 @@
+const isAdmin = require('../lib/isAdmin');
+
 async function approveCommand(sock, chatId, message) {
+    const reply = (text, extra = {}) =>
+        sock.sendMessage(chatId, { text, quoted: message, ...extra });
+
     try {
         const text = message.message?.conversation || message.message?.extendedTextMessage?.text || "";
         const args = text.trim().split(/\s+/).slice(1);
+        const senderId = message.key.participant || message.key.remoteJid;
+        const botId = sock.user.id;
 
-        // Group metadata
-        const metadata = await sock.groupMetadata(chatId).catch(() => null);
-        if (!metadata) return sock.sendMessage(chatId, { text: '❌ Group only command.' }, { quoted: message });
+        if (!chatId.endsWith('@g.us'))
+            return reply('⚠️ *This command is only available in groups.*');
 
-        // Sender & bot admin check
-        const sender = metadata.participants.find(p => [message.key.participant, message.key.remoteJid].includes(p.id));
-        const bot = metadata.participants.find(p => p.id.includes(sock.user.id.split(':')[0]));
-        if (!sender?.admin) return sock.sendMessage(chatId, { text: '❌ Admins only.' }, { quoted: message });
-        if (!bot?.admin) return sock.sendMessage(chatId, { text: '❌ I need admin rights.' }, { quoted: message });
+        let metadata;
+        try { metadata = await sock.groupMetadata(chatId); }
+        catch { return reply('❌ *Unable to access group information.*'); }
+        if (!metadata) return reply('❌ *Group information not found.*');
 
-        // Pending requests
-        const pending = await sock.groupRequestParticipantsList(chatId).catch(() => []);
-        if (!pending.length) return sock.sendMessage(chatId, { text: '📭 No pending requests.' }, { quoted: message });
+        const [senderIsAdmin, botIsAdmin] = await Promise.all([
+            isAdmin(sock, chatId, senderId),
+            isAdmin(sock, chatId, botId)
+        ]);
+        if (!senderIsAdmin) return reply('⛔ *Permission Denied*\n\nOnly admins can use this.');
+        if (!botIsAdmin) return reply('🔒 *Bot Permission Required*\n\nPromote the bot to admin.');
 
+        let pending;
+        try { pending = await sock.groupRequestParticipantsList(chatId); }
+        catch { return reply('⚠️ *Unable to fetch pending requests.*'); }
+        if (!pending?.length) return reply('📭 *No Pending Requests*');
+
+        // Approve all
         if (args[0]?.toLowerCase() === 'all') {
-            // Approve all
+            let approved = 0, failed = 0;
             for (const p of pending) {
-                await sock.groupRequestParticipantsUpdate(chatId, [p.jid], "approve").catch(() => {});
+                try { await sock.groupRequestParticipantsUpdate(chatId, [p.jid], "approve"); approved++; }
+                catch { failed++; }
             }
-            return sock.sendMessage(chatId, { text: `✅ Approved all ${pending.length} requests.` }, { quoted: message });
+            return reply(
+                `📋 *Approval Results*\n\n✅ Approved: ${approved}\n❌ Failed: ${failed}\n📊 Total: ${pending.length}`
+            );
         }
 
+        // Approve mentioned
         if (args.length) {
-            // Approve mentioned
             const mentioned = message.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
-            if (!mentioned.length) return sock.sendMessage(chatId, { text: '❌ Mention users or use ".approve all".' }, { quoted: message });
+            if (!mentioned.length)
+                return reply('❌ *Invalid Usage*\n\nUse `.approve all` or `.approve @user`');
 
-            const approved = [], failed = [];
+            const approved = [], failed = [], notPending = [];
             for (const jid of mentioned) {
                 if (pending.some(p => p.jid === jid)) {
-                    await sock.groupRequestParticipantsUpdate(chatId, [jid], "approve")
-                        .then(() => approved.push(jid.split('@')[0]))
-                        .catch(() => failed.push(jid.split('@')[0]));
-                } else failed.push(jid.split('@')[0]);
+                    try { await sock.groupRequestParticipantsUpdate(chatId, [jid], "approve"); approved.push(jid); }
+                    catch { failed.push(jid); }
+                } else notPending.push(jid);
             }
 
-            return sock.sendMessage(chatId, { text: `✅ Approved: ${approved.join(', ')}\n❌ Failed: ${failed.join(', ')}`.trim() }, { quoted: message });
+            const format = arr => arr.map(j => `@${j.split('@')[0]}`).join(', ');
+            return reply(
+                `📋 *Approval Results*\n\n` +
+                (approved.length ? `✅ Approved: ${format(approved)}\n\n` : '') +
+                (failed.length ? `❌ Failed: ${format(failed)}\n\n` : '') +
+                (notPending.length ? `⚠️ Not Pending: ${format(notPending)}` : ''),
+                { mentions: mentioned }
+            );
         }
 
         // Show pending list
         const list = pending.map(p => `• @${p.jid.split('@')[0]}`).join('\n');
-        return sock.sendMessage(chatId, {
-            text: `📋 *Pending Requests (${pending.length}):*\n\n${list}\n\nUse:\n• .approve all\n• .approve @user`,
-            mentions: pending.map(p => p.jid)
-        }, { quoted: message });
+        return reply(
+            `📋 *Pending Join Requests (${pending.length})*\n\n${list}\n\n*Commands:*\n.approve all\n.approve @user`,
+            { mentions: pending.map(p => p.jid) }
+        );
 
     } catch (err) {
         console.error('❌ Approve Command Error:', err);
-        sock.sendMessage(chatId, { text: '⚠️ Error processing request.' }, { quoted: message });
+        return reply('⚠️ *An unexpected error occurred.*');
     }
 }
 
