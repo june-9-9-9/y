@@ -13,10 +13,12 @@ async function pairCommand(sock, chatId, message) {
         const q = text.replace(/^\.pair\s*/i, "").trim();
 
         if (!q) {
-            return sock.sendMessage(chatId, {
-                text: "⚠️ Please provide a valid WhatsApp number.\n\nExample:\n.pair 25678467XXXX",
+            await sock.sendMessage(chatId, {
+                text: "⚠️ *Oops!* You forgot the number 😅\n\n👉 Example:\n.pair 25678467XXXX",
                 contextInfo: { forwardingScore: 1, isForwarded: false }
             }, { quoted: message });
+            await sock.sendMessage(chatId, { react: { text: "⚠️", key: message.key } });
+            return;
         }
 
         // Normalize and validate numbers
@@ -25,10 +27,12 @@ async function pairCommand(sock, chatId, message) {
             .filter(v => v.length >= 6 && v.length <= 20);
 
         if (numbers.length === 0) {
-            return sock.sendMessage(chatId, {
-                text: "❌ Invalid number format. Please use digits only!",
+            await sock.sendMessage(chatId, {
+                text: "❌ *Invalid number format!* 🚫\n\n👉 Please use digits only (6–20 digits).",
                 contextInfo: { forwardingScore: 1, isForwarded: true }
             }, { quoted: message });
+            await sock.sendMessage(chatId, { react: { text: "❌", key: message.key } });
+            return;
         }
 
         for (const number of numbers) {
@@ -37,21 +41,23 @@ async function pairCommand(sock, chatId, message) {
 
             if (!result?.[0]?.exists) {
                 await sock.sendMessage(chatId, {
-                    text: `🚫 Number ${number} is not registered on WhatsApp.`,
+                    text: `🚫 Number *${number}* is not registered on WhatsApp ❌`,
                     contextInfo: { forwardingScore: 1, isForwarded: true }
                 });
-                continue; // move to next number instead of stopping
+                await sock.sendMessage(chatId, { react: { text: "🚫", key: message.key } });
+                continue;
             }
 
             await sock.sendMessage(chatId, {
-                text: `⏳ Generating code for: ${number}`,
+                text: `⏳ Generating code for: *${number}* 🔐`,
                 contextInfo: { forwardingScore: 1, isForwarded: false }
             }, { quoted: message });
+            await sock.sendMessage(chatId, { react: { text: "⏳", key: message.key } });
 
             try {
                 const response = await axios.get(
                     `https://pair-code-june1-4b71ad8ea191.herokuapp.com/code?number=${number}`,
-                    { timeout: 30000 } // defensive timeout
+                    { timeout: 30000 }
                 );
 
                 const code = response.data?.code;
@@ -59,14 +65,16 @@ async function pairCommand(sock, chatId, message) {
                     throw new Error("Service Unavailable");
                 }
 
-                await sleep(3000); // shorter wait for UX
+                await sleep(3000);
                 await sock.sendMessage(chatId, {
                     text: `${code}`,
                     contextInfo: { forwardingScore: 1, isForwarded: true }
                 }, { quoted: message });
-            // Send explanation separately
+                await sock.sendMessage(chatId, { react: { text: "✅", key: message.key } });
+
+                // Fancy help message
                 await sock.sendMessage(chatId, {
-                    text: `📌 How to link\n ${number} with pair code:\n\n1. Copy code above 🔝\n2. Open WhatsApp on your phone.\n3. Go to Linked Devices in settings.\n4. Tap Link a Device or the pop up message\n5. Enter the code above when prompted.\n6. You device will be linked after loading.\n7. Use the session_id in your Dirrect chat(Dm) to deploy.`,
+                    text: `📌 *How to Link ${number}*\n\n1️⃣ Copy the code above 🔝\n2️⃣ Open WhatsApp 📱\n3️⃣ Go to *Settings > Linked Devices* ⚙️\n4️⃣ Tap *Link a Device* 🔗\n5️⃣ Enter the code 🔑\n6️⃣ Wait for it to load ⏳\n7️⃣ Done! 🎉 Your device is now linked.\n\n💡 Use the *session_id* in your DM to deploy 🚀`,
                     contextInfo: { forwardingScore: 1, isForwarded: false }
                 }, { quoted: message });
 
@@ -74,21 +82,23 @@ async function pairCommand(sock, chatId, message) {
                 console.error("API Error:", apiError.message);
                 const errorMessage =
                     apiError.message === "Service Unavailable"
-                        ? "⚠️ Service is currently unavailable. Please try again later."
-                        : "❌ Failed to generate pairing code. Please try again later.";
+                        ? "⚠️ Service is currently unavailable 🙏 Please try again later."
+                        : "❌ Failed to generate pairing code 😔 Please try again later.";
 
                 await sock.sendMessage(chatId, {
                     text: errorMessage,
                     contextInfo: { forwardingScore: 1, isForwarded: true }
                 }, { quoted: message });
+                await sock.sendMessage(chatId, { react: { text: "⚠️", key: message.key } });
             }
         }
     } catch (error) {
         console.error("Command Error:", error);
         await sock.sendMessage(chatId, {
-            text: "❌ An unexpected error occurred. Please try again later.",
+            text: "💥 Unexpected error occurred 😵\n\nPlease try again later 🙏",
             contextInfo: { forwardingScore: 1, isForwarded: true }
         });
+        await sock.sendMessage(chatId, { react: { text: "💥", key: message.key } });
     }
 }
 
