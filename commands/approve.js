@@ -6,25 +6,25 @@ async function approveCommand(sock, chatId, message) {
         const args = text.trim().split(/\s+/).slice(1);
 
         if (!chatId.endsWith('@g.us'))
-            return sock.sendMessage(chatId, { text: '⚠️ *Group only command.*', quoted: message });
+            return sock.sendMessage(chatId, { text: '⚠️ *Group only command.*'}, { quoted: message });
 
         let metadata;
         try { metadata = await sock.groupMetadata(chatId); }
-        catch { return sock.sendMessage(chatId, { text: '❌ *Unable to access group info.*', quoted: message }); }
+        catch { return sock.sendMessage(chatId, { text: '❌ *Unable to access group info.*'}, { quoted: message }); }
 
         const senderId = message.key.participant || message.key.remoteJid;
         const botId = sock.user.id;
         if (!(await isAdmin(sock, chatId, senderId)))
             return sock.sendMessage(chatId, { text: '⛔ *Admins only.*', quoted: message });
         if (!(await isAdmin(sock, chatId, botId)))
-            return sock.sendMessage(chatId, { text: '🔒 *Bot must be admin.*', quoted: message });
+            return sock.sendMessage(chatId, { text: '🔒 *Bot must be admin.*'}, { quoted: message });
 
         let pending;
         try { pending = await sock.groupRequestParticipantsList(chatId); }
-        catch { return sock.sendMessage(chatId, { text: '⚠️ *Unable to fetch requests.*', quoted: message }); }
+        catch { return sock.sendMessage(chatId, { text: '⚠️ *Unable to fetch requests.*'}, { quoted: message }); }
 
         if (!pending?.length)
-            return sock.sendMessage(chatId, { text: '📭 *No pending requests.*', quoted: message });
+            return sock.sendMessage(chatId, { text: '📭 *No pending requests.*'}, { quoted: message });
 
         // Helper: batch approve
         const batchApprove = async (jids) => {
