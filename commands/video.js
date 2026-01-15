@@ -54,7 +54,7 @@ async function videoCommand(sock, chatId, message) {
 
         let response;
         try {
-            response = await axios.get(apiUrl, { timeout: 30000 }); // 30s timeout
+            response = await axios.get(apiUrl, { timeout: 60000 }); // 60s timeout
         } catch (err) {
             if (err.message.includes("socket hang up")) {
                 console.warn("Retrying after socket hang up...");
