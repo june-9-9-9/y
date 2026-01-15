@@ -42,7 +42,7 @@ async function gitcloneCommand(sock, chatId, message) {
             document: { url: zipUrl },
             fileName: `${repo}-main.zip`,
             mimetype: 'application/zip',
-            caption: `_${user}/${repo}.zip_`
+            caption: `> _© June x_`
         }, { quoted: message });
 
     } catch (error) {
