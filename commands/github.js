@@ -44,10 +44,10 @@ const pushname = message.pushName || "Unknown User";
     txt += `🔹  *Forks* : ${json.forks_count}\n`;
     txt += `🔹  *Stars* : ${json.stargazers_count}\n`;
     txt += `🔹  *Desc* : ${json.description || 'None'}\n\n`;
-    txt += `Hey👋 ${pushname} _Thank you for choosing June, Fork-Star the repository_`;
+    txt += `Hey👋 ${pushname}\n Thank you for choosing June, Fork-Star the repository`;
 
     // Use the local asset image
-    const imgPath = path.join(__dirname, '../assets/menu2.jpg');
+    const imgPath = path.join(__dirname, '../assets/menu3.jpg');
     const imgBuffer = fs.readFileSync(imgPath);
 
     /*await sock.sendMessage(chatId, { image: imgBuffer, caption: txt }, { quoted: message });*/
