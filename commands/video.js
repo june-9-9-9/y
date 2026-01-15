@@ -63,12 +63,12 @@ async function videoCommand(sock, chatId, message) {
             react: { text: '⬇️', key: message.key }
         });
 
-        const caption = `*🎞️ YouTube Video Downloaded*\n\n*Title:* ${video.title}\n*Duration:* ${video.timestamp}\n*Channel:* ${video.author.name}`;
+        const caption = `*Title:* ${video.title}\n*Duration:* ${video.timestamp}`;
 
         // Send as normal video
         await sock.sendMessage(chatId, {
             video: { url: apiData.result },
-            caption: null,
+            caption,
             mimetype: "video/mp4"
         }, { quoted: message });
 
@@ -77,7 +77,7 @@ async function videoCommand(sock, chatId, message) {
             document: { url: apiData.result },
             mimetype: "video/mp4",
             fileName: `${video.title.substring(0, 100)}.mp4`,
-            caption: null
+            caption
         }, { quoted: message });
 
         // Success reaction
