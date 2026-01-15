@@ -25,7 +25,7 @@ async function gitcloneCommand(sock, chatId, message) {
         let [, user, repo] = query.match(regex) || [];
 
         if (!user || !repo) return await sock.sendMessage(chatId, {
-            text: '⚠️ Invalid repository format. Use: https://github.com/username/repository'
+            text: '⚠️ Invalid repository format. Use: https://github.com/username/repo...'
         }, { quoted: message });
 
         repo = repo.replace(/.git$/, '');
@@ -40,7 +40,7 @@ async function gitcloneCommand(sock, chatId, message) {
         // Send the ZIP file
         await sock.sendMessage(chatId, {
             document: { url: zipUrl },
-            fileName: `${user}/${repo}`,
+            fileName: `${user}-${repo}`,
             mimetype: 'application/zip',
             caption: `> ®${repo}`
         }, { quoted: message });
