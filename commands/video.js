@@ -51,9 +51,20 @@ async function videoCommand(sock, chatId, message) {
 
         const video = searchResult;
         const apiUrl = `https://apiskeith.vercel.app/download/video?url=${encodeURIComponent(video.url)}`;
-        const response = await axios.get(apiUrl);
-        const apiData = response.data;
 
+        let response;
+        try {
+            response = await axios.get(apiUrl, { timeout: 30000 }); // 30s timeout
+        } catch (err) {
+            if (err.message.includes("socket hang up")) {
+                console.warn("Retrying after socket hang up...");
+                response = await axios.get(apiUrl, { timeout: 30000 });
+            } else {
+                throw err;
+            }
+        }
+
+        const apiData = response.data;
         if (!apiData || !apiData.result) {
             throw new Error("API failed to fetch video!");
         }
@@ -93,6 +104,8 @@ async function videoCommand(sock, chatId, message) {
             errorMessage = "⏱️ Download timeout! Video might be too large.";
         } else if (error.message.includes("API failed")) {
             errorMessage = "🔧 API error! Try again in a few moments.";
+        } else if (error.message.includes("socket hang up")) {
+            errorMessage = "📡 Connection lost! Please retry.";
         }
 
         await sock.sendMessage(chatId, {
