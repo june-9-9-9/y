@@ -51,9 +51,17 @@ const text = message.message?.conversation || message.message?.extendedTextMessa
  
                     await sock.sendMessage(chatId, { text:`_🎶 Playing:_\n _${apiData.result.title || video.title}_` });
 
+                    await sock.sendMessage(chatId, {
+                          audio: { url: filePath },
+                          mimetype: "audio/mpeg",
+                          fileName: `${apiData.result.title}.mp3`,
+                          Thumbnail: null // attach thumbnail here
+                          },{
+                        quoted: message
+                            });
                     
                     await sock.sendMessage(chatId, { document: { url: filePath }, mimetype: "audio/mpeg", fileName: `${(apiData.result.title || video.title).substring(0, 100)}.mp3` }, { quoted: message });
-
+                                                                                                                  
                     // Cleanup
                     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
