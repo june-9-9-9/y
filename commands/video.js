@@ -31,11 +31,11 @@ async function videoCommand(sock, chatId, message) {
         }, { quoted: message });
 
         const video = searchResult;
-        const apiUrl = `https://veron-apis.zone.id/downloader/youtube1?url=${encodeURIComponent(video.url)}`;
+        const apiUrl = `https://apiskeith.vercel.app/download/video?url=${encodeURIComponent(video.url)}`;
         const response = await axios.get(apiUrl);
         const apiData = response.data;
 
-        if (!apiData.success || !apiData.result || !apiData.result.downloadUrl) {
+        if (!apiData.status || !apiData.result || !apiData.result.downloadUrl) {
             throw new Error("API failed to fetch video!");
         }
 
@@ -46,7 +46,7 @@ async function videoCommand(sock, chatId, message) {
         // Download MP4 video
         const videoResponse = await axios({
             method: "get",
-            url: apiData.result.downloadUrl,
+            url: apiData.result,
             responseType: "stream",
             timeout: 600000
         });
