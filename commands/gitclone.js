@@ -37,16 +37,12 @@ async function gitcloneCommand(sock, chatId, message) {
         const filenameMatch = contentDisp?.match(/attachment; filename=(.*)/);
         const filename = filenameMatch ? filenameMatch[1] : `${repo}.zip`;
 
-        // Send success message
-        await sock.sendMessage(chatId, {
-            text: `✅ Cloning repository: *${user}/${repo}*`
-        }, { quoted: message });
-
         // Send the ZIP file
         await sock.sendMessage(chatId, {
             document: { url: zipUrl },
             fileName: filename,
-            mimetype: 'application/zip'
+            mimetype: 'application/zip',
+            caption: 'JUNE-X'
         }, { quoted: message });
 
     } catch (error) {
