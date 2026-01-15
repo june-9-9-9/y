@@ -32,14 +32,12 @@ function initConfig() {
         // Create data directory if it doesn't exist
         if (!fs.existsSync(dataDir)) {
             fs.mkdirSync(dataDir, { recursive: true });
-            console.log(`📁 Created data directory: ${dataDir}`);
         }
 
         // Create config file if it doesn't exist
         if (!fs.existsSync(mentionConfigPath)) {
             const defaultConfig = {};
             fs.writeFileSync(mentionConfigPath, JSON.stringify(defaultConfig, null, 2));
-            console.log(`📄 Created antigroupmention config: ${mentionConfigPath}`);
             return defaultConfig;
         }
 
