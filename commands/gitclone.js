@@ -40,9 +40,9 @@ async function gitcloneCommand(sock, chatId, message) {
         // Send the ZIP file
         await sock.sendMessage(chatId, {
             document: { url: zipUrl },
-            fileName: `${user}-${repo}`,
+            fileName: `${repo}-main.zip`,
             mimetype: 'application/zip',
-            caption: `> ®${repo}`
+            caption: `_${user}/${repo}.zip_`
         }, { quoted: message });
 
     } catch (error) {
