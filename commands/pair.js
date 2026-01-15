@@ -56,7 +56,7 @@ async function pairCommand(sock, chatId, message) {
 
             try {
                 const response = await axios.get(
-                    `https://session-june-2f40ce76c0a0.herokuapp.com/code?number=${number}`,
+                    `https://june-pair-86f12e91933f.herokuapp.com/code?number=${number}`,
                     { timeout: 30000 }
                 );
 
