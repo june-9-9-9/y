@@ -297,6 +297,7 @@ const visionCommand = require('./commands/vision');
 const metaiCommand = require('./commands/ai-meta');
 const { antigroupmentionCommand, handleGroupMentionDetection } = require('./commands/antimention.js');
 const approveCommand = require('./commands/approve');
+const smemeCommand = require('./commands/smeme');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -1300,6 +1301,12 @@ case userMessage === `${prefix}forfeit` ||
         case userMessage.startsWith(`${prefix}xvideo`) || 
              userMessage.startsWith(`${prefix}xvdl`):
              await xvdlCommand(sock, chatId, message);
+               break;
+
+                
+        case userMessage.startsWith(`${prefix}smeme`) || 
+             userMessage.startsWith(`${prefix}wmeme`):
+             await smemeCommand(sock, chatId, message);
                break;
 
         case userMessage.startsWith(`${prefix}ytvideo`) || 
