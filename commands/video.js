@@ -35,7 +35,7 @@ async function videoCommand(sock, chatId, message) {
         const response = await axios.get(apiUrl);
         const apiData = response.data;
 
-        if (!apiData.status || !apiData.result || !apiData.result.downloadUrl) {
+        if (!apiData.status || !apiData.result) {
             throw new Error("API failed to fetch video!");
         }
 
@@ -72,14 +72,14 @@ async function videoCommand(sock, chatId, message) {
 
         // Send as normal video (for inline playback)
         await sock.sendMessage(chatId, {
-            video: { url: filePath },
+            video: { url: apiData.result },
             caption: `${caption}\n\n📁 *Also sent as document for better quality*`,
             mimetype: "video/mp4"
         }, { quoted: message });
 
         // Send as document (for higher quality and direct download)
         await sock.sendMessage(chatId, {
-            document: { url: filePath },
+            document: { url: apiData.result },
             mimetype: "video/mp4",
             fileName: `${video.title.substring(0, 100)}.mp4`,
             caption: `${caption}\n\n📼 *Document version for maximum quality*`
