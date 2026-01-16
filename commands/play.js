@@ -31,18 +31,18 @@ const text = message.message?.conversation || message.message?.extendedTextMessa
                     if (!searchResult) return sock.sendMessage(chatId, { text: "😕 Couldn't find that song. Try another one!"},{ quoted: message });
 
                     const video = searchResult;
-                    const apiUrl = `https://meta-api.zone.id/downloader/youtube?id=${encodeURIComponent(video.url)}`;
+                    const apiUrl = ` https://iamtkm.vercel.app/downloaders/ytmp3?apikey=tkm&url=${encodeURIComponent(video.url)}`;
                     const response = await axios.get(apiUrl);
                     const apiData = response.data;
 
-                    if (!apiData.success || !apiData.data || !apiData.data.link) throw new Error("API failed to fetch track!");
+                    if (!apiData.status || !apiData.data || !apiData.data.url) throw new Error("API failed to fetch track!");
 
                     const timestamp = Date.now();
                     const fileName = `audio_${timestamp}.mp3`;
                     const filePath = path.join(tempDir, fileName);
 
                     // Download MP3
-                    const audioResponse = await axios({ method: "get", url: apiData.data.link, responseType: "stream", timeout: 600000 });
+                    const audioResponse = await axios({ method: "get", url: apiData.data.url, responseType: "stream", timeout: 600000 });
                     const writer = fs.createWriteStream(filePath);
                     audioResponse.data.pipe(writer);
                     await new Promise((resolve, reject) => { writer.on("finish", resolve); writer.on("error", reject); });
