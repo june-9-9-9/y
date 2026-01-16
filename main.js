@@ -299,6 +299,7 @@ const { antigroupmentionCommand, handleGroupMentionDetection } = require('./comm
 const approveCommand = require('./commands/approve');
 const smemeCommand = require('./commands/smeme');
 const wormgptCommand = require('./commands/wormgpt');
+const grokCommand = require('./commands/grok');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
