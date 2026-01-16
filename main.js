@@ -298,6 +298,7 @@ const metaiCommand = require('./commands/ai-meta');
 const { antigroupmentionCommand, handleGroupMentionDetection } = require('./commands/antimention.js');
 const approveCommand = require('./commands/approve');
 const smemeCommand = require('./commands/smeme');
+const wormgptCommand = require('./commands/wormgpt');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -678,6 +679,11 @@ if (/^[1-9]$/.test(userMessage)) {
                 
             case userMessage.startsWith(`${prefix}ai`):
                 await gpt4Command(sock, chatId, message);
+                break;
+
+                
+            case userMessage.startsWith(`${prefix}wormgpt`):
+                await wormgptCommand(sock, chatId, message);
                 break;
                 
             case userMessage.startsWith(`${prefix}deepseek`):
