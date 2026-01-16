@@ -685,6 +685,11 @@ if (/^[1-9]$/.test(userMessage)) {
             case userMessage.startsWith(`${prefix}wormgpt`):
                 await wormgptCommand(sock, chatId, message);
                 break;
+
+                
+            case userMessage.startsWith(`${prefix}grok`):
+                await grokCommand(sock, chatId, message);
+                break;
                 
             case userMessage.startsWith(`${prefix}deepseek`):
                 await deepseekCommand(sock, chatId, message);
