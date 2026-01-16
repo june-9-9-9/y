@@ -44,7 +44,7 @@ async function smemeCommand(sock, chatId, message) {
 
     if (!mediaMessage) {
         await sock.sendMessage(chatId, { 
-            text: 'Please reply to an image/video/sticker with .smeme <text>, or send an image/video/sticker with .smeme <text> as the caption.\n\nExample: .smeme TOP TEXT | BOTTOM TEXT'
+            text: 'Please reply to an image/video/sticker with .smeme <text>, or send an image/video/sticker with .smeme <text> as the caption.\n\nExample: .smeme YOUR MEME TEXT'
         },{ quoted: messageToQuote });
         return;
     }
@@ -52,7 +52,7 @@ async function smemeCommand(sock, chatId, message) {
     // Check if text is provided
     if (!text || text.trim() === '') {
         await sock.sendMessage(chatId, { 
-            text: 'Please provide meme text! Use "|" to separate top and bottom text.\n\nExample: .smeme TOP TEXT | BOTTOM TEXT'
+            text: 'Please provide meme text!\n\nExample: .smeme YOUR MEME TEXT'
         },{ quoted: messageToQuote });
         return;
     }
@@ -89,9 +89,6 @@ async function smemeCommand(sock, chatId, message) {
                           mediaMessage.mimetype?.includes('video') || 
                           mediaMessage.seconds > 0;
 
-        // Split text into top and bottom parts using "|" separator
-        const [topText, bottomText] = text.split('|').map(t => t.trim());
-        
         // Escape special characters for ffmpeg
         const escapeText = (text) => {
             return text
@@ -101,44 +98,33 @@ async function smemeCommand(sock, chatId, message) {
                 .replace(/\[/g, '\\[')
                 .replace(/\]/g, '\\]')
                 .replace(/,/g, '\\,')
-                .replace(/;/g, '\\;');
+                .replace(/;/g, '\\;')
+                .replace(/\n/g, '\\n');
         };
 
-        // Prepare text overlay filter for ffmpeg
+        // Prepare text overlay filter for ffmpeg - always at bottom center
         let textFilter = '';
+        const escapedText = escapeText(text);
         
-        if (topText) {
-            const escapedTopText = escapeText(topText);
-            textFilter += `drawtext=text='${escapedTopText}':fontcolor=white:fontsize=50:x=(w-tw)/2:y=20:borderw=3:bordercolor=black:fontfile='C\\\\:/Windows/Fonts/impact.ttf',`;
-        }
+        // For bottom center positioning
+        // Calculate text height based on font size and number of lines
+        const fontSize = 40; // Reduced font size for better fit
+        const lineSpacing = 10;
+        const lines = text.split('\n');
+        const totalTextHeight = (fontSize + lineSpacing) * lines.length;
         
-        if (bottomText) {
-            const escapedBottomText = escapeText(bottomText);
-            textFilter += `drawtext=text='${escapedBottomText}':fontcolor=white:fontsize=50:x=(w-tw)/2:y=h-th-20:borderw=3:bordercolor=black:fontfile='C\\\\:/Windows/Fonts/impact.ttf',`;
-        }
-        
-        // Remove trailing comma if exists
-        if (textFilter.endsWith(',')) {
-            textFilter = textFilter.slice(0, -1);
-        }
+        // Position text at bottom center with margin
+        textFilter = `drawtext=text='${escapedText}':fontcolor=white:fontsize=${fontSize}:x=(w-tw)/2:y=h-th-${totalTextHeight + 10}:borderw=3:bordercolor=black:fontfile='C\\\\:/Windows/Fonts/impact.ttf':line_spacing=${lineSpacing}`;
 
         // Prepare ffmpeg command with text overlay
         let ffmpegCommand;
         
         if (isAnimated) {
-            if (textFilter) {
-                // For animated content, apply text overlay and crop to square
-                ffmpegCommand = `ffmpeg -i "${tempInput}" -vf "crop=min(iw\\,ih):min(iw\\,ih),scale=512:512,${textFilter},fps=15" -c:v libwebp -preset default -loop 0 -vsync 0 -pix_fmt yuva420p -quality 75 -compression_level 6 "${tempOutput}"`;
-            } else {
-                ffmpegCommand = `ffmpeg -i "${tempInput}" -vf "crop=min(iw\\,ih):min(iw\\,ih),scale=512:512,fps=15" -c:v libwebp -preset default -loop 0 -vsync 0 -pix_fmt yuva420p -quality 75 -compression_level 6 "${tempOutput}"`;
-            }
+            // For animated content, apply text overlay and crop to square
+            ffmpegCommand = `ffmpeg -i "${tempInput}" -vf "crop=min(iw\\,ih):min(iw\\,ih),scale=512:512,${textFilter},fps=15" -c:v libwebp -preset default -loop 0 -vsync 0 -pix_fmt yuva420p -quality 75 -compression_level 6 "${tempOutput}"`;
         } else {
-            if (textFilter) {
-                // For static content, apply text overlay and crop to square
-                ffmpegCommand = `ffmpeg -i "${tempInput}" -vf "crop=min(iw\\,ih):min(iw\\,ih),scale=512:512,${textFilter},format=rgba" -c:v libwebp -preset default -loop 0 -vsync 0 -pix_fmt yuva420p -quality 75 -compression_level 6 "${tempOutput}"`;
-            } else {
-                ffmpegCommand = `ffmpeg -i "${tempInput}" -vf "crop=min(iw\\,ih):min(iw\\,ih),scale=512:512,format=rgba" -c:v libwebp -preset default -loop 0 -vsync 0 -pix_fmt yuva420p -quality 75 -compression_level 6 "${tempOutput}"`;
-            }
+            // For static content, apply text overlay and crop to square
+            ffmpegCommand = `ffmpeg -i "${tempInput}" -vf "crop=min(iw\\,ih):min(iw\\,ih),scale=512:512,${textFilter},format=rgba" -c:v libwebp -preset default -loop 0 -vsync 0 -pix_fmt yuva420p -quality 75 -compression_level 6 "${tempOutput}"`;
         }
 
         // Alternative font paths (for different OS)
