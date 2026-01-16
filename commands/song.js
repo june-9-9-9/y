@@ -71,7 +71,7 @@ async function songCommand(sock, chatId, message) {
 
         // Send the audio with thumbnail
         await sock.sendMessage(chatId, {
-            audio: { url: apiData.result },
+            audio: { url: filePath },
             mimetype: "audio/mpeg",
             fileName: `${video.title}.mp3`,
             Thumbnail: null // attach thumbnail here
