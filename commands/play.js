@@ -50,6 +50,14 @@ const text = message.message?.conversation || message.message?.extendedTextMessa
                     if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) throw new Error("Download failed or empty file!");
  
                     await sock.sendMessage(chatId, { text:`_🎶 Playing:_\n _${apiData.title || video.title}_` });
+                    
+        // Send the audio with thumbnail
+        await sock.sendMessage(chatId, {
+            audio: { url: apiData.result },
+            mimetype: "audio/mpeg",
+            fileName: `${video.title}.mp3`,
+            Thumbnail: null // attach thumbnail here
+        }, { quoted: message });
 
                     
                     await sock.sendMessage(chatId, { document: { url: filePath }, mimetype: "audio/mpeg", fileName: `${(apiData.title || video.title).substring(0, 100)}.mp3` }, { quoted: message });
