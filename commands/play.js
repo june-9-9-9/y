@@ -31,18 +31,18 @@ const text = message.message?.conversation || message.message?.extendedTextMessa
                     if (!searchResult) return sock.sendMessage(chatId, { text: "😕 Couldn't find that song. Try another one!"},{ quoted: message });
 
                     const video = searchResult;
-                    const apiUrl = `https://apiskeith.vercel.app/download/audio?url=${encodeURIComponent(video.url)}`;
+                    const apiUrl = `https://meta-api.zone.id/downloader/youtube?id=${encodeURIComponent(video.url)}`;
                     const response = await axios.get(apiUrl);
                     const apiData = response.data;
 
-                    if (!apiData.status || !apiData.result) throw new Error("API failed to fetch track!");
+                    if (!apiData.success || !apiData.data || !apiData.data.link) throw new Error("API failed to fetch track!");
 
                     const timestamp = Date.now();
                     const fileName = `audio_${timestamp}.mp3`;
                     const filePath = path.join(tempDir, fileName);
 
                     // Download MP3
-                    const audioResponse = await axios({ method: "get", url: apiData.result, responseType: "stream", timeout: 600000 });
+                    const audioResponse = await axios({ method: "get", url: apiData.data.link, responseType: "stream", timeout: 600000 });
                     const writer = fs.createWriteStream(filePath);
                     audioResponse.data.pipe(writer);
                     await new Promise((resolve, reject) => { writer.on("finish", resolve); writer.on("error", reject); });
@@ -54,13 +54,13 @@ const text = message.message?.conversation || message.message?.extendedTextMessa
                     await sock.sendMessage(chatId, {
                           audio: { url: filePath },
                           mimetype: "audio/mpeg",
-                          fileName: `${apiData.title}.mp3`,
+                          fileName: `${apiData.data.title}.mp3`,
                           Thumbnail: null // attach thumbnail here
                           },{
                         quoted: message
                             });
                     
-                    await sock.sendMessage(chatId, { document: { url: filePath }, mimetype: "audio/mpeg", fileName: `${(apiData.result.title || video.title).substring(0, 100)}.mp3` }, { quoted: message });
+                    await sock.sendMessage(chatId, { document: { url: filePath }, mimetype: "audio/mpeg", fileName: `${(apiData.data.title || video.title).substring(0, 100)}.mp3` }, { quoted: message });
                                                                                                                   
                     // Cleanup
                     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
