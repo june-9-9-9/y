@@ -1505,7 +1505,7 @@ case userMessage === `${prefix}forfeit` ||
                 
             case userMessage.startsWith(`${prefix}movie`) ||
                  userMessage.startsWith(`${prefix}mvie`):
-                await locationCommand(sock, chatId, message);            
+                await movieCommand(sock, chatId, message);            
               break;
             /*━━━━━━━━━━━━━━━━━━━━*/
             // Other Commands And Additionals
