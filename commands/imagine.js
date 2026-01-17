@@ -1,84 +1,124 @@
 const axios = require('axios');
-const { fetchBuffer } = require('../lib/myfunc');
+const fs = require('fs');
+const path = require('path');
 
 async function imagineCommand(sock, chatId, message) {
     try {
-        // Get the prompt from the message
-        const prompt = message.message?.conversation?.trim() || 
-                      message.message?.extendedTextMessage?.text?.trim() || '';
+        // Send initial reaction
+        await sock.sendMessage(chatId, {
+            react: { text: '🎨', key: message.key }
+        });
+
+        const text = message.message?.conversation || 
+                     message.message?.extendedTextMessage?.text || 
+                     message.message?.imageMessage?.caption || 
+                     '';
         
-        // Remove the command prefix and trim
-        const imagePrompt = prompt.slice(8).trim();
-        
-        if (!imagePrompt) {
-            await sock.sendMessage(chatId, {
-                text: 'Please provide a prompt for the image generation.\nExample: .imagine a beautiful sunset over mountains'
-            }, {
-                quoted: message
-            });
-            return;
+        if (!text.includes(' ')) {
+            return await sock.sendMessage(chatId, {
+                text: '🎨 *Flux AI Image Generator*\n\n❌ Please provide a prompt for image generation!\n\n📝 *Usage:*\n.imagine a beautiful sunset over mountains\n.flux cute cat wearing glasses\n.imageai futuristic city at night\n\n🔍 *Examples:*\n• .imagine cyberpunk street\n• .imagine fantasy castle\n• .imagine anime character'
+            }, { quoted: message });
         }
 
-        // Send processing message
+        const parts = text.split(' ');
+        const prompt = parts.slice(1).join(' ').trim();
+
+        if (!prompt) {
+            return await sock.sendMessage(chatId, {
+                text: '🎨 *Flux AI Image Generator*\n\n❌ Please provide a prompt for image generation!\n\n📝 *Example:*\n.imagine a beautiful sunset over mountains'
+            }, { quoted: message });
+        }
+
+        if (prompt.length > 500) {
+            return await sock.sendMessage(chatId, {
+                text: '🎨 *Flux AI Image Generator*\n\n📝 Prompt too long! Max 500 characters.\n\n💡 Try a more concise description.'
+            }, { quoted: message });
+        }
+
+        // Update presence to "recording" (generating)
+        await sock.sendPresenceUpdate('recording', chatId);
+
+        // Call Flux API with arraybuffer response
+        const apiUrl = `https://apiskeith.vercel.app/ai/flux?q=${encodeURIComponent(prompt)}`;
+        const response = await axios.get(apiUrl, {
+            responseType: 'arraybuffer',
+            timeout: 45000 // 45 seconds for image generation
+        });
+
+        // Generate unique filename
+        const timestamp = Date.now();
+        const randomStr = Math.random().toString(36).substring(2, 8);
+        const filename = `flux_${timestamp}_${randomStr}.jpg`;
+        const tempDir = './temp';
+        const filePath = path.join(tempDir, filename);
+
+        // Create temp directory if it doesn't exist
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        // Save image temporarily
+        fs.writeFileSync(filePath, response.data);
+
+        // Send success reaction
         await sock.sendMessage(chatId, {
-            text: '🎨 Generating your image... Please wait.'
-        }, {
-            quoted: message
+            react: { text: '✅', key: message.key }
         });
-
-        // Enhance the prompt with quality keywords
-        const enhancedPrompt = enhancePrompt(imagePrompt);
-
-        // Make API request
-        const response = await axios.get(`https://shizoapi.onrender.com/api/ai/imagine?apikey=shizo&query=${encodeURIComponent(enhancedPrompt)}`, {
-            responseType: 'arraybuffer'
-        });
-
-        // Convert response to buffer
-        const imageBuffer = Buffer.from(response.data);
 
         // Send the generated image
         await sock.sendMessage(chatId, {
-            image: imageBuffer,
-            caption: `🎨 Generated image for prompt: "${imagePrompt}"`
-        }, {
-            quoted: message
+            image: { url: filePath },
+            caption: `🎨 *Flux AI Image Generator*\n\n📝 *Prompt:* ${prompt}\n\n🖼️ *AI Generated Image*\n\n> Powered by Keith's Flux AI`
+        }, { quoted: message });
+
+        // Send final reaction
+        await sock.sendMessage(chatId, {
+            react: { text: '🖼️', key: message.key }
         });
 
+        // Clean up temp file after sending
+        setTimeout(() => {
+            try {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                    console.log(`Cleaned up temp file: ${filename}`);
+                }
+            } catch (cleanupErr) {
+                console.error('Error cleaning up temp file:', cleanupErr);
+            }
+        }, 10000); // Clean up after 10 seconds
+
     } catch (error) {
-        console.error('Error in imagine command:', error);
+        console.error("Flux AI command error:", error);
+        
+        // Send error reaction
         await sock.sendMessage(chatId, {
-            text: '❌ Failed to generate image. Please try again later.'
-        }, {
-            quoted: message
+            react: { text: '❌', key: message.key }
         });
+
+        let errorMessage;
+        if (error.response?.status === 404) {
+            errorMessage = 'Flux AI API endpoint not found!';
+        } else if (error.message.includes('timeout') || error.code === 'ECONNABORTED') {
+            errorMessage = 'Image generation timed out! Try a simpler prompt.';
+        } else if (error.code === 'ENOTFOUND') {
+            errorMessage = 'Cannot connect to Flux AI service!';
+        } else if (error.response?.status === 429) {
+            errorMessage = 'Too many image generation requests! Please wait.';
+        } else if (error.response?.status >= 500) {
+            errorMessage = 'Flux AI service is currently unavailable.';
+        } else if (error.code === 'ENOSPC') {
+            errorMessage = 'Insufficient disk space to save image!';
+        } else if (error.message.includes('arraybuffer')) {
+            errorMessage = 'Invalid image data received from Flux AI.';
+        } else {
+            errorMessage = `Error: ${error.message}`;
+        }
+            
+        await sock.sendMessage(chatId, {
+            text: `🎨 *Flux AI Image Generator*\n\n🚫 ${errorMessage}\n\n💡 *Tips:*\n• Try a different prompt\n• Check your internet connection\n• Wait a few minutes and try again`
+        }, { quoted: message });
     }
 }
 
-// Function to enhance the prompt
-function enhancePrompt(prompt) {
-    // Quality enhancing keywords
-    const qualityEnhancers = [
-        'high quality',
-        'detailed',
-        'masterpiece',
-        'best quality',
-        'ultra realistic',
-        '4k',
-        'highly detailed',
-        'professional photography',
-        'cinematic lighting',
-        'sharp focus'
-    ];
-
-    // Randomly select 3-4 enhancers
-    const numEnhancers = Math.floor(Math.random() * 2) + 3; // Random number between 3-4
-    const selectedEnhancers = qualityEnhancers
-        .sort(() => Math.random() - 0.5)
-        .slice(0, numEnhancers);
-
-    // Combine original prompt with enhancers
-    return `${prompt}, ${selectedEnhancers.join(', ')}`;
-}
-
-module.exports = imagineCommand; 
+module.exports = imagineCommand;
