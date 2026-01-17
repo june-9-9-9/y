@@ -107,7 +107,7 @@ const generateMenu = (pushname, currentMode, hostName, ping, uptimeFormatted, pr
 
     // AI Menu
     menu += `┏❐ \`AI MENU\` ❐\n`;
-    menu += `┃ ${prefix2}dalle\n┃ ${prefix2}gpt\n┃ ${prefix2}gemini\n┃ ${prefix2}imagine\n┃ ${prefix2}flux\n┃ ${prefix2}copilot\n┃ ${prefix2}deepseek\n┃ ${prefix2}meta\n┃ ${prefix2}metai\n┃ ${prefix2}vision\n┃ ${prefix2}analyse\n`;
+    menu += `┃ ${prefix2}illama\n┃ ${prefix2}gpt\n┃ ${prefix2}gemini\n┃ ${prefix2}imagine\n┃ ${prefix2}flux\n┃ ${prefix2}copilot\n┃ ${prefix2}deepseek\n┃ ${prefix2}meta\n┃ ${prefix2}metai\n┃ ${prefix2}vision\n┃ ${prefix2}analyse\n┃ ${prefix2}ilama\n┃ ${prefix2}flux\n┃ ${prefix2}wormgpt\n┃ ${prefix2}birdai\n┃ ${prefix2}perplexity\n┃ ${prefix2}plexity\n┃ ${prefix2}mistral\n┃ ${prefix2}mist\n┃ ${prefix2}grok\n`;
     menu += `┗❐\n\n`;
 
     // Setting Menu
@@ -117,7 +117,7 @@ const generateMenu = (pushname, currentMode, hostName, ping, uptimeFormatted, pr
 
     // Main Menu
     menu += `┏❐ \`MAIN MENU\` ❐\n`;
-    menu += `┃ ${prefix2}yts\n┃ ${prefix2}url\n┃ ${prefix2}tourl\n┃ ${prefix2}block\n┃ ${prefix2}listblock\n┃ ${prefix2}blocklist\n┃ ${prefix2}tagall\n┃ ${prefix2}yts\n┃ ${prefix2}play\n┃ ${prefix2}spotify\n┃ ${prefix2}trt\n┃ ${prefix2}runtime\n┃ ${prefix2}ping\n┃ ${prefix2}apk\n┃ ${prefix2}vv\n┃ ${prefix2}video\n┃ ${prefix2}song\n┃ ${prefix2}ssweb\n┃ ${prefix2}instagram\n┃ ${prefix2}facebook\n┃ ${prefix2}tiktok\n┃ ${prefix2}ytmp4\n┃ ${prefix2}shazam\n┃ ${prefix2}find\n┃ ${prefix2}send\n┃ ${prefix2}get\n┃ ${prefix2}send\n┃ ${prefix2}tomp3\n┃ ${prefix2}toaudio\n┃ ${prefix2}ytsearch\n┃ ${prefix2}ytplay\n┃ ${prefix2}ytv\n┃ ${prefix2}fetch\n┃ ${prefix2}inspect\n┃ ${prefix2}img\n┃ ${prefix2}image\n┃ ${prefix2}vcf\n┃ ${prefix2}pair\n┃ ${prefix2}ytdocplay\n┃ ${prefix2}ytdocvideo\n┃ ${prefix2}mediafire\n┃ ${prefix2}mf\n┃ ${prefix2}ytv\n`;
+    menu += `┃ ${prefix2}yts\n┃ ${prefix2}url\n┃ ${prefix2}tourl\n┃ ${prefix2}block\n┃ ${prefix2}listblock\n┃ ${prefix2}blocklist\n┃ ${prefix2}tagall\n┃ ${prefix2}yts\n┃ ${prefix2}play\n┃ ${prefix2}spotify\n┃ ${prefix2}trt\n┃ ${prefix2}runtime\n┃ ${prefix2}ping\n┃ ${prefix2}apk\n┃ ${prefix2}vv\n┃ ${prefix2}video\n┃ ${prefix2}song\n┃ ${prefix2}ssweb\n┃ ${prefix2}instagram\n┃ ${prefix2}facebook\n┃ ${prefix2}tiktok\n┃ ${prefix2}ytmp4\n┃ ${prefix2}shazam\n┃ ${prefix2}find\n┃ ${prefix2}send\n┃ ${prefix2}get\n┃ ${prefix2}send\n┃ ${prefix2}tomp3\n┃ ${prefix2}toaudio\n┃ ${prefix2}ytsearch\n┃ ${prefix2}ytplay\n┃ ${prefix2}ytv\n┃ ${prefix2}fetch\n┃ ${prefix2}inspect\n┃ ${prefix2}img\n┃ ${prefix2}image\n┃ ${prefix2}vcf\n┃ ${prefix2}pair\n┃ ${prefix2}ytdocplay\n┃ ${prefix2}ytdocvideo\n┃ ${prefix2}mediafire\n┃ ${prefix2}mf\n┃ ${prefix2}ytv\n┃ ${prefix2}transcribe\n┃ ${prefix2}movie\n`;
     menu += `┗❐\n\n`;
 
     // Stick Menu
@@ -127,7 +127,7 @@ const generateMenu = (pushname, currentMode, hostName, ping, uptimeFormatted, pr
 
     // Game Menu
     menu += `┏❐ \`GAME MENU\` ❐\n`;
-    menu += `┃ ${prefix2}tictactoe\n┃ ${prefix2}hangman\n┃ ${prefix2}guess\n┃ ${prefix2}trivia\n┃ ${prefix2}answer\n┃ ${prefix2}truth\n┃ ${prefix2}dare\n┃ ${prefix2}8ball\n┃ ${prefix2}cf\n┃ ${prefix2}connect4\n┃ ${prefix2}connectfour\n`;
+    menu += `┃ ${prefix2}tictactoe\n┃ ${prefix2}hangman\n┃ ${prefix2}guess\n┃ ${prefix2}trivia\n┃ ${prefix2}answer\n┃ ${prefix2}truth\n┃ ${prefix2}dare\n┃ ${prefix2}8ball\n┃ ${prefix2}cf\n┃ ${prefix2}connect4\n┃ ${prefix2}connectfour\n┃ ${prefix2}guess\n`;
     menu += `┗❐\n\n`;
 
     // GitHub Menu
@@ -154,6 +154,12 @@ const generateMenu = (pushname, currentMode, hostName, ping, uptimeFormatted, pr
     menu += `┏❐ \`IMG EDIT\` ❐\n`;
     menu += `┃ ${prefix2}heart\n┃ ${prefix2}horny\n┃ ${prefix2}circle\n┃ ${prefix2}lgbt\n┃ ${prefix2}lolice\n┃ ${prefix2}stupid\n┃ ${prefix2}namecard\n┃ ${prefix2}tweet\n┃ ${prefix2}ytcomment\n┃ ${prefix2}comrade\n┃ ${prefix2}gay\n┃ ${prefix2}glass\n┃ ${prefix2}jail\n┃ ${prefix2}passed\n┃ ${prefix2}triggered\n`;
     menu += `┗❐\n`;
+    
+        // 
+    menu += `┏❐ \`CONVERTION MENU\` ❐\n`;
+    menu += `┃ ${prefix2}totext\n┃ ${prefix2}toimage\n┃ ${prefix2}simage\n┃ ${prefix2}toaudio\n┃ ${prefix2}toppt\n┃ ${prefix2}tomp3\n┃ ${prefix2}tourl\n`;
+    menu += `┗❐\n${readmore}\n`;
+    
 
     return menu;
 };
@@ -333,7 +339,7 @@ async function helpCommand(sock, chatId, message) {
 
     // Send reaction
     await sock.sendMessage(chatId, {
-        react: { text: '📔', key: message.key }
+        react: { text: '🔐', key: message.key }
     });
 
     try {
@@ -345,7 +351,7 @@ async function helpCommand(sock, chatId, message) {
 
         // Success reaction
         await sock.sendMessage(chatId, {
-            react: { text: '✅', key: message.key }
+            react: { text: '🪭', key: message.key }
         });
 
     } catch (error) {
