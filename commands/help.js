@@ -153,10 +153,10 @@ const generateMenu = (pushname, currentMode, hostName, ping, uptimeFormatted, pr
     // Image Edit Menu
     menu += `┏❐ \`IMG EDIT\` ❐\n`;
     menu += `┃ ${prefix2}heart\n┃ ${prefix2}horny\n┃ ${prefix2}circle\n┃ ${prefix2}lgbt\n┃ ${prefix2}lolice\n┃ ${prefix2}stupid\n┃ ${prefix2}namecard\n┃ ${prefix2}tweet\n┃ ${prefix2}ytcomment\n┃ ${prefix2}comrade\n┃ ${prefix2}gay\n┃ ${prefix2}glass\n┃ ${prefix2}jail\n┃ ${prefix2}passed\n┃ ${prefix2}triggered\n`;
-    menu += `┗❐\n`;
+    menu += `┗❐\n\n`;
     
-        // 
-    menu += `┏❐ \`CONVERTION MENU\` ❐\n`;
+        // Convertion menu
+    menu += `┏❐ \`CONVERT CMD\` ❐\n`;
     menu += `┃ ${prefix2}totext\n┃ ${prefix2}toimage\n┃ ${prefix2}simage\n┃ ${prefix2}toaudio\n┃ ${prefix2}toppt\n┃ ${prefix2}tomp3\n┃ ${prefix2}tourl\n`;
     menu += `┗❐\n${readmore}\n`;
     
