@@ -18,13 +18,11 @@ async function transcribeCommand(sock, chatId, message) {
         }
 
         // Detect media type
-        let mediaType, mediaNode;
+        let mediaType;
         if (quotedMsg.audioMessage) {
             mediaType = 'audio';
-            mediaNode = quotedMsg.audioMessage;
         } else if (quotedMsg.videoMessage) {
             mediaType = 'video';
-            mediaNode = quotedMsg.videoMessage;
         } else {
             return await sock.sendMessage(chatId, {
                 text: '🎤 *Audio/Video Transcription*\n\n❌ Unsupported media type!\n\n📌 Please reply to:\n• Audio message\n• Video message\n• Voice note\n\n❌ Not supported:\n• Images\n• Documents\n• Text messages'
@@ -34,9 +32,9 @@ async function transcribeCommand(sock, chatId, message) {
         // Show "recording" presence
         await sock.sendPresenceUpdate('recording', chatId);
 
-        // Download media buffer
+        // ✅ FIX: Pass the full quoted message object
         const buffer = await downloadMediaMessage(
-            { message: mediaNode },
+            { message: quotedMsg },
             'buffer',
             {},
             { sock }
