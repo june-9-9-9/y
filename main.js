@@ -306,6 +306,9 @@ const speechwriterCommand = require('./commands/ai-speechwriter');
 const mistralCommand = require('./commands/ai-mistral');
 const ilamaCommand = require('./commands/ai-ilama');
 const locationCommand = require('./commands/location');
+const perplexityCommand = require('./commands/ai-perplexity');
+const movieCommand = require('./commands/movie');
+const transcribeCommand = require('./commands/transcribe');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -1484,6 +1487,24 @@ case userMessage === `${prefix}forfeit` ||
                 
             case userMessage.startsWith(`${prefix}locate`) ||
                  userMessage.startsWith(`${prefix}location`):
+                await locationCommand(sock, chatId, message);            
+              break;
+
+                
+            case userMessage.startsWith(`${prefix}perplexity`) ||
+                 userMessage.startsWith(`${prefix}plexity`):
+                await perplexityCommand(sock, chatId, message);            
+              break;
+
+                
+            case userMessage.startsWith(`${prefix}transcribe`) ||
+                 userMessage.startsWith(`${prefix}totext`):
+                await transcribeCommand(sock, chatId, message);            
+              break;
+
+                
+            case userMessage.startsWith(`${prefix}movie`) ||
+                 userMessage.startsWith(`${prefix}mvie`):
                 await locationCommand(sock, chatId, message);            
               break;
             /*━━━━━━━━━━━━━━━━━━━━*/
