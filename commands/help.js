@@ -107,7 +107,7 @@ const generateMenu = (pushname, currentMode, hostName, ping, uptimeFormatted, pr
 
     // AI Menu
     menu += `┏❐ \`AI MENU\` ❐\n`;
-    menu += `┃ ${prefix2}illama\n┃ ${prefix2}gpt\n┃ ${prefix2}gemini\n┃ ${prefix2}imagine\n┃ ${prefix2}flux\n┃ ${prefix2}copilot\n┃ ${prefix2}deepseek\n┃ ${prefix2}meta\n┃ ${prefix2}metai\n┃ ${prefix2}vision\n┃ ${prefix2}analyse\n┃ ${prefix2}ilama\n┃ ${prefix2}flux\n┃ ${prefix2}wormgpt\n┃ ${prefix2}birdai\n┃ ${prefix2}perplexity\n┃ ${prefix2}plexity\n┃ ${prefix2}mistral\n┃ ${prefix2}mist\n┃ ${prefix2}grok\n`;
+    menu += `┃ ${prefix2}illama\n┃ ${prefix2}gpt\n┃ ${prefix2}gemini\n┃ ${prefix2}imagine\n┃ ${prefix2}flux\n┃ ${prefix2}copilot\n┃ ${prefix2}deepseek\n┃ ${prefix2}speechwrite\n┃ ${prefix2}speech\n┃ ${prefix2}meta\n┃ ${prefix2}metai\n┃ ${prefix2}vision\n┃ ${prefix2}analyse\n┃ ${prefix2}ilama\n┃ ${prefix2}flux\n┃ ${prefix2}wormgpt\n┃ ${prefix2}birdai\n┃ ${prefix2}perplexity\n┃ ${prefix2}plexity\n┃ ${prefix2}mistral\n┃ ${prefix2}mist\n┃ ${prefix2}grok\n`;
     menu += `┗❐\n\n`;
 
     // Setting Menu
