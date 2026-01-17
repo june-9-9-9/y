@@ -66,7 +66,7 @@ async function locationCommand(sock, chatId, message) {
 
         // Send info message with coordinates
         await sock.sendMessage(chatId, {
-            text: `📍 *Location Shared*\n\n🏙️ *Name:* ${formattedName}\n🌐 *Coordinates:*\n   • Latitude: ${lat}\n   • Longitude: ${lng}\n\n🔍 *Search Query:* ${locationQuery}\n\n> *Powered by Keith's Location API*`
+            text: `📍 *Location Shared*\n\n🏙️ *Name:* ${formattedName}\n🌐 *Coordinates:*\n   • Latitude: ${lat}\n   • Longitude: ${lng}\n\n🔍 *Search Query:* ${locationQuery}\n*`
         }, { quoted: message });
 
         // Send final reaction
