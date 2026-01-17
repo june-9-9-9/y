@@ -2,112 +2,113 @@ const axios = require('axios');
 
 async function spotifyCommand(sock, chatId, message) {
     try {
-        const rawText = message.message?.conversation?.trim() ||
-            message.message?.extendedTextMessage?.text?.trim() ||
-            message.message?.imageMessage?.caption?.trim() ||
-            message.message?.videoMessage?.caption?.trim() ||
-            '';
+        // Initial reaction
+        await sock.sendMessage(chatId, {
+            react: { text: '🎵', key: message.key }
+        });
+
+        const text = message.message?.conversation || 
+                     message.message?.extendedTextMessage?.text || 
+                     message.message?.imageMessage?.caption || 
+                     '';
         
-        const used = (rawText || '').split(/\s+/)[0] || '.spotify';
-        const query = rawText.slice(used.length).trim();
-        
+        if (!text.includes(' ')) {
+            return await sock.sendMessage(chatId, {
+                text: '🎵 *Spotify Music Downloader*\n\n❌ Please provide a song name or Spotify URL!\n\n📝 *Usage:*\n.spotify Blinding Lights\nThe Weeknd\n.spot https://open.spotify.com/track/...\n.spdl Shape of You Ed Sheeran\n\n🔍 *Examples:*\n• .spotify Bohemian Rhapsody\n• .spot Yesterday The Beatles\n• .spotify https://open.spotify.com/track/0VjIjW4GlUZAMYd2vXMi3b\n\n💡 *Supported:*\n• Song names\n• Artist + Song\n• Spotify URLs\n• Playlist URLs (first track)'
+            }, { quoted: message });
+        }
+
+        const parts = text.split(' ');
+        const query = parts.slice(1).join(' ').trim();
+
         if (!query) {
-            await sock.sendMessage(chatId, { 
-                text: 'Usage: .spotify <song/artist/keywords>\n\nExample: .spotify Faded\nExample: .spotify Alan Walker' 
-            }, { quoted: message });
-            return;
-        }
-
-        // Send initial reaction
-        await sock.sendMessage(chatId, {
-            react: { text: '🔍', key: message.key }
-        });
-
-        // Call the new API
-        const apiUrl = `https://veron-apis.zone.id/downloader/spotify?query=${encodeURIComponent(query)}`;
-        const { data } = await axios.get(apiUrl, { 
-            timeout: 30000, // Increased timeout for processing
-            headers: { 
-                'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'accept': 'application/json'
-            } 
-        });
-
-        // Check if API call was successful
-        if (!data?.success || !data?.result?.success || !data.result.metadata) {
-            throw new Error(data?.result?.error || 'No results found for this query');
-        }
-
-        const metadata = data.result.metadata;
-        const downloadInfo = data.result.downloadInfo;
-
-        // Build direct download URL
-        const directDownloadUrl = `https://veron-apis.zone.id${downloadInfo.directDownload}`;
-
-        // Build caption
-        let caption = `🎵 *Spotify Music*\n\n`;
-        caption += `📔 Title: *${metadata.title}*\n`;
-        caption += `👤 Artist: ${metadata.artist}\n`;
-        caption += `⏰ Duration: ${metadata.duration}\n`;
-        caption += `📦 Size: ${(downloadInfo.size / 1024 / 1024).toFixed(2)} MB\n`;
-        caption += `🎧 Format: ${downloadInfo.format}\n`;
-        caption += `✨ Quality: ${downloadInfo.quality}\n`;
-        
-        if (metadata.url) {
-            caption += `\n🔗 Spotify URL: ${metadata.url}`;
-        }
-        caption += `\n\n📥 Downloading audio please wait...`;
-
-        // Send thumbnail with caption
-        if (metadata.cover) {
-            await sock.sendMessage(chatId, { 
-                image: { url: metadata.cover }, 
-                caption 
-            }, { quoted: message });
-        } else {
-            await sock.sendMessage(chatId, { 
-                text: caption 
+            return await sock.sendMessage(chatId, {
+                text: '🎵 *Spotify Music Downloader*\n\n❌ Please provide a song name or Spotify URL!\n\n📝 *Example:*\n.spotify Dance Monkey'
             }, { quoted: message });
         }
 
-        // Update reaction
-        await sock.sendMessage(chatId, {
-            react: { text: '⬇️', key: message.key }
-        });
+        if (query.length > 200) {
+            return await sock.sendMessage(chatId, {
+                text: '🎵 *Spotify Music Downloader*\n\n📝 Query too long! Max 200 characters.\n\n💡 Try a shorter song name.'
+            }, { quoted: message });
+        }
 
-        // Send audio file
-        const safeTitle = metadata.title.replace(/[\\/:*?"<>|]/g, '');
-        await sock.sendMessage(chatId, {
-            audio: { url: directDownloadUrl },
-            mimetype: 'audio/mpeg',
-            fileName: `${safeTitle} - ${metadata.artist}.mp3`
-        }, { quoted: message });
+        // Presence update
+        await sock.sendPresenceUpdate('recording', chatId);
+
+        // API call
+        const apiUrl = `https://apiskeith.vercel.app/download/spotify?q=${encodeURIComponent(query)}`;
+        const response = await axios.get(apiUrl, { timeout: 60000 });
+
+        const track = response.data?.result?.track;
+
+        if (!track?.downloadLink) throw new Error('No download link found');
+        if (!track?.title) throw new Error('Invalid track information');
 
         // Success reaction
         await sock.sendMessage(chatId, {
             react: { text: '✅', key: message.key }
         });
-        
+
+        // Clean filename
+        const cleanFileName = (str) => str.replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim();
+        const fileName = cleanFileName(`${track.title} - ${track.artist || 'Unknown Artist'}.mp3`);
+
+        // Track info FIRST
+        let trackInfo = `🎵 *Spotify Music Downloader*\n\n`;
+        trackInfo += `📀 *Title:* ${track.title}\n`;
+        if (track.artist) trackInfo += `🎤 *Artist:* ${track.artist}\n`;
+        if (track.album) trackInfo += `💿 *Album:* ${track.album}\n`;
+        if (track.duration) trackInfo += `⏱ *Duration:* ${track.duration}\n`;
+        if (track.releaseDate) trackInfo += `📅 *Released:* ${track.releaseDate}\n`;
+        if (track.popularity) trackInfo += `⭐ *Popularity:* ${track.popularity}/100\n`;
+        if (track.genres?.length > 0) trackInfo += `🎭 *Genres:* ${track.genres.join(', ')}\n`;
+        if (track.url) trackInfo += `🔗 *Spotify URL:* ${track.url}\n`;
+        trackInfo += `\n✅ *Download successful!*\n`;
+        trackInfo += `> Powered by Keith's Spotify API`;
+
+        await sock.sendMessage(chatId, { text: trackInfo }, { quoted: message });
+
+        // Then audio
+        await sock.sendMessage(chatId, {
+            audio: { url: track.downloadLink },
+            mimetype: 'audio/mpeg',
+            fileName: fileName
+        }, { quoted: message });
+
+        // Then document
+        await sock.sendMessage(chatId, {
+            document: { url: track.downloadLink },
+            mimetype: 'audio/mpeg',
+            fileName: fileName
+        }, { quoted: message });
+
+        // Final reaction
+        await sock.sendMessage(chatId, {
+            react: { text: '🎧', key: message.key }
+        });
 
     } catch (error) {
-        console.error('[SPOTIFY] error:', error?.message || error);
-        
-        let errorMsg = 'Unknown error occurred';
-        if (error?.response?.data?.message) {
-            errorMsg = error.response.data.message;
-        } else if (error?.message) {
-            errorMsg = error.message;
-        } else if (error?.response?.data?.result?.error) {
-            errorMsg = error.response.data.result.error;
-        }
+        console.error("Spotify command error:", error);
 
-        await sock.sendMessage(chatId, { 
-            text: `❌ *Failed to download Spotify audio*\n\n` +
-                  `_Error:_ ${errorMsg}\n\n` +
-                  `Please try:\n` +
-                  `• Different search keywords\n` +
-                  `• Check your internet connection\n` +
-                  `• Try again later`
+        await sock.sendMessage(chatId, {
+            react: { text: '❌', key: message.key }
+        });
+
+        let errorMessage;
+        if (error.response?.status === 404) errorMessage = 'Spotify API endpoint not found!';
+        else if (error.message.includes('timeout') || error.code === 'ECONNABORTED') errorMessage = 'Download timed out! The song might be too long.';
+        else if (error.code === 'ENOTFOUND') errorMessage = 'Cannot connect to Spotify service!';
+        else if (error.response?.status === 429) errorMessage = 'Too many download requests! Please wait a while.';
+        else if (error.response?.status === 403) errorMessage = 'Spotify download service is temporarily blocked!';
+        else if (error.response?.status >= 500) errorMessage = 'Spotify service is currently unavailable.';
+        else if (error.message.includes('No download link') || error.message.includes('Invalid track')) errorMessage = 'Song not found or cannot be downloaded!';
+        else if (error.message.includes('premium')) errorMessage = 'This may be a premium-only track!';
+        else if (error.message.includes('region') || error.message.includes('not available')) errorMessage = 'This track is not available in your region!';
+        else errorMessage = `Error: ${error.message}`;
+
+        await sock.sendMessage(chatId, {
+            text: `🎵 *Spotify Music Downloader*\n\n🚫 ${errorMessage}\n\n *Tips:*\n• Try a different song\n• Check the spelling\n• Try without special characters\n• Use exact song title\n• Wait a few minutes and try again\n\n🔗 *Alternative:* Use .ytmp3 for YouTube downloads`
         }, { quoted: message });
     }
 }
