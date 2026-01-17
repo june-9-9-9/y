@@ -68,8 +68,7 @@ async function blocklistCommand(sock, chatId, message) {
         }
 
         await sock.sendMessage(chatId, { 
-            text: `📋 FETCHING BLOCKLIST...\nTotal: ${blockedContacts.length} contacts\nProcessing...`,
-            quoted: message
+            text: `📋Total: ${blockedContacts.length}`
         });
         await react(sock, chatId, message.key, '🔍');
 
@@ -92,10 +91,6 @@ async function blocklistCommand(sock, chatId, message) {
             if (chunk < totalChunks - 1) await delay(1500);
         }
 
-        await sock.sendMessage(chatId, { 
-            text: `✅ BLOCKLIST COMPLETE!\nTotal blocked contacts: ${blockedContacts.length}`,
-            quoted: message
-        });
         await react(sock, chatId, message.key, '✅');
     } catch (error) {
         console.error('Error in blocklistCommand:', error);
