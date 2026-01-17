@@ -300,6 +300,12 @@ const approveCommand = require('./commands/approve');
 const smemeCommand = require('./commands/smeme');
 const wormgptCommand = require('./commands/wormgpt');
 const grokCommand = require('./commands/grok');
+const blackboxCommand = require('./commands/ai-blackbox');
+const birdCommand = require('./commands/ai-bird');
+const speechwriterCommand = require('./commands/ai-speechwriter');
+const mistralCommand = require('./commands/ai-mistral');
+const ilamaCommand = require('./commands/ai-ilama');
+const location = require('./commands/location');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -1444,7 +1450,42 @@ case userMessage === `${prefix}forfeit` ||
                  userMessage.startsWith(`${prefix}setstatus`):
                 await tostatusCommand(sock, chatId, message);            
               break;
+
                 
+            case userMessage.startsWith(`${prefix}ilama`) ||
+                 userMessage.startsWith(`${prefix}illama`):
+                await ilamaCommand(sock, chatId, message);            
+              break;
+
+                
+            case userMessage.startsWith(`${prefix}blackai`) ||
+                 userMessage.startsWith(`${prefix}blackbox`):
+                await blackboxCommand(sock, chatId, message);            
+              break;
+
+                
+            case userMessage.startsWith(`${prefix}mist`) ||
+                 userMessage.startsWith(`${prefix}mistral`):
+                await mistralCommand(sock, chatId, message);            
+              break;
+
+                
+            case userMessage.startsWith(`${prefix}birdai`) ||
+                 userMessage.startsWith(`${prefix}bird`):
+                await birdCommand(sock, chatId, message);            
+              break;
+
+                
+            case userMessage.startsWith(`${prefix}speech`) ||
+                 userMessage.startsWith(`${prefix}speechwrite`):
+                await speechwriterCommand(sock, chatId, message);            
+              break;
+
+                
+            case userMessage.startsWith(`${prefix}locate`) ||
+                 userMessage.startsWith(`${prefix}location`):
+                await locationCommand(sock, chatId, message);            
+              break;
             /*━━━━━━━━━━━━━━━━━━━━*/
             // Other Commands And Additionals
             /*━━━━━━━━━━━━━━━━━━━━*/
