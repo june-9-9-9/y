@@ -1,145 +1,50 @@
-// Utility: delay helper
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+// Utility
+const delay = ms => new Promise(res => setTimeout(res, ms));
 
-// --- Helpers ---
-function isOwner(message) {
-    return message?.key?.fromMe === true;
-}
+// Helpers
+const isOwner = msg => msg?.key?.fromMe === true;
+const getBotId = sock => sock?.user?.id?.split(':')[0];
+const react = async (sock, chatId, key, emoji) => {
+  try { await sock.sendMessage(chatId, { react: { text: emoji, key } }); } catch {}
+};
 
-function getBotId(sock) {
-    return sock?.user?.id?.split(':')[0];
-}
-
-async function react(sock, chatId, key, emoji) {
-    try {
-        await sock.sendMessage(chatId, { react: { text: emoji, key } });
-    } catch (err) {
-        console.warn(`⚠️ Failed to react with ${emoji}:`, err);
-    }
-}
-
-// --- Commands ---
+// Commands
 async function blockCommand(sock, chatId, message) {
-    try {
-        if (!isOwner(message)) {
-            await sock.sendMessage(chatId, { text: 'Owner-only!', quoted: message });
-            return react(sock, chatId, message.key, '❌');
-        }
+  if (!isOwner(message)) return sock.sendMessage(chatId, { text: 'Owner-only!', quoted: message });
+  const user = message.message?.extendedTextMessage?.contextInfo?.participant;
+  if (!user) return sock.sendMessage(chatId, { text: 'Reply to a user to block.', quoted: message });
+  if (user.includes(getBotId(sock))) return sock.sendMessage(chatId, { text: 'Cannot block the bot.', quoted: message });
 
-        const contextInfo = message.message?.extendedTextMessage?.contextInfo;
-        const userToBlock = contextInfo?.participant;
-
-        if (!userToBlock) {
-            await sock.sendMessage(chatId, { text: 'Reply to a user to block.', quoted: message });
-            return react(sock, chatId, message.key, '⚠️');
-        }
-
-        if (userToBlock.includes(getBotId(sock))) {
-            await sock.sendMessage(chatId, { text: 'Cannot block the bot.', quoted: message });
-            return react(sock, chatId, message.key, '🤖');
-        }
-
-        await sock.updateBlockStatus(userToBlock, 'block');
-        await sock.sendMessage(chatId, { text: 'Blocked.', quoted: message });
-        await react(sock, chatId, message.key, '✅');
-
-        console.log(`✅ Blocked user: ${userToBlock}`);
-    } catch (error) {
-        console.error('Error in blockCommand:', error);
-        await sock.sendMessage(chatId, { text: 'Block failed.', quoted: message }).catch(() => {});
-        await react(sock, chatId, message.key, '💥');
-    }
+  try {
+    await sock.updateBlockStatus(user, 'block');
+    await sock.sendMessage(chatId, { text: 'Blocked ✅', quoted: message });
+    await react(sock, chatId, message.key, '✅');
+  } catch {
+    await sock.sendMessage(chatId, { text: 'Block failed 💥', quoted: message });
+    await react(sock, chatId, message.key, '💥');
+  }
 }
 
 async function blocklistCommand(sock, chatId, message) {
-    try {
-        if (!isOwner(message)) {
-            await sock.sendMessage(chatId, { text: 'Owner-only!', quoted: message });
-            return react(sock, chatId, message.key, '❌');
-        }
+  if (!isOwner(message)) return sock.sendMessage(chatId, { text: 'Owner-only!', quoted: message });
+  const blocked = await sock.fetchBlocklist().catch(() => []);
+  if (!blocked.length) return sock.sendMessage(chatId, { text: 'No blocked contacts 📭', quoted: message });
 
-        const blockedContacts = await sock.fetchBlocklist().catch(() => []);
-        if (!blockedContacts.length) {
-            await sock.sendMessage(chatId, { text: 'No blocked contacts.', quoted: message });
-            return react(sock, chatId, message.key, '📭');
-        }
-
-        await react(sock, chatId, message.key, '🔍');
-
-        const chunkSize = 100;
-        const totalChunks = Math.ceil(blockedContacts.length / chunkSize);
-
-        for (let chunk = 0; chunk < totalChunks; chunk++) {
-            let chunkText = `Blocked ${chunk * chunkSize + 1}-${Math.min((chunk + 1) * chunkSize, blockedContacts.length)} of ${blockedContacts.length}\n\n`;
-            const startIndex = chunk * chunkSize;
-            const endIndex = Math.min((chunk + 1) * chunkSize, blockedContacts.length);
-
-            for (let i = startIndex; i < endIndex; i++) {
-                const jid = blockedContacts[i];
-                const number = jid.split('@')[0];
-                const index = (i + 1).toString().padStart(3, '0');
-                chunkText += `${index}. ${number}\n`;
-            }
-
-            await sock.sendMessage(chatId, { text: chunkText, quoted: message });
-            if (chunk < totalChunks - 1) await delay(1500);
-        }
-
-        await sock.sendMessage(chatId, { text: 'Blocklist complete.', quoted: message });
-        await react(sock, chatId, message.key, '✅');
-    } catch (error) {
-        console.error('Error in blocklistCommand:', error);
-        await sock.sendMessage(chatId, { text: 'Blocklist failed.', quoted: message }).catch(() => {});
-        await react(sock, chatId, message.key, '💥');
-    }
+  let text = `Blocked contacts (${blocked.length}):\n\n`;
+  blocked.forEach((jid, i) => text += `${String(i+1).padStart(3,'0')}. ${jid.split('@')[0]} ✅\n`);
+  await sock.sendMessage(chatId, { text, quoted: message });
 }
 
 async function unblockallCommand(sock, chatId, message) {
-    try {
-        if (!isOwner(message)) {
-            await sock.sendMessage(chatId, { text: 'Owner-only!', quoted: message });
-            return react(sock, chatId, message.key, '❌');
-        }
+  if (!isOwner(message)) return sock.sendMessage(chatId, { text: 'Owner-only!', quoted: message });
+  const blocked = await sock.fetchBlocklist().catch(() => []);
+  if (!blocked.length) return sock.sendMessage(chatId, { text: 'No contacts to unblock 📭', quoted: message });
 
-        const blockedContacts = await sock.fetchBlocklist().catch(() => []);
-        if (!blockedContacts.length) {
-            await sock.sendMessage(chatId, { text: 'No contacts to unblock.', quoted: message });
-            return react(sock, chatId, message.key, '📭');
-        }
-
-        await sock.sendMessage(chatId, { text: 'Unblocking...', quoted: message });
-        await react(sock, chatId, message.key, '🔄');
-
-        let successCount = 0;
-        for (const jid of blockedContacts) {
-            try {
-                await sock.updateBlockStatus(jid, 'unblock');
-                successCount++;
-                console.log(`✅ Unblocked: ${jid}`);
-
-                if (successCount % 10 === 0) {
-                    await sock.sendMessage(chatId, { text: `Progress: ${successCount}/${blockedContacts.length}`, quoted: message });
-                }
-
-                await delay(500);
-            } catch {
-                console.warn(`⚠️ Failed to unblock: ${jid}`);
-            }
-        }
-
-        await sock.sendMessage(chatId, { text: `Unblocked ${successCount}/${blockedContacts.length}.`, quoted: message });
-        await react(sock, chatId, message.key, '✅');
-
-        console.log(`✅ Soft unblock complete: ${successCount}/${blockedContacts.length}`);
-    } catch (error) {
-        console.error('Error in unblockallCommand:', error);
-        await sock.sendMessage(chatId, { text: 'Unblock failed.', quoted: message }).catch(() => {});
-        await react(sock, chatId, message.key, '💥');
-    }
+  let count = 0;
+  for (const jid of blocked) {
+    try { await sock.updateBlockStatus(jid, 'unblock'); count++; await delay(300); } catch {}
+  }
+  await sock.sendMessage(chatId, { text: `Unblocked ${count}/${blocked.length} ✅`, quoted: message });
 }
 
-module.exports = {
-    blockCommand,
-    blocklistCommand,
-    unblockallCommand
-};
+module.exports = { blockCommand, blocklistCommand, unblockallCommand };
