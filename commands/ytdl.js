@@ -78,8 +78,8 @@ async function ytsongCommand(sock, chatId, message) {
             videoUrl = videoInfo.url;
         }
 
-        const res = await axios.get(`https://api.privatezia.biz.id/api/downloader/ytmp3?url=${videoUrl}`);
-        const dl = res.data?.result?.downloadUrl;
+        const res = await axios.get(`https://apiskeith.vercel.app/download/audio?url=${videoUrl}`);
+        const dl = res.data?.result;
         if (!dl) {
             await sock.sendMessage(chatId, { text: "Download failed." }, { quoted: message });
             await sock.sendMessage(chatId, { react: { text: "❌", key: message.key } });
