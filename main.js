@@ -305,7 +305,7 @@ const birdCommand = require('./commands/ai-bird');
 const speechwriterCommand = require('./commands/ai-speechwriter');
 const mistralCommand = require('./commands/ai-mistral');
 const ilamaCommand = require('./commands/ai-ilama');
-const location = require('./commands/location');
+const locationCommand = require('./commands/location');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
