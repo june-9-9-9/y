@@ -71,7 +71,7 @@ async function onlineCommand(sock, chatId, message) {
             mentions.push(id);
             const memberData = participants.find(p => p.id === id);
             const name = memberData?.pushname || memberData?.name || id.split('@')[0];
-            return `${i + 1}. @${id.split('@')[0]} (${name})`;
+            return `${i + 1}. @${id.split('@')[0]}`;
         });
 
         const resultMessage = `👥 Online: ${onlineCount}/${totalMembers}\n\n${onlineList.join('\n')}`;
