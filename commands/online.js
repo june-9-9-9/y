@@ -8,7 +8,7 @@ async function onlineCommand(sock, chatId, message) {
         }
 
         // Get group metadata
-        const groupMetadata = await sock.groupMetadata(chatId);
+        const groupMetadata = sock.groupMetadata(chatId);
         const participants = groupMetadata.participants || [];
 
         // Get sender info and check if admin
