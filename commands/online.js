@@ -59,23 +59,55 @@ async function onlineCommand(sock, chatId, message) {
         const onlineArray = Array.from(onlineMembers);
         const onlineCount = onlineArray.length;
 
+        // Get message text to check for tag flag
+        const messageText = message.message?.conversation || 
+                           message.message?.extendedTextMessage?.text || 
+                           message.message?.imageMessage?.caption || '';
+        
+        const shouldTag = messageText.includes('--tag') || 
+                         messageText.includes('-t') || 
+                         messageText.includes('@all');
+
         if (onlineCount === 0) {
             return await sock.sendMessage(chatId, {
-                text: `👥 Online: 0 / ${totalMembers}\n⚠️ No online members detected (privacy may hide presence).`,
-                quoted: message
-            });
+                text: `👥 Online: 0 / ${totalMembers}\n⚠️ No online members detected (privacy may hide presence).`
+            }, { quoted: message });
         }
 
-        const mentions = [];
-        const onlineList = onlineArray.map((id, i) => {
-            mentions.push(id);
+        // Create mentions array for tagging
+        const mentions = onlineArray.map(id => {
             const memberData = participants.find(p => p.id === id);
-            const name = memberData?.pushname || memberData?.name || id.split('@')[0];
-            return `${i + 1}. @${id.split('@')[0]}`;
+            return {
+                id: id,
+                name: memberData?.pushname || memberData?.name || id.split('@')[0]
+            };
         });
 
-        const resultMessage = `👥 Online: ${onlineCount}/${totalMembers}\n\n${onlineList.join('\n')}`;
-        await sock.sendMessage(chatId, { text: resultMessage, mentions }, { quoted: message });
+        // Create mention strings with or without tagging
+        const mentionTexts = mentions.map((member, i) => {
+            return `${i + 1}. @${member.id.split('@')[0]}`;
+        });
+
+        // Prepare the result message
+        let resultMessage = `👥 Online Members: ${onlineCount}/${totalMembers}\n\n`;
+        
+        if (shouldTag) {
+            // Tag all online members in the message
+            const mentionTags = mentions.map(m => `@${m.id.split('@')[0]}`).join(' ');
+            resultMessage += `${mentionTags}\n\nList of online members:\n${mentionTexts.join('\n')}\n\n📢 All online members have been tagged!`;
+        } else {
+            // Just list them without tagging in the message body
+            resultMessage += `${mentionTexts.join('\n')}\n\n💡 Use \`--tag\` or \`-t\` to tag all online members.`;
+        }
+
+        // Create mentions array for WhatsApp tagging
+        const whatsappMentions = mentions.map(m => m.id);
+
+        // Send the message with proper mentions
+        await sock.sendMessage(chatId, {
+            text: resultMessage,
+            mentions: shouldTag ? whatsappMentions : []
+        }, { quoted: message });
 
     } catch (error) {
         console.error("Online command error:", error);
