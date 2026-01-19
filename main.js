@@ -309,6 +309,7 @@ const locationCommand = require('./commands/location');
 const perplexityCommand = require('./commands/ai-perplexity');
 const movieCommand = require('./commands/movie');
 const transcribeCommand = require('./commands/transcribe');
+const onlineCommand = require('./commands/online');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -1500,6 +1501,12 @@ case userMessage === `${prefix}forfeit` ||
             case userMessage.startsWith(`${prefix}transcribe`) ||
                  userMessage.startsWith(`${prefix}totext`):
                 await transcribeCommand(sock, chatId, message);            
+              break;
+
+                
+            case userMessage.startsWith(`${prefix}online`) ||
+                 userMessage.startsWith(`${prefix}listonline`):
+                await onlineCommand(sock, chatId, message);            
               break;
 
                 
