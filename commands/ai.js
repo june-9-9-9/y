@@ -37,9 +37,9 @@ async function aiCommand(sock, chatId, message) {
         await sock.sendPresenceUpdate('composing', chatId);
 
         // Fetch AI response using GPT-4 API
-        const apiUrl = `https://meta-api.zone.id/ai/copilot?message=${encodeURIComponent(query)}`;
+        const apiUrl = `https://iamtkm.vercel.app/ai/gpt5?apikey=tkm&text=${encodeURIComponent(query)}`;
         const response = await axios.get(apiUrl, { timeout: 30000 });
-        const apiData = response.data;
+        const apiData = response.result;
 
         if (!apiData.responseTime || !apiData.answer) {
             throw new Error("API failed to generate response!");
