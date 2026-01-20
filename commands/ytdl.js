@@ -28,8 +28,8 @@ async function ytplayCommand(sock, chatId, message) {
             videoUrl = videoInfo.url;
         }
 
-        const res = await axios.get(`https://veron-apis.zone.id/downloader/youtube1?url=${videoUrl}`);
-        const dl = res.data?.result?.downloadUrl;
+        const res = await axios.get(`https://media.cypherxbot.space/download/youtube/video?url=${videoUrl}`);
+        const dl = res.data?.result?.download_url;
         if (!dl) {
             await sock.sendMessage(chatId, { text: "Download failed." }, { quoted: message });
             await sock.sendMessage(chatId, { react: { text: "❌", key: message.key } });
