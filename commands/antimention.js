@@ -71,18 +71,23 @@ async function antigroupmentionCommand(sock, chatId, message, senderId) {
         const fake = createFakeContact(message);
         const isSenderAdmin = await isAdmin(sock, chatId, senderId);
         if (!isSenderAdmin) {
-            await sock.sendMessage(chatId, { text: '❌ For Group Admins Only' }, { quoted: fake });
+            await sock.sendMessage(chatId, { text: '❌ Admins only.' }, { quoted: fake });
             return;
         }
 
         const text = message.message?.conversation || message.message?.extendedTextMessage?.text || '';
         const args = text.trim().split(/\s+/);
-        const action = args[1]?.toLowerCase(); // fixed parsing
+        const action = args[1]?.toLowerCase();
 
         const groupConfig = getGroupConfig(chatId);
 
         if (!action) {
-            await sock.sendMessage(chatId, { text: `👥 *ANTIGROUPMENTION SETUP*\n\nCommands:\n• .antigroupmention on\n• .antigroupmention off\n• .antigroupmention set delete|kick|warn\n• .antigroupmention get\n• .antigroupmention reset\n• .antigroupmention stats` }, { quoted: fake });
+            await sock.sendMessage(chatId, { 
+                text: `👥 ANTIGROUPMENTION\n
+.on / .off
+.set delete|kick|warn
+.get / .reset / .stats`
+            }, { quoted: fake });
             return;
         }
 
@@ -90,29 +95,29 @@ async function antigroupmentionCommand(sock, chatId, message, senderId) {
             case 'on':
                 groupConfig.enabled = true;
                 setGroupConfig(chatId, groupConfig);
-                await sock.sendMessage(chatId, { text: '✅ Enabled. Blocking @everyone/@all from non-admins.' }, { quoted: fake });
+                await sock.sendMessage(chatId, { text: '✅ Enabled. Non-admin mentions blocked.' }, { quoted: fake });
                 break;
             case 'off':
                 groupConfig.enabled = false;
                 setGroupConfig(chatId, groupConfig);
-                await sock.sendMessage(chatId, { text: '❌ Disabled. Protection off.' }, { quoted: fake });
+                await sock.sendMessage(chatId, { text: '❌ Disabled.' }, { quoted: fake });
                 break;
             case 'set':
                 const setAction = args[2]?.toLowerCase();
                 if (!['delete', 'kick', 'warn'].includes(setAction)) {
-                    await sock.sendMessage(chatId, { text: '❌ Invalid action. Use delete/kick/warn' }, { quoted: fake });
+                    await sock.sendMessage(chatId, { text: '❌ Use: delete | kick | warn' }, { quoted: fake });
                     return;
                 }
                 groupConfig.action = setAction; groupConfig.enabled = true;
                 setGroupConfig(chatId, groupConfig);
-                await sock.sendMessage(chatId, { text: `✅ Action set to ${setAction}` }, { quoted: message });
+                await sock.sendMessage(chatId, { text: `✅ Action: ${setAction}` }, { quoted: message });
                 break;
             case 'get':
-                await sock.sendMessage(chatId, { text: `🔧 Config\nStatus: ${groupConfig.enabled ? '✅ ENABLED' : '❌ DISABLED'}\nAction: ${groupConfig.action}` }, { quoted: fake });
+                await sock.sendMessage(chatId, { text: `🔧 Config\nStatus: ${groupConfig.enabled ? '✅ ON' : '❌ OFF'}\nAction: ${groupConfig.action}` }, { quoted: fake });
                 break;
             case 'reset':
                 removeGroupConfig(chatId);
-                await sock.sendMessage(chatId, { text: '🔄 Reset to defaults.' }, { quoted: fake });
+                await sock.sendMessage(chatId, { text: '🔄 Reset done.' }, { quoted: fake });
                 break;
             case 'stats':
             case 'status':
@@ -150,7 +155,7 @@ async function handleGroupMentionDetection(sock, chatId, message, senderId) {
         switch (groupConfig.action) {
             case 'delete':
                 await sock.sendMessage(chatId, { delete: { remoteJid: chatId, fromMe: false, id: quotedMessageId, participant: quotedParticipant } });
-                await sock.sendMessage(chatId, { text: `⚠️ @${senderId.split('@')[0]} message deleted.`, mentions: [senderId] });
+                await sock.sendMessage(chatId, { text: `⚠️ @${senderId.split('@')[0]} deleted.`, mentions: [senderId] });
                 break;
             case 'kick':
                 await sock.sendMessage(chatId, { delete: { remoteJid: chatId, fromMe: false, id: quotedMessageId, participant: quotedParticipant } });
