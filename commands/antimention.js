@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { isAdmin } = require('../lib/isAdmin'); // Add this import
 
 // In-memory storage
 const antiStatusMentionData = { settings: {}, warns: {} };
@@ -109,7 +110,7 @@ async function antistatusmentionCommand(sock, chatId, message) {
         const parts = text.split(' ');
         const query = parts.slice(1).join(' ').trim();
 
-        // Get group info and check admin status
+        // Get group info and check admin status using external module
         const groupMetadata = await sock.groupMetadata(chatId).catch(() => null);
         if (!groupMetadata) {
             return await sock.sendMessage(chatId, { 
@@ -117,25 +118,23 @@ async function antistatusmentionCommand(sock, chatId, message) {
             }, { quoted: message });
         }
 
-        const participant = groupMetadata.participants.find(p => 
-            p.id === (message.key.participant || message.key.remoteJid)
-        );
-        const isAdmin = participant?.admin === 'admin' || participant?.admin === 'superadmin';
+        // Check if user is admin using external module
+        const userId = message.key.participant || message.key.remoteJid;
+        const userIsAdmin = await isAdmin(sock, chatId, userId);
         
-        const botParticipant = groupMetadata.participants.find(p => 
-            p.id.includes(sock.user.id.split(':')[0])
-        );
-        const isBotAdmin = botParticipant?.admin === 'admin' || botParticipant?.admin === 'superadmin';
-
-        if (!isBotAdmin) {
+        if (!userIsAdmin) {
             return await sock.sendMessage(chatId, { 
-                text: "❌ Need bot admin!"
+                text: "❌ Admin only!"
             }, { quoted: message });
         }
 
-        if (!isAdmin) {
+        // Check if bot is admin using external module
+        const botId = sock.user.id.split(':')[0] + '@s.whatsapp.net';
+        const botIsAdmin = await isAdmin(sock, chatId, botId);
+        
+        if (!botIsAdmin) {
             return await sock.sendMessage(chatId, { 
-                text: "❌ Admin only!"
+                text: "❌ Need bot admin!"
             }, { quoted: message });
         }
 
@@ -236,9 +235,88 @@ async function antistatusmentionCommand(sock, chatId, message) {
     }
 }
 
+// Event handler for status mentions
+async function handleAntiStatusMention(sock, message) {
+    try {
+        const chatId = message.key.remoteJid;
+        if (!chatId.endsWith('@g.us')) return; // Only groups
+
+        const settings = await getAntiStatusMentionSettings(chatId);
+        if (settings.status === 'off') return;
+
+        // Check if message contains status mention
+        const text = message.message?.conversation || 
+                     message.message?.extendedTextMessage?.text || 
+                     message.message?.imageMessage?.caption ||
+                     '';
+        
+        if (!text.includes('@status')) return;
+
+        const userId = message.key.participant || message.key.remoteJid;
+        
+        // Check if user is admin (exempt admins)
+        const userIsAdmin = await isAdmin(sock, chatId, userId);
+        if (userIsAdmin) return;
+
+        switch (settings.status) {
+            case 'warn':
+                const warnCount = await addUserStatusWarn(chatId, userId);
+                
+                if (warnCount >= settings.warn_limit) {
+                    // Take action after reaching limit
+                    await resetUserStatusWarns(chatId, userId);
+                    
+                    if (settings.action === 'remove') {
+                        await sock.groupParticipantsUpdate(chatId, [userId], 'remove');
+                        await sock.sendMessage(chatId, {
+                            text: `🚫 @${userId.split('@')[0]} removed for status mentions (${settings.warn_limit} warnings)`,
+                            mentions: [userId]
+                        });
+                    } else if (settings.action === 'delete') {
+                        await sock.sendMessage(chatId, {
+                            delete: message.key
+                        });
+                        await sock.sendMessage(chatId, {
+                            text: `⚠️ @${userId.split('@')[0]} reached ${settings.warn_limit} warnings for status mentions`,
+                            mentions: [userId]
+                        });
+                    }
+                } else {
+                    await sock.sendMessage(chatId, {
+                        delete: settings.action === 'delete' ? message.key : undefined,
+                        text: `⚠️ @${userId.split('@')[0]} warned for status mention! (${warnCount}/${settings.warn_limit})`,
+                        mentions: [userId]
+                    });
+                }
+                break;
+
+            case 'delete':
+                await sock.sendMessage(chatId, {
+                    delete: message.key
+                });
+                await sock.sendMessage(chatId, {
+                    text: `🗑️ Status mention deleted from @${userId.split('@')[0]}`,
+                    mentions: [userId]
+                });
+                break;
+
+            case 'remove':
+                await sock.groupParticipantsUpdate(chatId, [userId], 'remove');
+                await sock.sendMessage(chatId, {
+                    text: `🚫 @${userId.split('@')[0]} removed for status mention`,
+                    mentions: [userId]
+                });
+                break;
+        }
+    } catch (error) {
+        console.error("Error in handleAntiStatusMention:", error);
+    }
+}
+
 // Export
 module.exports = {
     antistatusmentionCommand,
+    handleAntiStatusMention, // Export the handler
     getAntiStatusMentionSettings,
     updateAntiStatusMentionSettings,
     clearAllStatusWarns,
