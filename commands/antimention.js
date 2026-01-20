@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { isAdmin } = require('../lib/isAdmin'); // Add this import
+const isAdmin = require('../lib/isAdmin'); // Add this import
 
 // In-memory storage
 const antiStatusMentionData = { settings: {}, warns: {} };
