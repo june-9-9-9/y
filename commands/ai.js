@@ -41,7 +41,7 @@ async function aiCommand(sock, chatId, message) {
         const response = await axios.get(apiUrl, { timeout: 30000 });
         const apiData = response.result;
 
-        if (!apiData.responseTime || !apiData.answer) {
+        if (!apiData.status || !apiData.result) {
             throw new Error("API failed to generate response!");
         }
 
@@ -51,7 +51,7 @@ async function aiCommand(sock, chatId, message) {
         });
 
         // Format and send response
-        const aiResponse = apiData.answer.trim();
+        const aiResponse = apiData.result.trim();
         
         await sock.sendMessage(chatId, {
             text: `🤖 *AI Assistant*\n\n📝 *Question:* ${query}\n\n💬 *Response:* ${aiResponse}\n\n ↘️ *Powered by Gpt-5*`
