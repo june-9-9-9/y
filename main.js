@@ -746,7 +746,8 @@ if (/^[1-9]$/.test(userMessage)) {
                 await warnCommand(sock, chatId, senderId, mentionedJidListWarn, message);
                 break;
 
-            case userMessage.startsWith(`${prefix}tts`):
+            case userMessage.startsWith(`${prefix}tts`) || 
+                 userMessage.startsWith(`${prefix}say`):
                 const text = userMessage.slice((prefix + 'tts').length).trim();
                 await ttsCommand(sock, chatId, text, message);
                 break;
@@ -953,9 +954,9 @@ if (/^[1-9]$/.test(userMessage)) {
             /*━━━━━━━━━━━━━━━━━━━━*/
 
 
-            case userMessage === `${prefix}send` ||
-                 userMessage === `${prefix}get` || 
-                 userMessage === `${prefix}status`:
+            case userMessage === `send` ||
+                 userMessage === `get` || 
+                 userMessage === `status`:
                 await saveStatusCommand(sock, chatId, message);
                 break;
 
