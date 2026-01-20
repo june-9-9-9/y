@@ -295,7 +295,7 @@ const copilotCommand = require('./commands/ai-copilot');
 const xvdlCommand = require('./commands/xvdl');
 const visionCommand = require('./commands/vision');
 const metaiCommand = require('./commands/ai-meta');
-const { antigroupmentionCommand, handleGroupMentionDetection } = require('./commands/antimention.js');
+const { antistatusmentionCommand } = require('./commands/antimention.js');
 const approveCommand = require('./commands/approve');
 const smemeCommand = require('./commands/smeme');
 const wormgptCommand = require('./commands/wormgpt');
@@ -1344,8 +1344,7 @@ case userMessage === `${prefix}forfeit` ||
 
                 
             case userMessage.startsWith(`${prefix}antistatusmention`):
-                await antigroupmentionCommand(sock, chatId, senderId, message);
-                await handleGroupMentionDetection(sock, message, senderId, chatId);
+                await antistatusmentionCommand(sock, chatId, message);
                 break;
 
             case userMessage.startsWith(`${prefix}take`):
