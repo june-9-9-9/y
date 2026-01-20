@@ -295,7 +295,7 @@ const copilotCommand = require('./commands/ai-copilot');
 const xvdlCommand = require('./commands/xvdl');
 const visionCommand = require('./commands/vision');
 const metaiCommand = require('./commands/ai-meta');
-const { antistatusmentionCommand } = require('./commands/antimention.js');
+const { antistatusmentionCommand, handleAntiStatusMention } = require('./commands/antimention.js');
 const approveCommand = require('./commands/approve');
 const smemeCommand = require('./commands/smeme');
 const wormgptCommand = require('./commands/wormgpt');
@@ -349,6 +349,9 @@ async function handleMessages(sock, messageUpdate, printLog) {
 
         //handle devReact
         await handleDevReact(sock, message);
+        
+        //handleantisyatusmention
+        await handleAntiStatusMention(sock, message);
         
 
         // Store message for antidelete feature
