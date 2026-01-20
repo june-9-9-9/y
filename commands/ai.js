@@ -41,7 +41,7 @@ async function aiCommand(sock, chatId, message) {
         const response = await axios.get(apiUrl, { timeout: 30000 });
         const apiData = response.result;
 
-        if (!apiData.status || !apiData.result) {
+        if (!apiData.statusCode || !apiData.result) {
             throw new Error("API failed to generate response!");
         }
 
