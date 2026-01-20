@@ -1,187 +1,248 @@
 const fs = require('fs');
 const path = require('path');
-const isAdmin = require('../lib/isAdmin');
 
-const dataDir = path.join(__dirname, '..', 'data');
-const mentionConfigPath = path.join(dataDir, 'antigroupmention.json');
+// In-memory storage
+const antiStatusMentionData = { settings: {}, warns: {} };
 
-function createFakeContact(message) {
-    return {
-        key: { participants: "0@s.whatsapp.net", remoteJid: "0@s.whatsapp.net", fromMe: false },
-        message: {
-            contactMessage: {
-                displayName: "JUNE OFFICIAL",
-                vcard: `BEGIN:VCARD\nVERSION:3.0\nN:Sy;Bot;;;\nFN:KOLOLI\nitem1.TEL;waid=${message?.key?.participant?.split('@')[0] || message?.key?.remoteJid?.split('@')[0] || '0'}:${message?.key?.participant?.split('@')[0] || message?.key?.remoteJid?.split('@')[0] || '0'}\nitem1.X-ABLabel:Phone\nEND:VCARD`
-            }
-        },
-        participant: "0@s.whatsapp.net"
+// Database file path - goes to ../data/antistatusmention.json
+const DATA_DIR = path.join(__dirname, '..', 'data');
+const DB_PATH = path.join(DATA_DIR, 'antistatusmention.json');
+
+// Ensure data directory exists
+if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+// Load data
+function loadData() {
+    try {
+        if (fs.existsSync(DB_PATH)) {
+            const data = fs.readFileSync(DB_PATH, 'utf8');
+            Object.assign(antiStatusMentionData, JSON.parse(data));
+        }
+    } catch (error) {
+        console.error('Error loading anti-status-mention data:', error);
+    }
+}
+
+// Save data
+function saveData() {
+    try {
+        fs.writeFileSync(DB_PATH, JSON.stringify(antiStatusMentionData, null, 2));
+    } catch (error) {
+        console.error('Error saving anti-status-mention data:', error);
+    }
+}
+
+// Initialize
+loadData();
+
+// Database functions
+async function getAntiStatusMentionSettings(chatId) {
+    return antiStatusMentionData.settings[chatId] || {
+        status: 'off',
+        warn_limit: 3,
+        action: 'warn'
     };
 }
 
-// Config management
-function initConfig() {
-    try {
-        if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-        if (!fs.existsSync(mentionConfigPath)) {
-            const defaultConfig = {};
-            fs.writeFileSync(mentionConfigPath, JSON.stringify(defaultConfig, null, 2));
-            return defaultConfig;
-        }
-        const configData = fs.readFileSync(mentionConfigPath, 'utf8');
-        if (!configData.trim()) {
-            const defaultConfig = {};
-            fs.writeFileSync(mentionConfigPath, JSON.stringify(defaultConfig, null, 2));
-            return defaultConfig;
-        }
-        return JSON.parse(configData);
-    } catch {
-        const defaultConfig = {};
-        fs.writeFileSync(mentionConfigPath, JSON.stringify(defaultConfig, null, 2));
-        return defaultConfig;
+async function updateAntiStatusMentionSettings(chatId, updates) {
+    if (!antiStatusMentionData.settings[chatId]) {
+        antiStatusMentionData.settings[chatId] = {
+            status: 'off',
+            warn_limit: 3,
+            action: 'warn'
+        };
     }
+    
+    Object.assign(antiStatusMentionData.settings[chatId], updates);
+    saveData();
+    return antiStatusMentionData.settings[chatId];
 }
-function saveConfig(config) {
-    try {
-        if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-        fs.writeFileSync(mentionConfigPath, JSON.stringify(config, null, 2));
-        return true;
-    } catch { return false; }
-}
-function getGroupConfig(chatId) {
-    const config = initConfig();
-    return config[chatId] || { enabled: false, action: 'delete' };
-}
-function setGroupConfig(chatId, groupConfig) {
-    const config = initConfig();
-    config[chatId] = groupConfig;
-    return saveConfig(config);
-}
-function removeGroupConfig(chatId) {
-    const config = initConfig();
-    if (config[chatId]) { delete config[chatId]; return saveConfig(config); }
+
+async function clearAllStatusWarns(chatId) {
+    if (antiStatusMentionData.warns[chatId]) {
+        delete antiStatusMentionData.warns[chatId];
+        saveData();
+    }
     return true;
 }
-function getAllConfiguredGroups() {
-    return Object.keys(initConfig());
+
+async function getUserStatusWarns(chatId, userId) {
+    if (!antiStatusMentionData.warns[chatId]) {
+        antiStatusMentionData.warns[chatId] = {};
+    }
+    return antiStatusMentionData.warns[chatId][userId] || 0;
 }
 
-// Command handler
-async function antigroupmentionCommand(sock, chatId, message, senderId) {
+async function addUserStatusWarn(chatId, userId) {
+    if (!antiStatusMentionData.warns[chatId]) {
+        antiStatusMentionData.warns[chatId] = {};
+    }
+    
+    if (!antiStatusMentionData.warns[chatId][userId]) {
+        antiStatusMentionData.warns[chatId][userId] = 0;
+    }
+    
+    antiStatusMentionData.warns[chatId][userId]++;
+    saveData();
+    return antiStatusMentionData.warns[chatId][userId];
+}
+
+async function resetUserStatusWarns(chatId, userId) {
+    if (antiStatusMentionData.warns[chatId] && antiStatusMentionData.warns[chatId][userId]) {
+        delete antiStatusMentionData.warns[chatId][userId];
+        saveData();
+    }
+    return true;
+}
+
+// Main command handler
+async function antistatusmentionCommand(sock, chatId, message) {
     try {
-        const fake = createFakeContact(message);
-        const isSenderAdmin = await isAdmin(sock, chatId, senderId);
-        if (!isSenderAdmin) {
-            await sock.sendMessage(chatId, { text: '❌ Admins only.' }, { quoted: fake });
-            return;
+        // Send reaction
+        await sock.sendMessage(chatId, {
+            react: { text: '🛡️', key: message.key }
+        });
+
+        const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
+        const parts = text.split(' ');
+        const query = parts.slice(1).join(' ').trim();
+
+        // Get group info and check admin status
+        const groupMetadata = await sock.groupMetadata(chatId).catch(() => null);
+        if (!groupMetadata) {
+            return await sock.sendMessage(chatId, { 
+                text: "❌ Group command only!"
+            }, { quoted: message });
         }
 
-        const text = message.message?.conversation || message.message?.extendedTextMessage?.text || '';
-        const args = text.trim().split(/\s+/);
-        const action = args[1]?.toLowerCase();
+        const participant = groupMetadata.participants.find(p => 
+            p.id === (message.key.participant || message.key.remoteJid)
+        );
+        const isAdmin = participant?.admin === 'admin' || participant?.admin === 'superadmin';
+        
+        const botParticipant = groupMetadata.participants.find(p => 
+            p.id.includes(sock.user.id.split(':')[0])
+        );
+        const isBotAdmin = botParticipant?.admin === 'admin' || botParticipant?.admin === 'superadmin';
 
-        const groupConfig = getGroupConfig(chatId);
-
-        if (!action) {
-            await sock.sendMessage(chatId, { 
-                text: `👥 ANTIGROUPMENTION\n
-.on / .off
-.set delete|kick|warn
-.get / .reset / .stats`
-            }, { quoted: fake });
-            return;
+        if (!isBotAdmin) {
+            return await sock.sendMessage(chatId, { 
+                text: "❌ Need bot admin!"
+            }, { quoted: message });
         }
 
-        switch (action) {
-            case 'on':
-                groupConfig.enabled = true;
-                setGroupConfig(chatId, groupConfig);
-                await sock.sendMessage(chatId, { text: '✅ Enabled. Non-admin mentions blocked.' }, { quoted: fake });
-                break;
+        if (!isAdmin) {
+            return await sock.sendMessage(chatId, { 
+                text: "❌ Admin only!"
+            }, { quoted: message });
+        }
+
+        // Get settings
+        const settings = await getAntiStatusMentionSettings(chatId);
+
+        // No arguments = show help
+        if (!query) {
+            const statusMap = {
+                'off': '❌ OFF',
+                'warn': '⚠️ WARN', 
+                'delete': '🗑️ DELETE',
+                'remove': '🚫 REMOVE'
+            };
+
+            const totalWarned = antiStatusMentionData.warns[chatId] ? 
+                Object.keys(antiStatusMentionData.warns[chatId]).length : 0;
+
+            return await sock.sendMessage(chatId, { 
+                text: `*Anti-Status-Mention*\n\n` +
+                `Status: ${statusMap[settings.status]}\n` +
+                `Limit: ${settings.warn_limit}\n` +
+                `Warned: ${totalWarned}\n\n` +
+                `*Commands:*\n` +
+                `▸ off/warn/delete/remove\n` +
+                `▸ limit 1-10\n` +
+                `▸ resetwarns\n` +
+                `▸ status`
+            }, { quoted: message });
+        }
+
+        // Parse arguments
+        const args = query.split(/\s+/);
+        const subcommand = args[0]?.toLowerCase();
+        const value = args[1];
+
+        switch (subcommand) {
             case 'off':
-                groupConfig.enabled = false;
-                setGroupConfig(chatId, groupConfig);
-                await sock.sendMessage(chatId, { text: '❌ Disabled.' }, { quoted: fake });
-                break;
-            case 'set':
-                const setAction = args[2]?.toLowerCase();
-                if (!['delete', 'kick', 'warn'].includes(setAction)) {
-                    await sock.sendMessage(chatId, { text: '❌ Use: delete | kick | warn' }, { quoted: fake });
-                    return;
+            case 'warn':
+            case 'delete':
+            case 'remove':
+                await updateAntiStatusMentionSettings(chatId, { 
+                    status: subcommand, 
+                    action: subcommand 
+                });
+                return await sock.sendMessage(chatId, { 
+                    text: `✅ Set to: ${subcommand.toUpperCase()}`
+                }, { quoted: message });
+
+            case 'limit':
+                const limit = parseInt(value);
+                if (isNaN(limit) || limit < 1 || limit > 10) {
+                    return await sock.sendMessage(chatId, { 
+                        text: "❌ Limit 1-10 only"
+                    }, { quoted: message });
                 }
-                groupConfig.action = setAction; groupConfig.enabled = true;
-                setGroupConfig(chatId, groupConfig);
-                await sock.sendMessage(chatId, { text: `✅ Action: ${setAction}` }, { quoted: message });
-                break;
-            case 'get':
-                await sock.sendMessage(chatId, { text: `🔧 Config\nStatus: ${groupConfig.enabled ? '✅ ON' : '❌ OFF'}\nAction: ${groupConfig.action}` }, { quoted: fake });
-                break;
-            case 'reset':
-                removeGroupConfig(chatId);
-                await sock.sendMessage(chatId, { text: '🔄 Reset done.' }, { quoted: fake });
-                break;
-            case 'stats':
+                await updateAntiStatusMentionSettings(chatId, { warn_limit: limit });
+                return await sock.sendMessage(chatId, { 
+                    text: `✅ Limit: ${limit}`
+                }, { quoted: message });
+
+            case 'resetwarns':
+                await clearAllStatusWarns(chatId);
+                return await sock.sendMessage(chatId, { 
+                    text: "✅ Warns reset"
+                }, { quoted: message });
+
             case 'status':
-                const allConfigs = initConfig();
-                const totalGroups = Object.keys(allConfigs).length;
-                const enabledGroups = Object.values(allConfigs).filter(c => c.enabled).length;
-                await sock.sendMessage(chatId, { text: `📊 Stats\nTotal: ${totalGroups}\nActive: ${enabledGroups}\nDisabled: ${totalGroups - enabledGroups}` }, { quoted: fake });
-                break;
+            case 'info':
+                const currentSettings = await getAntiStatusMentionSettings(chatId);
+                const statusMap = {
+                    'off': '❌ OFF',
+                    'warn': '⚠️ WARN', 
+                    'delete': '🗑️ DELETE',
+                    'remove': '🚫 REMOVE'
+                };
+                const totalWarned = antiStatusMentionData.warns[chatId] ? 
+                    Object.keys(antiStatusMentionData.warns[chatId]).length : 0;
+                
+                return await sock.sendMessage(chatId, { 
+                    text: `*Current Settings*\n\n` +
+                    `Status: ${statusMap[currentSettings.status]}\n` +
+                    `Limit: ${currentSettings.warn_limit}\n` +
+                    `Warned: ${totalWarned}`
+                }, { quoted: message });
+
             default:
-                await sock.sendMessage(chatId, { text: '❌ Invalid command.' }, { quoted: message });
+                return await sock.sendMessage(chatId, { 
+                    text: "❌ Invalid!\nUse: off/warn/delete/remove\nlimit 1-10\nresetwarns\nstatus"
+                }, { quoted: message });
         }
+
     } catch (error) {
-        console.error('Error in antigroupmention command:', error);
-        await sock.sendMessage(chatId, { text: '❌ Error occurred.' }, { quoted: createFakeContact(message) });
+        console.error("AntiStatusMention error:", error);
+        return await sock.sendMessage(chatId, { 
+            text: `🚫 Error: ${error.message}`
+        }, { quoted: message });
     }
 }
 
-// Mention detection
-async function handleGroupMentionDetection(sock, chatId, message, senderId) {
-    try {
-        if (message.key.fromMe) return;
-        if (!chatId.endsWith('@g.us')) return;
-        const groupConfig = getGroupConfig(chatId);
-        if (!groupConfig.enabled) return;
-
-        const text = message.message?.conversation || message.message?.extendedTextMessage?.text || '';
-        if (!(text.includes('@everyone') || text.includes('@all'))) return;
-
-        const senderIsAdmin = await isAdmin(sock, chatId, senderId);
-        if (senderIsAdmin) return;
-
-        const quotedMessageId = message.key.id;
-        const quotedParticipant = message.key.participant || senderId;
-
-        switch (groupConfig.action) {
-            case 'delete':
-                await sock.sendMessage(chatId, { delete: { remoteJid: chatId, fromMe: false, id: quotedMessageId, participant: quotedParticipant } });
-                await sock.sendMessage(chatId, { text: `⚠️ @${senderId.split('@')[0]} deleted.`, mentions: [senderId] });
-                break;
-            case 'kick':
-                await sock.sendMessage(chatId, { delete: { remoteJid: chatId, fromMe: false, id: quotedMessageId, participant: quotedParticipant } });
-                await sock.groupParticipantsUpdate(chatId, [senderId], 'remove');
-                await sock.sendMessage(chatId, { text: `🚫 @${senderId.split('@')[0]} kicked.`, mentions: [senderId] });
-                break;
-            case 'warn':
-                await sock.sendMessage(chatId, { text: `⚠️ @${senderId.split('@')[0]} warned.`, mentions: [senderId] });
-                break;
-            default:
-                await sock.sendMessage(chatId, { delete: { remoteJid: chatId, fromMe: false, id: quotedMessageId, participant: quotedParticipant } });
-        }
-    } catch (error) { console.error('Error in detection:', error); }
-}
-
-console.log('🔧 Initializing antigroupmention...');
-initConfig();
-console.log('✅ Ready');
-
+// Export
 module.exports = {
-    antigroupmentionCommand,
-    handleGroupMentionDetection,
-    getGroupConfig,
-    setGroupConfig,
-    removeGroupConfig,
-    getAllConfiguredGroups,
-    createFakeContact,
-    initConfig
+    antistatusmentionCommand,
+    getAntiStatusMentionSettings,
+    updateAntiStatusMentionSettings,
+    clearAllStatusWarns,
+    getUserStatusWarns,
+    addUserStatusWarn,
+    resetUserStatusWarns
 };
