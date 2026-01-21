@@ -15,7 +15,7 @@ async function menuConfigCommand(sock, chatId, message, args) {
     const pushname = message.pushName || "Unknown User";
 
     // 🔒 Owner-only restriction
-    if (!isOwnerOrSudo(message.sender)) {
+    if (!isOwnerOrSudo(message.sender) || !message.key.fromMe) {
         await sock.sendMessage(chatId, { 
             text: '❌ This command is restricted to bot owner(s).' 
         }, { quoted: message });
