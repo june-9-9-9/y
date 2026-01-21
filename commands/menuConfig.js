@@ -12,21 +12,6 @@ const {
 
 async function menuConfigCommand(sock, chatId, message, args) {
     const pushname = message.pushName || "Unknown User";
-
-    if (!message.key.fromMe) {
-        await sock.sendMessage(chatId, { 
-            text: '❌ Only bot owner can change the bot menu styles!',
-            contextInfo: {
-                forwardingScore: 1,
-                isForwarded: false,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: '',
-                    newsletterName: '',
-                    serverMessageId: -1
-                }
-            }
-        },{quoted: message});
-    }
     
     if (args.length === 0) {
         // Show current settings
