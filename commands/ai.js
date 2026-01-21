@@ -107,15 +107,15 @@ async function processAIRequest(sock, chatId, message, query) {
  * Handle AI API request
  */
 async function handleAIAPIRequest(sock, chatId, message, query) {
-    const apiUrl = `https://api.zenzxz.my.id/api/ai/chatai?query=${encodeURIComponent(
+    const apiUrl = `https://iamtkm.vercel.app/ai/gpt5?apikey=tkm&text=${encodeURIComponent(
         query
-    )}&model=deepseek-v3`;
+    )}`;
 
     const { data } = await axios.get(apiUrl).catch((err) => {
         throw err;
     });
 
-    const replyText = data?.data?.answer || null;
+    const replyText = data?.result || null;
 
     if (replyText) {
         return sock.sendMessage(chatId, { text: replyText }, { quoted: message });
