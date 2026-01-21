@@ -44,7 +44,7 @@ const pushname = message.pushName || "Unknown User";
     txt += `🔹  *Forks* : ${json.forks_count}\n`;
     txt += `🔹  *Stars* : ${json.stargazers_count}\n`;
     txt += `🔹  *Desc* : ${json.description || 'None'}\n\n`;
-    txt += `Hey👋..${pushname}\nThank you for choosing June x Bot, Fork And Star The Repository`;
+    txt += `_Hey👋..${pushname}_\n_Thank you for choosing June x Bot, fork and Star the repository_`;
 
     // Use the local asset image
     const imgPath = path.join(__dirname, '../assets/menu3.jpg');
