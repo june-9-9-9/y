@@ -1,6 +1,5 @@
 // commands/menuConfig.js
 
-
 const { 
     setMenuStyle, 
     getMenuSettings, 
@@ -10,8 +9,18 @@ const {
     updateMenuSettings
 } = require('./menuSettings');
 
+const isOwnerOrSudo = require('../lib/isOwner');  // ✅ Import owner check
+
 async function menuConfigCommand(sock, chatId, message, args) {
     const pushname = message.pushName || "Unknown User";
+
+    // 🔒 Owner-only restriction
+    if (!isOwnerOrSudo(message.sender)) {
+        await sock.sendMessage(chatId, { 
+            text: '❌ This command is restricted to bot owner(s).' 
+        }, { quoted: message });
+        return;
+    }
     
     if (args.length === 0) {
         // Show current settings
