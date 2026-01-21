@@ -351,7 +351,7 @@ async function helpCommand(sock, chatId, message) {
 
         // Success reaction
         await sock.sendMessage(chatId, {
-            react: { text: '🪭', key: message.key }
+            react: { text: '🏷️', key: message.key }
         });
 
     } catch (error) {
