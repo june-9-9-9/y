@@ -206,10 +206,6 @@ async function sendMenuWithStyle(sock, chatId, message, menulist, menustyle, thu
     const ownername = pushname;
     const tylorkids = thumbnailBuffer; // Fixed: using thumbnails from assets
     const plink = "https://github.com/vinpink2";
-// 🔒 Owner-only check
-        if (!message.key.fromMe) {
-            return sock.sendMessage(chatId, { text: '😅 Command only for the owner.' }, { quoted: message });
-        }
     
     if (menustyle === '1') {
         await sock.sendMessage(chatId, {
