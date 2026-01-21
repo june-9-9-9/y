@@ -1,89 +1,160 @@
 const axios = require('axios');
 
+/**
+ * AI Command Handler
+ * @param {object} sock - WhatsApp socket
+ * @param {string} chatId - Chat ID
+ * @param {object} message - Message object
+ */
 async function aiCommand(sock, chatId, message) {
     try {
-        // Send reaction
-        await sock.sendMessage(chatId, {
-            react: { text: '🤖', key: message.key }
-        });
+        const text = extractMessageText(message);
 
-        const text = message.message?.conversation || 
-                     message.message?.extendedTextMessage?.text || 
-                     message.message?.imageMessage?.caption || 
-                     '';
-        
-        if (!text.includes(' ')) {
-            return await sock.sendMessage(chatId, {
-                text: '❌ Please provide a question for the AI!\n\nExample: .ai What is artificial intelligence?'
-            }, { quoted: message });
+        if (!text) {
+            return sendPromptMessage(sock, chatId, message);
         }
 
-        const parts = text.split(' ');
-        const query = parts.slice(1).join(' ').trim();
+        const { command, query } = parseCommand(text);
 
         if (!query) {
-            return await sock.sendMessage(chatId, {
-                text: '❌ Please provide a question for the AI!\n\nExample: .ai What is artificial intelligence?'
-            }, { quoted: message });
+            return sendEmptyQueryMessage(sock, chatId, message);
         }
 
-        if (query.length > 1000) {
-            return await sock.sendMessage(chatId, {
-                text: '📝 Question too long! Max 1000 characters.'
-            }, { quoted: message });
-        }
-
-        // Update presence to "typing"
-        await sock.sendPresenceUpdate('composing', chatId);
-
-        // Fetch AI response using GPT-4 API
-        const apiUrl = `https://iamtkm.vercel.app/ai/gpt5?apikey=tkm&text=${encodeURIComponent(query)}`;
-        const response = await axios.get(apiUrl, { timeout: 30000 });
-        const apiData = response.result;
-
-        if (!apiData.result) {
-            throw new Error("API failed to generate response!");
-        }
-
-        // Send success reaction
-        await sock.sendMessage(chatId, {
-            react: { text: '✅', key: message.key }
-        });
-
-        // Format and send response
-        const aiResponse = apiData.result.trim();
-        
-        await sock.sendMessage(chatId, {
-            text: `🤖 *AI Assistant*\n\n📝 *Question:* ${query}\n\n💬 *Response:* ${aiResponse}\n\n ↘️ *Powered by Gpt-5*`
-        }, { quoted: message });
-
+        await processAIRequest(sock, chatId, message, query);
     } catch (error) {
-        console.error("AI command error:", error);
-        
-        // Send error reaction
-        await sock.sendMessage(chatId, {
-            react: { text: '❌', key: message.key }
-        });
-
-        let errorMessage;
-        if (error.response?.status === 404) {
-            errorMessage = 'API endpoint not found!';
-        } else if (error.message.includes('timeout') || error.code === 'ECONNABORTED') {
-            errorMessage = 'Request timed out! Try again.';
-        } else if (error.code === 'ENOTFOUND') {
-            errorMessage = 'Cannot connect to AI service!';
-        } else if (error.response?.status === 429) {
-            errorMessage = 'Too many requests! Please try again later.';
-        } else if (error.response?.status >= 500) {
-            errorMessage = 'AI service is currently unavailable.';
-        } else {
-            errorMessage = `Error: ${error.message}`;
-        }
-            
-        await sock.sendMessage(chatId, {
-            text: `🚫 ${errorMessage}`
-        }, { quoted: message });
+        logError('AI Command Error', error);
+        return sendErrorMessage(sock, chatId, message);
     }
+}
+
+/**
+ * Extract text from message object
+ */
+function extractMessageText(message) {
+    return (
+        message.message?.conversation ||
+        message.message?.extendedTextMessage?.text ||
+        message.text ||
+        null
+    );
+}
+
+/**
+ * Parse command and query from text
+ */
+function parseCommand(text) {
+    const [command, ...rest] = text.trim().split(/\s+/);
+    return {
+        command: command?.toLowerCase() || '',
+        query: rest.join(' ').trim(),
+    };
+}
+
+/**
+ * Send initial prompt message
+ */
+async function sendPromptMessage(sock, chatId, message) {
+    const promptText =
+        "⚠️ Please provide a question after !gpt\n\n" +
+        "Example: !gpt What is quantum computing?";
+    return sock.sendMessage(chatId, { text: promptText }, { quoted: message });
+}
+
+/**
+ * Send empty query message
+ */
+async function sendEmptyQueryMessage(sock, chatId, message) {
+    const text =
+        "❌ No query detected.\nExample: !gpt What is quantum computing?";
+    return sock.sendMessage(chatId, { text }, { quoted: message });
+}
+
+/**
+ * Send generic error message
+ */
+async function sendErrorMessage(sock, chatId, message) {
+    return sock.sendMessage(
+        chatId,
+        {
+            text: "❌ An error occurred. Please try again later.",
+            contextInfo: {
+                mentionedJid: [message.key.participant || message.key.remoteJid],
+                quotedMessage: message.message,
+            },
+        },
+        { quoted: message }
+    );
+}
+
+/**
+ * Process AI request
+ */
+async function processAIRequest(sock, chatId, message, query) {
+    // Show processing indicator
+    await sock.sendMessage(chatId, {
+        react: { text: '🤖', key: message.key },
+    });
+
+    try {
+        await handleAIAPIRequest(sock, chatId, message, query);
+    } catch (error) {
+        logError('API Processing Error', error);
+        await sendAPIErrorMessage(sock, chatId, message, error);
+    }
+}
+
+/**
+ * Handle AI API request
+ */
+async function handleAIAPIRequest(sock, chatId, message, query) {
+    const apiUrl = `https://api.zenzxz.my.id/api/ai/chatai?query=${encodeURIComponent(
+        query
+    )}&model=deepseek-v3`;
+
+    const { data } = await axios.get(apiUrl).catch((err) => {
+        throw err;
+    });
+
+    const replyText = data?.data?.answer || null;
+
+    if (replyText) {
+        return sock.sendMessage(chatId, { text: replyText }, { quoted: message });
+    }
+
+    throw new Error('No valid response from AI API');
+}
+
+/**
+ * Send API error message
+ */
+async function sendAPIErrorMessage(sock, chatId, message, error) {
+    const errorMessage =
+        error.response?.status === 429
+            ? "❌ Rate limit exceeded. Please try again later."
+            : "❌ Failed to reach AI API.";
+
+    return sock.sendMessage(
+        chatId,
+        {
+            text: errorMessage,
+            contextInfo: {
+                mentionedJid: [message.key.participant || message.key.remoteJid],
+                quotedMessage: message.message,
+            },
+        },
+        { quoted: message }
+    );
+}
+
+/**
+ * Log error with context
+ */
+function logError(context, error) {
+    console.error(`[${context}]`, {
+        message: error.message,
+        stack: error.stack,
+        response: error.response?.data || null,
+    });
 }
 
 module.exports = aiCommand;
