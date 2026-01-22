@@ -306,11 +306,11 @@ const perplexityCommand = require('./commands/ai-perplexity');
 const movieCommand = require('./commands/movie');
 const transcribeCommand = require('./commands/transcribe');
 const onlineCommand = require('./commands/online');
-const anticallCommand = require('./commands/anticall');
+const { anticallCommand, handleIncomingCall } = require('./commands/anticall');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
-global.packname = settings?.packname || "JUNE MD";
+global.packname = settings?.packname || "JUNE X";
 global.author = settings?.author || "Vinpink2";
 global.channelLink = "https://whatsapp.com/channel/0029Va90zAnIHphOuO8Msp3A";
 global.ytchanel = "";
@@ -349,6 +349,12 @@ async function handleMessages(sock, messageUpdate, printLog) {
         
         //handleantisyatusmention
         await handleAntiStatusMention(sock, message);
+
+        
+         // Handle incoming calls
+         sock.ev.on('call', async (callData) => {
+         await handleIncomingCall(sock, callData);
+         });
         
 
         // Store message for antidelete feature
