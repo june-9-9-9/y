@@ -10,11 +10,6 @@ async function handleIncomingCall(sock, callData) {
     const callerJid = call.from;
     console.log(`📞 Incoming call from ${callerJid} - Action: ${settings.action}`);
 
-    // Send rejection message once
-    if (settings.message) {
-      await sock.sendMessage(callerJid, { text: settings.message });
-    }
-
     // Handle block action
     if (settings.action === 'block') {
       try {
@@ -65,7 +60,7 @@ async function anticallCommand(sock, chatId, message) {
 
     if (!sub) {
       return sock.sendMessage(chatId, {
-        text: `*📜 Anti-Call Settings*\n\n🔹 Status: ${settings.status ? '✅ ON' : '❌ OFF'}\n🔹 Action: ${settings.action}\n🔹 Message: ${settings.message || '*No message set*'}\n\n*🛠 Commands:*\n${prefix}anticall on/off\n${prefix}anticall message <text>\n${prefix}anticall action reject/block\n${prefix}anticall test`
+        text: `*📜 Anti-Call Settings*\n\n🔹 Status: ${settings.status ? '✅ ON' : '❌ OFF'}\n🔹 Action: ${settings.action}\n\n*🛠 Commands:*\n${prefix}anticall on/off\n${prefix}anticall action reject/block`
       }, { quoted: message });
     }
 
@@ -75,19 +70,12 @@ async function anticallCommand(sock, chatId, message) {
         await updateAntiCallSettings({ status: sub === 'on' });
         return sock.sendMessage(chatId, { text: `Anti-call ${sub === 'on' ? '✅ ENABLED' : '❌ DISABLED'}` }, { quoted: message });
 
-      case 'message':
-        if (!value) return sock.sendMessage(chatId, { text: '❌ Provide a rejection message.' }, { quoted: message });
-        if (value.length > 500) return sock.sendMessage(chatId, { text: '❌ Message too long (max 500 chars).' }, { quoted: message });
-        await updateAntiCallSettings({ message: value });
-        return sock.sendMessage(chatId, { text: `✅ Message updated:\n"${value}"` }, { quoted: message });
-
       case 'action':
-        if (!['reject', 'block'].includes(value)) return sock.sendMessage(chatId, { text: '❌ Invalid action. Use reject/block.' }, { quoted: message });
+        if (!['reject', 'block'].includes(value)) {
+          return sock.sendMessage(chatId, { text: '❌ Invalid action. Use reject/block.' }, { quoted: message });
+        }
         await updateAntiCallSettings({ action: value });
         return sock.sendMessage(chatId, { text: `✅ Action set to ${value.toUpperCase()}` }, { quoted: message });
-
-      case 'test':
-        return sock.sendMessage(chatId, { text: settings.message ? `📝 Preview:\n"${settings.message}"` : '❌ No message set.' }, { quoted: message });
 
       default:
         return sock.sendMessage(chatId, { text: '❌ Invalid command.' }, { quoted: message });
