@@ -3,26 +3,6 @@ const { getAntiCallSettings, updateAntiCallSettings } = require('../lib/database
 const fs = require('fs');
 const path = require('path');
 
-// Superuser list (store in a separate file or database)
-const SUPERUSERS_FILE = path.join(__dirname, '../data/superusers.json');
-
-function getSuperUsers() {
-    try {
-        if (fs.existsSync(SUPERUSERS_FILE)) {
-            const data = fs.readFileSync(SUPERUSERS_FILE, 'utf8');
-            return JSON.parse(data);
-        }
-    } catch (error) {
-        console.error('Error reading superusers:', error);
-    }
-    return [];
-}
-
-function isSuperUser(userId) {
-    const superusers = getSuperUsers();
-    return superusers.includes(userId);
-}
-
 // Call handler for incoming calls
 async function handleIncomingCall(sock, callData) {
     try {
@@ -48,10 +28,11 @@ async function handleIncomingCall(sock, callData) {
                 await sock.updateBlockStatus(callerJid, 'block');
                 console.log(`🚫 Blocked caller: ${callerJid}`);
                 
-                // Notify superusers
-                const superusers = getSuperUsers();
-                for (const superuser of superusers) {
-                    await sock.sendMessage(superuser + '@s.whatsapp.net', {
+                // Notify bot owner
+                // You can customize who gets notified here
+                const adminJid = process.env.ADMIN_JID || ''; // Optional: set admin in env
+                if (adminJid) {
+                    await sock.sendMessage(adminJid + '@s.whatsapp.net', {
                         text: `🚨 *Call Blocked*\n\n` +
                               `📞 *Caller:* ${callerJid}\n` +
                               `🕐 *Time:* ${new Date().toLocaleString()}\n` +
@@ -83,15 +64,23 @@ async function anticallCommand(sock, chatId, message) {
             react: { text: '📞', key: message.key }
         });
         
-        // Extract user ID
-        const userId = message.key.participant?.split('@')[0] || 
-                      message.key.remoteJid?.split('@')[0] ||
-                      "unknown";
+        // Check if command is from bot owner (fromMe indicates bot sent it)
+        // In WhatsApp Web, fromMe means it was sent by the bot itself
+        // For owner-only commands, you should check the sender's JID instead
+        const senderJid = message.key.participant || message.key.remoteJid;
+        const isOwner = senderJid === (process.env.OWNER_JID || ''); // Set OWNER_JID in .env
         
-        // Check superuser status
-        if (!isSuperUser(userId)) {
+        // If no OWNER_JID is set, allow only messages sent by the bot itself
+        if (!process.env.OWNER_JID && !message.key.fromMe) {
             return await sock.sendMessage(chatId, { 
-                text: "❌ You need superuser privileges to manage anti-call settings."
+                text: "❌ This command can only be used by the bot owner.\n\nPlease set OWNER_JID in environment variables to use this command."
+            }, { quoted: message });
+        }
+        
+        // If OWNER_JID is set, check if sender matches
+        if (process.env.OWNER_JID && !isOwner && !message.key.fromMe) {
+            return await sock.sendMessage(chatId, { 
+                text: "❌ This is an owner-only command. Only the bot owner can manage anti-call settings."
             }, { quoted: message });
         }
         
@@ -112,29 +101,17 @@ async function anticallCommand(sock, chatId, message) {
             const action = settings.action === 'block' ? 'Block caller' : 'Reject call';
             const actionEmoji = settings.action === 'block' ? '🚫' : '❌';
             
-            // Get stats if available
-            let statsText = '';
-            try {
-                const stats = getCallStats();
-                if (stats) {
-                    statsText = `\n*📊 Statistics:*\n` +
-                               `▸ Total calls blocked: ${stats.blocked || 0}\n` +
-                               `▸ Total calls rejected: ${stats.rejected || 0}\n` +
-                               `▸ Last blocked: ${stats.lastBlocked || 'Never'}`;
-                }
-            } catch (e) { /* Ignore stats errors */ }
-            
             return await sock.sendMessage(chatId, {
                 text: 
                     `*📜 Anti-Call Settings*\n\n` +
                     `🔹 *Status:* ${status}\n` +
                     `🔹 *Action:* ${actionEmoji} ${action}\n` +
-                    `🔹 *Message:* ${settings.message || '*No message set*'}\n` +
-                    `${statsText}\n\n` +
-                    `*🛠 Usage Instructions:*\n` +
+                    `🔹 *Message:* ${settings.message || '*No message set*'}\n\n` +
+                    `*🛠 Owner Commands:*\n` +
                     `▸ *${prefix}anticall on/off* - Toggle anti-call\n` +
                     `▸ *${prefix}anticall message <text>* - Set rejection message\n` +
-                    `▸ *${prefix}anticall action reject/block*`
+                    `▸ *${prefix}anticall action reject/block* - Set action\n` +
+                    `▸ *${prefix}anticall test* - Preview message`
             }, { quoted: message });
         }
         
@@ -205,7 +182,7 @@ async function anticallCommand(sock, chatId, message) {
                     `Now when someone calls:\n` +
                     `1. Call will be rejected\n` +
                     `2. Caller will be blocked permanently\n` +
-                    `3. You will be notified of blocked calls` :
+                    `3. Owner will be notified (if configured)` :
                     `✔️ Action changed to *REJECT*.\n\n` +
                     `Now when someone calls:\n` +
                     `1. Call will be rejected\n` +
@@ -251,12 +228,10 @@ async function anticallCommand(sock, chatId, message) {
         
         if (error.message.includes("database") || error.message.includes("JSON")) {
             errorMessage = "💾 Database error. Please check if the data directory exists.";
-        } else if (error.message.includes("permission")) {
-            errorMessage = "🔒 Permission denied. You must be a superuser.";
         }
         
         return await sock.sendMessage(chatId, { 
-            text: errorMessage + "\n\nContact the bot administrator if this persists."
+            text: errorMessage + "\n\nContact the bot owner if this persists."
         }, { quoted: message });
     }
 }
