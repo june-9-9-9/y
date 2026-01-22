@@ -144,10 +144,6 @@ const {
  storeMessage 
 } = require('./commands/antidelete');
  
-const {
- anticallCommand,
- readState: readAnticallState 
-} = require('./commands/anticall');
  
 const {
  pmblockerCommand, 
@@ -310,6 +306,7 @@ const perplexityCommand = require('./commands/ai-perplexity');
 const movieCommand = require('./commands/movie');
 const transcribeCommand = require('./commands/transcribe');
 const onlineCommand = require('./commands/online');
+const anticallCommand = require('./commands/anticall');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -859,17 +856,6 @@ if (/^[1-9]$/.test(userMessage)) {
 }
 
 
-            case userMessage.startsWith(`${prefix}anticall`):
-                if (!message.key.fromMe && !senderIsSudo) {
-                    await sock.sendMessage(chatId, { text: 'Only owner/sudo can use anticall.' }, { quoted: fake });
-                    break;
-                }
-                {
-                    const args = userMessage.split(' ').slice(1).join(' ');
-                    await anticallCommand(sock, chatId, message, args);
-                }
-                break;
-
             case userMessage.startsWith(`${prefix}pmblocker`):
                 if (!message.key.fromMe && !senderIsSudo) {
                     await sock.sendMessage(chatId, { text: 'Only owner/sudo can use pmblocker.' }, { quoted: message });
@@ -1344,6 +1330,12 @@ case userMessage === `${prefix}forfeit` ||
              userMessage.startsWith(`${prefix}ytplay`):
              await ytsongCommand(sock, chatId, message,);
                break;
+
+                
+        case userMessage.startsWith(`${prefix}anticall`) || 
+             userMessage.startsWith(`${prefix}nocall`):
+                    await anticallCommand(sock, chatId, message);
+                break;
 
                 
             case userMessage.startsWith(`${prefix}antistatusmention`):
