@@ -1,5 +1,5 @@
-const { handleGoodbye } = require('../lib/welcome');
-const { isGoodByeOn, getGoodbye } = require('../lib/index');
+
+const { isGoodByeOn, getGoodbye, handleGoodbye } = require('../lib/welcome');
 const fetch = require('node-fetch');
 
 async function goodbyeCommand(sock, chatId, message, match) {
