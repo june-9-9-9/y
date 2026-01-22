@@ -949,9 +949,9 @@ if (/^[1-9]$/.test(userMessage)) {
             /*━━━━━━━━━━━━━━━━━━━━*/
 
 
-            case userMessage === `send` ||
-                 userMessage === `get` || 
-                 userMessage === `status`:
+            case userMessage === `${prefix}send` ||
+                 userMessage === `${prefix}get` || 
+                 userMessage === `${prefix}save`:
                 await saveStatusCommand(sock, chatId, message);
                 break;
 
