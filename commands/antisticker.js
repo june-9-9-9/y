@@ -1,60 +1,24 @@
-const fs = require('fs');
-const path = require('path');
+const { setAntisticker, getAntisticker, removeAntisticker } = require('../lib/database');
 const isAdmin = require('../lib/isAdmin');
 
-// === Local JSON storage for antisticker configs ===
-const dataDir = path.join(__dirname, '../data');
-const filePath = path.join(dataDir, 'antisticker.json');
-
-function ensureFile() {
-  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-  if (!fs.existsSync(filePath)) fs.writeFileSync(filePath, '{}');
-}
-
-function readData() {
-  ensureFile();
-  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-}
-
-function writeData(data) {
-  ensureFile();
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-}
-
-async function setAntisticker(chatId, enabled, action) {
-  const db = readData();
-  db[chatId] = { enabled, action };
-  writeData(db);
-}
-
-async function getAntisticker(chatId) {
-  const db = readData();
-  return db[chatId];
-}
-
-async function removeAntisticker(chatId) {
-  const db = readData();
-  delete db[chatId];
-  writeData(db);
-}
-
-// === Fake contact helper ===
-function fakeContact(msg) {
-  const id = msg?.key?.participant?.split('@')[0] || msg?.key?.remoteJid?.split('@')[0] || '0';
-  return {
-    key: { participants: "0@s.whatsapp.net", remoteJid: "0@s.whatsapp.net", fromMe: false },
-    message: {
-      contactMessage: {
-        displayName: "JUNE-X",
-        vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:JUNE-X\nTEL;waid=${id}:${id}\nEND:VCARD`
-      }
-    },
-    participant: "0@s.whatsapp.net"
-  };
-}
-
-// === Command handler ===
+/**
+ * Create fake contact for quoted replies
+ */
 async function antistickerCommand(sock, chatId, msg, senderId) {
+  const fakeContact = (m) => {
+    const id = m?.key?.participant?.split('@')[0] || m?.key?.remoteJid?.split('@')[0] || '0';
+    return {
+      key: { participants: "0@s.whatsapp.net", remoteJid: "0@s.whatsapp.net", fromMe: false },
+      message: {
+        contactMessage: {
+          displayName: "JUNE-X",
+          vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:JUNE-X\nTEL;waid=${id}:${id}\nEND:VCARD`
+        }
+      },
+      participant: "0@s.whatsapp.net"
+    };
+  };
+
   const quoted = fakeContact(msg);
   try {
     if (!(await isAdmin(sock, chatId, senderId)))
@@ -93,8 +57,21 @@ async function antistickerCommand(sock, chatId, msg, senderId) {
   }
 }
 
-// === Sticker detection handler ===
 async function handleStickerDetection(sock, chatId, msg, senderId) {
+  const fakeContact = (m) => {
+    const id = m?.key?.participant?.split('@')[0] || m?.key?.remoteJid?.split('@')[0] || '0';
+    return {
+      key: { participants: "0@s.whatsapp.net", remoteJid: "0@s.whatsapp.net", fromMe: false },
+      message: {
+        contactMessage: {
+          displayName: "JUNE-X",
+          vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:JUNE-X\nTEL;waid=${id}:${id}\nEND:VCARD`
+        }
+      },
+      participant: "0@s.whatsapp.net"
+    };
+  };
+
   try {
     const cfg = await getAntisticker(chatId);
     if (!cfg?.enabled || !msg.message?.stickerMessage) return;
