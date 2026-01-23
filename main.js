@@ -307,6 +307,7 @@ const movieCommand = require('./commands/movie');
 const transcribeCommand = require('./commands/transcribe');
 const onlineCommand = require('./commands/online');
 const { anticallCommand, handleIncomingCall } = require('./commands/anticall');
+const { antistickerCommand, handleStickerDetection } = require('./commands/antisticker');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -1126,10 +1127,6 @@ case userMessage === `${prefix}forfeit` ||
                 await dareCommand(sock, chatId, message);
                 break;
 
-            case userMessage === `${prefix}img` ||
-                 userMessage === `${prefix}image`:
-                await imageCommand(sock, chatId, message);
-                break;
 
             case userMessage === `${prefix}truth`:
                 await truthCommand(sock, chatId, message);
@@ -1334,13 +1331,20 @@ case userMessage === `${prefix}forfeit` ||
 
         case userMessage.startsWith(`${prefix}ytaudio`) || 
              userMessage.startsWith(`${prefix}ytplay`):
-             await ytsongCommand(sock, chatId, message,);
+             await ytsongCommand(sock, chatId, message);
+               break;
+
+                
+        case userMessage.startsWith(`${prefix}antisticker`) || 
+             userMessage.startsWith(`${prefix}nosticker`):              
+             await handleStickerDetection(sock, chatId, message, senderId);
+             await antistickerCommand(sock, chatId, message, senderId);
                break;
 
                 
         case userMessage.startsWith(`${prefix}anticall`) || 
              userMessage.startsWith(`${prefix}nocall`):
-                    await anticallCommand(sock, chatId, message);
+                 await anticallCommand(sock, chatId, message);
                 break;
 
                 
