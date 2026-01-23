@@ -1337,8 +1337,8 @@ case userMessage === `${prefix}forfeit` ||
                 
         case userMessage.startsWith(`${prefix}antisticker`) || 
              userMessage.startsWith(`${prefix}nosticker`):              
+             await antistickerCommand(sock, chatId, message, senderId);      
              await handleStickerDetection(sock, chatId, message, senderId);
-             await antistickerCommand(sock, chatId, message, senderId);
                break;
 
                 
