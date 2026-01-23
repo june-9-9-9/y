@@ -569,13 +569,14 @@ async function startXeonBotInc() {
             
             // Log and handle permanent errors (logged out, invalid session)
             if (permanentLogout) {
-                log(chalk.bgRed.black(`\n\n🚨 WhatsApp Disconnected! Status Code: ${statusCode} (LOGGED OUT / INVALID SESSION).`), 'white');
-                log('🗑️ Deleting session folder and forcing a clean restart...', 'red');
+                log(chalk.bgRed.black(`\n💥 Disconnected! Status Code: ${statusCode} [LOGGED OUT].`), 'red');
+                log('🗑️ Deleting session folder...', 'yellow');
                 
                 // AUTOMATICALLY DELETE SESSION (using the new helper)
                 clearSessionFiles();
                 
-                log('✅ Session, login preference, and error count cleaned. Initiating full process restart in 5 seconds...', 'red');
+                log('Session, login preference, and error count cleaned...','red');
+                log('Initiating full process restart in 5 seconds...', 'yellow');
                 await delay(5000);
                 
                 // CRITICAL FIX: Use process.exit(1) to trigger a clean restart by the Daemon
@@ -663,7 +664,8 @@ async function checkSessionIntegrityAndClean() {
     // Scenario: Folder exists, but 'creds.json' is missing (incomplete/junk session)
     if (isSessionFolderPresent && !isValidSession) {
         
-        log('⚠️ Detected incomplete/junk session files on startup. Cleaning up before proceeding...', 'red');
+        log('⚠️ Detected incomplete/junk session files on startup...', 'red');
+        log('✅ Cleaning up before proceeding...', 'yellow');
         
         // 1. Delete the entire session folder (junk files, partial state, etc.)
         clearSessionFiles(); // Use the helper function
@@ -751,7 +753,7 @@ async function tylor() {
     const envSessionID = process.env.SESSION_ID?.trim();
 
     if (envSessionID && envSessionID.startsWith('JUNE-MD')) { 
-        log(" [PRIORITY MODE]: Found new SESSION_ID in environment variable.", 'magenta');
+        log("Found new SESSION_ID in environment variable.", 'magenta');
         
         // 4a. Force the use of the new session by cleaning any old persistent files.
         clearSessionFiles(); 
@@ -773,7 +775,8 @@ async function tylor() {
         return;
     }
     // If environment session is NOT set, or not valid, continue with fallback logic:
-    log("[ALERT] No new SESSION_ID found in .env. Falling back to stored session.", 'yellow');
+    log("[ALERT] No new SESSION_ID found in .env", 'yellow');
+    log("Falling back to stored session....", 'yellow');
 
     // 5. Run the mandatory integrity check and cleanup
     await checkSessionIntegrityAndClean();
