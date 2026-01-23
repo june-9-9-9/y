@@ -39,19 +39,19 @@ async function antistickerCommand(sock, chatId, message, senderId) {
         }
 
         const text = message.message?.conversation || message.message?.extendedTextMessage?.text || '';
-        const args = text.trim().split(/\s+/).slice(1); // split by whitespace
+        const args = text.trim().split(/\s+/).slice(1);
         const action = args[0]?.toLowerCase();
-
-        if (!action) {
-            const usage = `💬 *ANTISTICKER SETUP*\n\nCommands:\n• .antisticker on\n• .antisticker set delete\n• .antisticker set kick\n• .antisticker set warn\n• .antisticker off\n• .antisticker status`;
-            return sock.sendMessage(chatId, { text: usage }, { quoted: fake });
-        }
 
         const actionEmoji = {
             delete: '🗑️',
             kick: '👢',
             warn: '⚠️'
         };
+
+        if (!action) {
+            const usage = `💬 *ANTISTICKER SETUP*\n\nCommands:\n• .antisticker on\n• .antisticker set delete\n• .antisticker set kick\n• .antisticker set warn\n• .antisticker off\n• .antisticker status`;
+            return sock.sendMessage(chatId, { text: usage }, { quoted: fake });
+        }
 
         switch (action) {
             case 'on':
@@ -122,7 +122,11 @@ async function handleStickerDetection(sock, chatId, message, senderId) {
         const fake = createFakeContact(message);
 
         // Always delete sticker first
-        await sock.sendMessage(chatId, { delete: message.key });
+        try {
+            await sock.sendMessage(chatId, { delete: message.key });
+        } catch (err) {
+            console.error('Failed to delete sticker:', err);
+        }
 
         switch (config.action) {
             case 'delete':
@@ -143,8 +147,12 @@ async function handleStickerDetection(sock, chatId, message, senderId) {
                     mentions: [senderId]
                 }, { quoted: fake });
 
-                await sock.groupParticipantsUpdate(chatId, [senderId], 'remove');
-                console.log('Sticker deleted and user kicked');
+                try {
+                    await sock.groupParticipantsUpdate(chatId, [senderId], 'remove');
+                    console.log('Sticker deleted and user kicked');
+                } catch (err) {
+                    console.error('Failed to kick user:', err);
+                }
                 break;
         }
     } catch (error) {
