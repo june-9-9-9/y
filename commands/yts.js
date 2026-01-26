@@ -33,7 +33,7 @@ async function ytsCommand(sock, chatId, senderId, message, userMessage) {
             });
         }
 
-        let resultMessage = `🄹 🅄 🄽 🄴   🅇  ON: "${query}"\n\n`;
+        let resultMessage = `🄹 🅄 🄽 🄴  🅇  🄾 🄽: "${query}"\n\n`;
 
         videos.forEach((video, index) => {
             const duration = video.timestamp || 'N/A';
