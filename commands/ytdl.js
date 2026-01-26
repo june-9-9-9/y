@@ -28,8 +28,8 @@ async function ytplayCommand(sock, chatId, message) {
             videoUrl = videoInfo.url;
         }
 
-        const res = await axios.get(`https://media.cypherxbot.space/download/youtube/video?url=${videoUrl}`);
-        const dl = res.data?.result?.download_url;
+        const res = await axios.get(`https://iamtkm.vercel.app/downloaders/ytmp4?apikey=tkm&url=${videoUrl}`);
+        const dl = res.data?.data?.url;
         if (!dl) {
             await sock.sendMessage(chatId, { text: "Download failed." }, { quoted: message });
             await sock.sendMessage(chatId, { react: { text: "❌", key: message.key } });
