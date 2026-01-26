@@ -308,6 +308,7 @@ const transcribeCommand = require('./commands/transcribe');
 const onlineCommand = require('./commands/online');
 const { anticallCommand, handleIncomingCall } = require('./commands/anticall');
 const { antistickerCommand, handleStickerDetection } = require('./commands/antisticker');
+const { ligue1StandingsCommand, laligaStandingsCommand, matchesCommand } = require('./commands/sport1');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -1301,6 +1302,18 @@ case userMessage === `${prefix}forfeit` ||
              userMessage.startsWith(`${prefix}inspect`):
              await fetchCommand(sock, chatId, message);
                break;
+              
+        case userMessage.startsWith(`${prefix}league1standings`):  
+             await ligue1StandingsCommand(sock, chatId, message);
+                break;
+                
+       case userMessage.startsWith(`${prefix}laligastandings`):
+            await laligaStandingsCommand(sock, chatId, message);
+                break;
+
+       case userMessage.startsWith(`${prefix}maches`):
+           await matchesCommand(sock, chatId, message);
+                break;
 
                 
         case userMessage.startsWith(`${prefix}mf`) || 
@@ -1309,7 +1322,7 @@ case userMessage === `${prefix}forfeit` ||
              break;
                 
         case userMessage.startsWith(`${prefix}pair`) || 
-             userMessage.startsWith(`${prefix}code`):
+             userMessage.startsWith(`${prefix}paircode`):
              await pairCommand(sock, chatId, message);
                break;
 
