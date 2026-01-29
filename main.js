@@ -58,11 +58,7 @@ const { tictactoeCommand, handleTicTacToeMove } = require('./commands/tictactoe'
 /*━━━━━━━━━━━━━━━━━━━━*/
 const {    
     autotypingCommand,
-    isAutotypingEnabled,
-    straightTypingPresence,
-    handleAutotypingForMessage,
-    handleAutotypingForCommand,
-    showTypingAfterCommand
+    straightTypingPresence
   } = require('./commands/autotyping');
 
 const {     
@@ -542,7 +538,7 @@ if (/^[1-9]$/.test(userMessage)) {
         /*━━━━━━━━━━━━━━━━━━━━*/
         if (!userMessage.startsWith(prefix)) {
             // Show typing indicator if autotyping is enabled
-            await handleAutotypingForMessage(sock, chatId, userMessage);
+          //  await handleAutotypingForMessage(sock, chatId, userMessage);
 
             if (isGroup) {
                 // Process non-command messages first
