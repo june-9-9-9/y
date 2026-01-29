@@ -58,7 +58,11 @@ const { tictactoeCommand, handleTicTacToeMove } = require('./commands/tictactoe'
 /*━━━━━━━━━━━━━━━━━━━━*/
 const {    
     autotypingCommand,
-    straightTypingPresence
+    isAutotypingEnabled,
+    straightTypingPresence,
+    handleAutotypingForMessage,
+    handleAutotypingForCommand,
+    showTypingAfterCommand
   } = require('./commands/autotyping');
 
 const {     
