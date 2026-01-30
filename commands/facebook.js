@@ -53,7 +53,7 @@ async function facebookCommand(sock, chatId, message) {
         // Send loading reaction
         await sock.sendMessage(chatId, {
             react: { text: '⬇️', key: message.key }
-        });
+        }); 
 
         // Use API
         const apiUrl = `https://apiskeith.vercel.app/download/fbdown?url=${encodeURIComponent(url)}`;
@@ -108,13 +108,19 @@ async function facebookCommand(sock, chatId, message) {
 
         // Try URL method first
         try {
-            const caption = `${title}\n\nBy JUNE-X Bot`;
+            const caption = `${title}\n\n JUNE-X 💙`;
 
             await sock.sendMessage(chatId, {
                 video: { url: fbvid },
                 mimetype: "video/mp4",
                 caption: caption
             }, { quoted: fake });
+
+            
+        // Send loading reaction
+        await sock.sendMessage(chatId, {
+            react: { text: '⤵️', key: message.key }
+        }); 
 
             console.log('Video sent successfully via URL');
             return;
