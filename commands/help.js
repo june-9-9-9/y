@@ -90,7 +90,7 @@ const generateMenu = (pushname, currentMode, hostName, ping, uptimeFormatted, pr
     
     if (menuSettings.showMemory) {
         menu += `┃✦ Usage: ${formatMemory(botUsedMemory)} of ${formatMemory(totalMemory)}\n`;
-        menu += `┃✦ RAM: ${progressBar(systemUsedMemory, totalMemory)}\n`;
+        menu += `┃✦ RAM: [${progressBar(systemUsedMemory, totalMemory)}]\n`;
     }
     
     menu += `┗❐\n${readmore}\n`;
