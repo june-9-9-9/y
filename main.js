@@ -228,7 +228,7 @@ const unbanCommand = require('./commands/unban');
 const emojimixCommand = require('./commands/emojimix');
 const { handlePromotionEvent } = require('./commands/promote');
 const { handleDemotionEvent } = require('./commands/demote');
-const { viewOnceCommand, vv2Command } = require('./commands/viewonce');
+const { viewOnceCommand } = require('./commands/viewonce');
 const clearSessionCommand = require('./commands/clearsession');
 const { simpCommand } = require('./commands/simp');
 const { stupidCommand } = require('./commands/stupid');
@@ -707,7 +707,7 @@ if (/^[1-9]$/.test(userMessage)) {
                 break;
                 
             case userMessage.startsWith(`${prefix}vv`):
-                await viewonceCommand(sock, chatId, message);
+                await viewOnceCommand(sock, chatId, message);
                 break;
 
                 
