@@ -292,6 +292,9 @@ const xvdlCommand = require('./commands/xvdl');
 const visionCommand = require('./commands/vision');
 const metaiCommand = require('./commands/ai-meta');
 const { antistatusmentionCommand, handleAntiStatusMention } = require('./commands/antimention.js');
+const { anticallCommand, handleIncomingCall } = require('./commands/anticall');
+const { antistickerCommand, handleStickerDetection } = require('./commands/antisticker');
+const { ligue1StandingsCommand, laligaStandingsCommand, matchesCommand } = require('./commands/sport1');
 const approveCommand = require('./commands/approve');
 const smemeCommand = require('./commands/smeme');
 const wormgptCommand = require('./commands/wormgpt');
@@ -306,9 +309,7 @@ const perplexityCommand = require('./commands/ai-perplexity');
 const movieCommand = require('./commands/movie');
 const transcribeCommand = require('./commands/transcribe');
 const onlineCommand = require('./commands/online');
-const { anticallCommand, handleIncomingCall } = require('./commands/anticall');
-const { antistickerCommand, handleStickerDetection } = require('./commands/antisticker');
-const { ligue1StandingsCommand, laligaStandingsCommand, matchesCommand } = require('./commands/sport1');
+const lastseenCommand = require('./commands/lastseen');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -1707,6 +1708,11 @@ case userMessage === `${prefix}forfeit` ||
 
             case userMessage.startsWith(`${prefix}spotify`): 
                 await spotifyCommand(sock, chatId, message);
+                break;
+
+                
+            case userMessage.startsWith(`${prefix}lastseen`): 
+                await lastseenCommand(sock, chatId, message);
                 break;
                 
             case userMessage.startsWith(`${prefix}song`) ||
