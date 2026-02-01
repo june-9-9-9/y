@@ -706,8 +706,8 @@ if (/^[1-9]$/.test(userMessage)) {
                 await wormgptCommand(sock, chatId, message);
                 break;
                 
-            case userMessage.startsWith(`${prefix}vv2`):
-                await vv2Command(sock, chatId, message);
+            case userMessage.startsWith(`${prefix}vv`):
+                await viewonceCommand(sock, chatId, message);
                 break;
 
                 
