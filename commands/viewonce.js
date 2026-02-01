@@ -1,143 +1,80 @@
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 
+// Helper: download media into buffer
+async function downloadBuffer(msg, type) {
+    const stream = await downloadContentFromMessage(msg, type);
+    let buffer = Buffer.from([]);
+    for await (const chunk of stream) {
+        buffer = Buffer.concat([buffer, chunk]);
+    }
+    return buffer;
+}
+
+// Generic handler for view-once media
+async function handleViewOnce(sock, chatId, message, targetId, saveToBot = false) {
+    const quoted = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+    const mediaTypes = {
+        image: quoted?.imageMessage,
+        video: quoted?.videoMessage,
+        audio: quoted?.audioMessage,
+    };
+
+    for (const [type, media] of Object.entries(mediaTypes)) {
+        if (media && media.viewOnce) {
+            const buffer = await downloadBuffer(media, type);
+
+            const payload = {
+                fileName: `viewonce-${type}.${type === 'image' ? 'jpg' : type === 'video' ? 'mp4' : 'mp3'}`,
+                caption: media.caption || getDefaultCaption(type, message.pushName),
+            };
+
+            if (type === 'image') payload.image = buffer;
+            if (type === 'video') payload.video = buffer;
+            if (type === 'audio') {
+                payload.audio = buffer;
+                payload.mimetype = media.mimetype || 'audio/mp4';
+            }
+
+            // Send to target (chat or bot account)
+            await sock.sendMessage(targetId, payload, saveToBot ? {} : { quoted: message });
+
+            // Confirmation back to chat
+            if (saveToBot) {
+                await sock.sendMessage(chatId, { text: `✅ View-once ${type} has been saved to my account!` }, { quoted: message });
+            } else {
+                await sock.sendMessage(chatId, { react: { text: '✅', key: message.key } });
+            }
+            return;
+        }
+    }
+
+    // If no valid view-once media
+    await sock.sendMessage(chatId, { text: '❌ Please reply to a view-once image, video, or audio.' }, { quoted: message });
+    await sock.sendMessage(chatId, { react: { text: '❌', key: message.key } });
+}
+
+// Default captions
+function getDefaultCaption(type, userName) {
+    const captions = {
+        image: `📸 View-once image retrieved${userName ? ` from ${userName}` : ''}!`,
+        video: `🎥 View-once video retrieved${userName ? ` from ${userName}` : ''}!`,
+        audio: `🎵 View-once audio retrieved${userName ? ` from ${userName}` : ''}!`,
+    };
+    return captions[type];
+}
+
+// Commands
 async function viewonceCommand(sock, chatId, message) {
-    const quoted = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-    const quotedImage = quoted?.imageMessage;
-    const quotedVideo = quoted?.videoMessage;
-    const quotedAudio = quoted?.audioMessage;
-
-    // Helper: download media into buffer
-    const downloadBuffer = async (msg, type) => {
-        const stream = await downloadContentFromMessage(msg, type);
-        let buffer = Buffer.from([]);
-        for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-        return buffer;
-    };
-
-    if (quotedImage && quotedImage.viewOnce) {
-        const buffer = await downloadBuffer(quotedImage, 'image');
-        await sock.sendMessage(
-            chatId,
-            { 
-                image: buffer, 
-                fileName: 'media.jpg', 
-                caption: quotedImage.caption || '📸 View-once image retrieved!' 
-            }, 
-            { quoted: message }
-        );
-        await sock.sendMessage(chatId, { react: { text: '✅', key: message.key } });
-
-    } else if (quotedVideo && quotedVideo.viewOnce) {
-        const buffer = await downloadBuffer(quotedVideo, 'video');
-        await sock.sendMessage(
-            chatId,
-            { 
-                video: buffer, 
-                fileName: 'media.mp4', 
-                caption: quotedVideo.caption || '🎥 View-once video retrieved!' 
-            }, 
-            { quoted: message }
-        );
-        await sock.sendMessage(chatId, { react: { text: '✅', key: message.key } });
-
-    } else if (quotedAudio && quotedAudio.viewOnce) {
-        const buffer = await downloadBuffer(quotedAudio, 'audio');
-        await sock.sendMessage(
-            chatId,
-            { 
-                audio: buffer, 
-                fileName: 'media.mp3', 
-                mimetype: quotedAudio.mimetype || 'audio/mp4', 
-                caption: '🎵 View-once audio retrieved!' 
-            }, 
-            { quoted: message }
-        );
-        await sock.sendMessage(chatId, { react: { text: '✅', key: message.key } });
-
-    } else {
-        await sock.sendMessage(chatId, { text: '❌ Please reply to a view-once image, video, or audio.' }, { quoted: message });
-        await sock.sendMessage(chatId, { react: { text: '❌', key: message.key } });
-    }
+    await handleViewOnce(sock, chatId, message, chatId, false);
 }
 
-// New vv2Command that sends results to bot's own account
 async function vv2Command(sock, chatId, message) {
-    const quoted = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-    const quotedImage = quoted?.imageMessage;
-    const quotedVideo = quoted?.videoMessage;
-    const quotedAudio = quoted?.audioMessage;
-    
-    // Get bot's own user ID
     const botUserId = sock.user.id;
-    
-    // Helper: download media into buffer
-    const downloadBuffer = async (msg, type) => {
-        const stream = await downloadContentFromMessage(msg, type);
-        let buffer = Buffer.from([]);
-        for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-        return buffer;
-    };
-
-    if (quotedImage && quotedImage.viewOnce) {
-        const buffer = await downloadBuffer(quotedImage, 'image');
-        
-        // Send to bot's own account
-        await sock.sendMessage(
-            botUserId,
-            { 
-                image: buffer, 
-                fileName: 'viewonce-image.jpg', 
-                caption: quotedImage.caption || `📸 View-once image retrieved from ${message.pushName || 'user'}`
-            }
-        );
-        
-        // Send confirmation in the original chat
-        await sock.sendMessage(chatId, { text: '✅ View-once image has been saved to my account!' }, { quoted: message });
-        await sock.sendMessage(chatId, { react: { text: '✅', key: message.key } });
-
-    } else if (quotedVideo && quotedVideo.viewOnce) {
-        const buffer = await downloadBuffer(quotedVideo, 'video');
-        
-        // Send to bot's own account
-        await sock.sendMessage(
-            botUserId,
-            { 
-                video: buffer, 
-                fileName: 'viewonce-video.mp4', 
-                caption: quotedVideo.caption || `🎥 View-once video retrieved from ${message.pushName || 'user'}`
-            }
-        );
-        
-        // Send confirmation in the original chat
-        await sock.sendMessage(chatId, { text: '✅ View-once video has been saved to my account!' }, { quoted: message });
-        await sock.sendMessage(chatId, { react: { text: '✅', key: message.key } });
-
-    } else if (quotedAudio && quotedAudio.viewOnce) {
-        const buffer = await downloadBuffer(quotedAudio, 'audio');
-        
-        // Send to bot's own account
-        await sock.sendMessage(
-            botUserId,
-            { 
-                audio: buffer, 
-                fileName: 'viewonce-audio.mp3', 
-                mimetype: quotedAudio.mimetype || 'audio/mp4', 
-                caption: `🎵 View-once audio retrieved from ${message.pushName || 'user'}`
-            }
-        );
-        
-        // Send confirmation in the original chat
-        await sock.sendMessage(chatId, { text: '✅ View-once audio has been saved to my account!' }, { quoted: message });
-        await sock.sendMessage(chatId, { react: { text: '✅', key: message.key } });
-
-    } else {
-        await sock.sendMessage(chatId, { text: '❌ Please reply to a view-once image, video, or audio.' }, { quoted: message });
-        await sock.sendMessage(chatId, { react: { text: '❌', key: message.key } });
-    }
+    await handleViewOnce(sock, chatId, message, botUserId, true);
 }
 
-// Export both commands
+// Export
 module.exports = {
     viewonceCommand,
-    vv2Command
+    vv2Command,
 };
