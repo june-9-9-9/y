@@ -37,7 +37,7 @@ async function copilotCommand(sock, chatId, message) {
         await sock.sendPresenceUpdate('composing', chatId);
 
         // Fetch AI response using Copilot API
-        const apiUrl = `https://iamtkm.vercel.app/ai/copilot?apikey=tkm&text=${encodeURIComponent(query)}`;
+        const apiUrl = `https://iamtkm.top/ai/copilot?apikey=tkm&text=${encodeURIComponent(query)}`;
         const response = await axios.get(apiUrl, { timeout: 30000 });
         const apiData = response.data;
 
