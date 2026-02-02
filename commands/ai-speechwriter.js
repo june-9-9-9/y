@@ -42,7 +42,7 @@ async function speechwriterCommand(sock, chatId, message) {
         const tone = "serious";
 
         // Build API URL with parameters
-        const apiUrl = `https://apiskeith.vercel.app/ai/speechwriter?topic=${encodeURIComponent(topic)}&length=${length}&type=${type}&tone=${tone}`;
+        const apiUrl = `https://apiskeith.top/ai/speechwriter?topic=${encodeURIComponent(topic)}&length=${length}&type=${type}&tone=${tone}`;
         const response = await axios.get(apiUrl, { timeout: 30000 });
         const apiData = response.data;
 
