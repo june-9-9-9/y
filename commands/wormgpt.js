@@ -24,7 +24,7 @@ async function wormgptCommand(sock, chatId, message) {
         });
 
         // Call WormGPT API
-        const apiUrl = `https://apiskeith.vercel.app/ai/wormgpt?q=${encodeURIComponent(query)}`;
+        const apiUrl = `https://apiskeith.top/ai/wormgpt?q=${encodeURIComponent(query)}`;
         const { data } = await axios.get(apiUrl, { 
             timeout: 30000,
             headers: { 
@@ -39,7 +39,7 @@ async function wormgptCommand(sock, chatId, message) {
 
         // Processing reaction
         await sock.sendMessage(chatId, {
-            react: { text: '💭', key: message.key }
+            react: { text: '👿', key: message.key }
         });
 
         // Send only the result
@@ -49,7 +49,7 @@ async function wormgptCommand(sock, chatId, message) {
 
         // Success reaction
         await sock.sendMessage(chatId, {
-            react: { text: '✅', key: message.key }
+            react: { text: '🧬', key: message.key }
         });
 
     } catch (error) {
