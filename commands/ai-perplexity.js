@@ -37,7 +37,7 @@ async function perplexityCommand(sock, chatId, message) {
         await sock.sendPresenceUpdate('composing', chatId);
 
         // Fetch AI response using Perplexity API
-        const apiUrl = `https://apiskeith.vercel.app/ai/perplexity?q=${encodeURIComponent(query)}`;
+        const apiUrl = `https://apiskeith.top/ai/perplexity?q=${encodeURIComponent(query)}`;
         const response = await axios.get(apiUrl, { timeout: 30000 });
         const apiData = response.data;
 
