@@ -37,7 +37,7 @@ async function bardCommand(sock, chatId, message) {
         await sock.sendPresenceUpdate('composing', chatId);
 
         // Fetch AI response using Bard API
-        const apiUrl = `https://apiskeith.vercel.app/ai/bard?q=${encodeURIComponent(query)}`;
+        const apiUrl = `https://apiskeith.top/ai/bard?q=${encodeURIComponent(query)}`;
         const response = await axios.get(apiUrl, { timeout: 30000 });
         const apiData = response.data;
 
