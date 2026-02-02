@@ -4,7 +4,7 @@ async function metaiCommand(sock, chatId, message) {
     try {
         // Send reaction
         await sock.sendMessage(chatId, {
-            react: { text: '📥', key: message.key }
+            react: { text: '⤵️', key: message.key }
         });
 
         const text = message.message?.conversation || 
@@ -37,7 +37,7 @@ async function metaiCommand(sock, chatId, message) {
         await sock.sendPresenceUpdate('composing', chatId);
 
         // Fetch AI response using Meta AI API
-        const apiUrl = `https://apiskeith.vercel.app/ai/metai?q=${encodeURIComponent(query)}`;
+        const apiUrl = `https://apiskeith.top/ai/metai?q=${encodeURIComponent(query)}`;
         const response = await axios.get(apiUrl, { timeout: 30000 });
         const apiData = response.data;
 
