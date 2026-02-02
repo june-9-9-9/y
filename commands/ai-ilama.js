@@ -23,7 +23,7 @@ async function ilamaCommand(sock, chatId, message) {
 
         if (!query) {
             return await sock.sendMessage(chatId, {
-                text: '❌ Please provide a query for iLama AI!\n\nExample: .ilama What is artificial intelligence?'
+                text: '❌ Please provide a query for iLama AI!\n\nExample: .ilama What is artificial ai?'
             }, { quoted: message });
         }
 
@@ -37,7 +37,7 @@ async function ilamaCommand(sock, chatId, message) {
         await sock.sendPresenceUpdate('composing', chatId);
 
         // Fetch AI response using iLama API
-        const apiUrl = `https://apiskeith.vercel.app/ai/ilama?q=${encodeURIComponent(query)}`;
+        const apiUrl = `https://apiskeith.top/ai/ilama?q=${encodeURIComponent(query)}`;
         const response = await axios.get(apiUrl, { timeout: 30000 });
         const apiData = response.data;
 
