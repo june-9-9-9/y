@@ -70,7 +70,7 @@ async function songCommand(sock, chatId, message) {
         }
 
         const video = searchResult;
-        const apiUrl = `https://apiskeith.vercel.app/download/audio?url=${encodeURIComponent(video.url)}`;
+        const apiUrl = `https://apiskeith.top/download/audio?url=${encodeURIComponent(video.url)}`;
         const response = await axios.get(apiUrl);
         const apiData = response.data;
 
