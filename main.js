@@ -228,7 +228,7 @@ const unbanCommand = require('./commands/unban');
 const emojimixCommand = require('./commands/emojimix');
 const { handlePromotionEvent } = require('./commands/promote');
 const { handleDemotionEvent } = require('./commands/demote');
-const { viewOnceCommand } = require('./commands/viewonce');
+const { viewonceCommand } = require('./commands/viewonce');
 const clearSessionCommand = require('./commands/clearsession');
 const { simpCommand } = require('./commands/simp');
 const { stupidCommand } = require('./commands/stupid');
@@ -1551,7 +1551,7 @@ case userMessage === `${prefix}forfeit` ||
                 break;
 
            case userMessage === `${prefix}vv`:
-                await viewOnceCommand(sock, chatId, message);
+                await viewonceCommand(sock, chatId, message);
                 break;
 
               
