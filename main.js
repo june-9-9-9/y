@@ -1550,10 +1550,6 @@ case userMessage === `${prefix}forfeit` ||
                 await kickAllCommand(sock, chatId, message);
                 break;
 
-           case userMessage === `${prefix}vv`:
-                await viewonceCommand(sock, chatId, message);
-                break;
-
               
             case userMessage === `${prefix}toaudio` ||
                 userMessage === `${prefix}tomp3`:
