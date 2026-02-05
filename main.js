@@ -706,10 +706,6 @@ if (/^[1-9]$/.test(userMessage)) {
                 await wormgptCommand(sock, chatId, message);
                 break;
                 
-            case userMessage.startsWith(`${prefix}vv`):
-                await viewOnceCommand(sock, chatId, message);
-                break;
-
                 
             case userMessage.startsWith(`${prefix}grok`):
                 await grokCommand(sock, chatId, message);
