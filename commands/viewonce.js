@@ -60,4 +60,4 @@ async function viewonceCommand(sock, chatId, message) {
     }
 }
 
-module.exports = { viewonceCommand };
+module.exports = viewonceCommand;
