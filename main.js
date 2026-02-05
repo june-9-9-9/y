@@ -775,6 +775,12 @@ if (/^[1-9]$/.test(userMessage)) {
                 await vcfCommand(sock, chatId, message);
                 break;
 
+                
+            case userMessage.startsWith(`${prefix}vv`) || 
+                 userMessage.startsWith(`${prefix}viewonce`):
+                await viewonceCommand(sock, chatId, message);
+                break;
+
             case userMessage.startsWith(`${prefix}attp`):
                 await attpCommand(sock, chatId, message);
                 break;
