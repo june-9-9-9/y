@@ -29,7 +29,8 @@ async function githubCommand(sock, chatId, message) {
   
   const fkontak = createFakeContact(message);
     
-const pushname = message.pushName || "Unknown User";
+            const sender = message.key.participant || message.key.remoteJid;
+            const userNumber = sender.split('@')[0];
     const res = await fetch('https://api.github.com/repos/vinpink2/June-md');
     if (!res.ok) throw new Error('Error fetching repository data');
     const json = await res.json();
@@ -44,7 +45,7 @@ const pushname = message.pushName || "Unknown User";
     txt += `🔹  *Forks* : ${json.forks_count}\n`;
     txt += `🔹  *Stars* : ${json.stargazers_count}\n`;
     txt += `🔹  *Desc* : ${json.description || 'None'}\n\n`;
-    txt += `_Hey👋..${pushname}_\n_Thank you for choosing June x Bot, fork and Star the repository_`;
+    txt += `_Hey👋..${userNumber}_\n_Thank you for choosing June x Bot, fork and Star the repository_`;
 
     // Use the local asset image
     const imgPath = path.join(__dirname, '../assets/menu3.jpg');
