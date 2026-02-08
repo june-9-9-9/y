@@ -45,7 +45,7 @@ async function githubCommand(sock, chatId, message) {
     txt += `🔹  *Forks* : ${json.forks_count}\n`;
     txt += `🔹  *Stars* : ${json.stargazers_count}\n`;
     txt += `🔹  *Desc* : ${json.description || 'None'}\n\n`;
-    txt += `_Hey👋..${userNumber}_\n_Thank you for choosing June x Bot, fork and Star the repository_`;
+    txt += `_Hey👋..@${userNumber}_\n_Thank you for choosing June x Bot, fork and Star the repository_`;
 
     // Use the local asset image
     const imgPath = path.join(__dirname, '../assets/menu3.jpg');
