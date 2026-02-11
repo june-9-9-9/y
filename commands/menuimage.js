@@ -1,16 +1,14 @@
 const { getBotName, getMenuImage, setMenuImage, getConfig, updateConfig } = require('../lib/botConfig');
-const { createFakeContact } = require('../lib/fakecontact');
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const fs = require('fs');
 const path = require('path');
 
 async function setbotconfigCommand(sock, chatId, message) {
     try {
-        const fake = createFakeContact(message); // Pass entire message object, not just senderId
         const botName = getBotName();
 
         if (!message.key.fromMe) {
-            await sock.sendMessage(chatId, { text: `*${botName}*\nThis command is only available for the owner!` }, { quoted: fake });
+            await sock.sendMessage(chatId, { text: `*${botName}*\nThis command is only available for the owner!` }, { quoted: message });
             return;
         }
 
@@ -22,25 +20,24 @@ async function setbotconfigCommand(sock, chatId, message) {
             const config = getConfig();
             const usage = `*${botName} BOT CONFIGURATION*\n\n` +
                 `Current Settings:\n` +
-                `Bot Name: ${config.botName || 'Not set'}\n` +
+                `Bot Name: ${config.botName}\n` +
                 `Menu Image: ${config.menuImage ? 'Set' : 'Not set'}\n` +
                 `Antidelete Private: ${config.antideletePrivate ? 'ON' : 'OFF'}\n\n` +
                 `Commands:\n` +
                 `.setmenuimage - Reply to image to set menu image\n` +
-                `.setmenuimage [url] - Set menu image from URL\n` +
                 `.botconfig get - View current config`;
-            await sock.sendMessage(chatId, { text: usage }, { quoted: fake });
+            await sock.sendMessage(chatId, { text: usage }, { quoted: message });
             return;
         }
 
         if (action === 'get') {
             const config = getConfig();
             const statusText = `*${botName} Configuration*\n\n` +
-                `Bot Name: ${config.botName || 'Not set'}\n` +
-                `Owner Name: ${config.ownerName || 'Not set'}\n` +
+                `Bot Name: ${config.botName}\n` +
+                `Owner Name: ${config.ownerName}\n` +
                 `Menu Image: ${config.menuImage ? 'Set' : 'Not set'}\n` +
                 `Antidelete Private: ${config.antideletePrivate ? 'ON' : 'OFF'}`;
-            await sock.sendMessage(chatId, { text: statusText }, { quoted: fake });
+            await sock.sendMessage(chatId, { text: statusText }, { quoted: message });
         }
     } catch (error) {
         console.error('Error in setbotconfig command:', error.message, 'Line:', error.stack?.split('\n')[1]);
@@ -49,11 +46,10 @@ async function setbotconfigCommand(sock, chatId, message) {
 
 async function setmenuimageCommand(sock, chatId, message) {
     try {
-        const fake = createFakeContact(message); // Pass entire message object
         const botName = getBotName();
 
         if (!message.key.fromMe) {
-            await sock.sendMessage(chatId, { text: `*${botName}*\nThis command is only available for the owner!` }, { quoted: fake });
+            await sock.sendMessage(chatId, { text: `*${botName}*\nThis command is only available for the owner!` }, { quoted: message });
             return;
         }
 
@@ -61,18 +57,14 @@ async function setmenuimageCommand(sock, chatId, message) {
         const text = message.message?.conversation || message.message?.extendedTextMessage?.text || '';
         const args = text.split(' ').slice(1).join(' ').trim();
 
-        // Handle URL
         if (args && (args.startsWith('http://') || args.startsWith('https://'))) {
             setMenuImage(args);
-            await sock.sendMessage(chatId, { text: `*${botName}*\nMenu image URL has been set!` }, { quoted: fake });
+            await sock.sendMessage(chatId, { text: `*${botName}*\nMenu image URL has been set!` }, { quoted: message });
             return;
         }
 
-        // Handle replied image
         if (!quotedMessage?.imageMessage) {
-            await sock.sendMessage(chatId, { 
-                text: `*${botName}*\nPlease reply to an image or provide an image URL!\n\nUsage:\n.setmenuimage (reply to image)\n.setmenuimage https://example.com/image.jpg` 
-            }, { quoted: fake });
+            await sock.sendMessage(chatId, { text: `*${botName}*\nPlease reply to an image or provide an image URL!\n\nUsage:\n.setmenuimage (reply to image)\n.setmenuimage https://example.com/image.jpg` }, { quoted: message });
             return;
         }
 
@@ -92,11 +84,9 @@ async function setmenuimageCommand(sock, chatId, message) {
             fs.writeFileSync(imagePath, buffer);
 
             setMenuImage(imagePath);
-            await sock.sendMessage(chatId, { text: `*${botName}*\nMenu image has been updated!` }, { quoted: fake });
+            await sock.sendMessage(chatId, { text: `*${botName}*\nMenu image has been updated!` }, { quoted: message });
         } catch (downloadError) {
-            await sock.sendMessage(chatId, { 
-                text: `*${botName}*\nFailed to download image: ${downloadError.message}` 
-            }, { quoted: fake });
+            await sock.sendMessage(chatId, { text: `*${botName}*\nFailed to download image: ${downloadError.message}` }, { quoted: message });
         }
     } catch (error) {
         console.error('Error in setmenuimage command:', error.message, 'Line:', error.stack?.split('\n')[1]);
