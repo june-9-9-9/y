@@ -1,43 +1,24 @@
 const { setAntidemote, getAntidemote, removeAntidemote } = require('../lib/antidemote-file');
 const isAdmin = require('../lib/isAdmin');
 
-function createFakeContact(message) {
-    const participantId = message?.key?.participant?.split('@')[0] || 
-                          message?.key?.remoteJid?.split('@')[0] || '0';
-    
-    return {
-        key: {
-            participants: "0@s.whatsapp.net",
-            remoteJid: "0@s.whatsapp.net",
-            fromMe: false
-        },
-        message: {
-            contactMessage: {
-                displayName: "DAVE-X",
-                vcard: `BEGIN:VCARD\nVERSION:3.0\nN:Sy;Bot;;;\nFN:DAVE-X\nitem1.TEL;waid=${participantId}:${participantId}\nitem1.X-ABLabel:Phone\nEND:VCARD`
-            }
-        },
-        participant: "0@s.whatsapp.net"
-    };
-}
-
 async function antidemoteCommand(sock, chatId, message, senderId) {
     try {
-        const fake = createFakeContact(message);
         const isSenderAdmin = await isAdmin(sock, chatId, senderId);
 
         if (!isSenderAdmin) {
-            await sock.sendMessage(chatId, { text: '❌ For Group Admins Only' }, { quoted: fake });
+            await sock.sendMessage(chatId, { text: '❌ For Group Admins Only' }, { quoted: message });
             return;
         }
 
-        const text = message.message?.conversation || message.message?.extendedTextMessage?.text || '';
+        const text = message.message?.conversation || 
+                    message.message?.extendedTextMessage?.text || 
+                    message.message?.imageMessage?.caption || '';
         const args = text.trim().split(' ').slice(1);
         const action = args[0]?.toLowerCase();
 
         if (!action) {
             const usage = `🛡️ *ANTIDEMOTE SETUP*\n\n• .antidemote on - Prevent demoting admins\n• .antidemote off - Allow demoting\n• .antidemote status - Check status`;
-            await sock.sendMessage(chatId, { text: usage }, { quoted: fake });
+            await sock.sendMessage(chatId, { text: usage }, { quoted: message });
             return;
         }
 
@@ -46,34 +27,33 @@ async function antidemoteCommand(sock, chatId, message, senderId) {
                 await setAntidemote(chatId, 'on');
                 await sock.sendMessage(chatId, { 
                     text: '🛡️ Antidemote has been turned ON\n\nAdmins cannot be demoted in this group!' 
-                }, { quoted: fake });
+                }, { quoted: message });
                 break;
 
             case 'off':
                 await removeAntidemote(chatId);
                 await sock.sendMessage(chatId, { 
                     text: '❌ Antidemote has been turned OFF\n\nAdmins can now be demoted normally' 
-                }, { quoted: fake });
+                }, { quoted: message });
                 break;
 
             case 'status':
             case 'get':
                 const config = await getAntidemote(chatId);
                 const statusText = `🛡️ *Antidemote Status*\n\nStatus: ${config.enabled ? '✅ ON' : '❌ OFF'}\n\n${config.enabled ? 'Admins are protected from demotion' : 'No protection active'}`;
-                await sock.sendMessage(chatId, { text: statusText }, { quoted: fake });
+                await sock.sendMessage(chatId, { text: statusText }, { quoted: message });
                 break;
 
             default:
                 await sock.sendMessage(chatId, { 
                     text: '❌ Invalid command. Use:\n• on\n• off\n• status' 
-                }, { quoted: fake });
+                }, { quoted: message });
         }
     } catch (error) {
         console.error('Error in antidemote command:', error);
-        const fake = createFakeContact(message);
         await sock.sendMessage(chatId, { 
             text: '❌ An error occurred while processing the command' 
-        }, { quoted: fake });
+        }, { quoted: message });
     }
 }
 
@@ -114,4 +94,4 @@ async function handleAntidemote(sock, chatId, participants, author) {
 module.exports = {
     antidemoteCommand,
     handleAntidemote
-}; 
+};
