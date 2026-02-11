@@ -1,4 +1,15 @@
-const { setAntidemote, getAntidemote, removeAntidemote } = require('../lib/antidemote-file');
+const { 
+    setAntidemote, 
+    getAntidemote, 
+    removeAntidemote,
+    revertLastAction,
+    addKickRecord,
+    getKickStats,
+    incrementProtectedCount,
+    addBannedUser,
+    removeBannedUser,
+    isUserBanned
+} = require('../lib/antidemote-file');
 const isAdmin = require('../lib/isAdmin');
 
 async function antidemoteCommand(sock, chatId, message, senderId) {
@@ -15,44 +26,229 @@ async function antidemoteCommand(sock, chatId, message, senderId) {
                     message.message?.imageMessage?.caption || '';
         const args = text.trim().split(' ').slice(1);
         const action = args[0]?.toLowerCase();
+        const config = await getAntidemote(chatId);
 
         if (!action) {
-            const usage = `*ANTIDEMOTE*\n.antidemote on/off/status`;
+            const usage = `🛡️ *ANTIDEMOTE COMMANDS*\n\n` +
+                `• .antidemote on - Enable protection\n` +
+                `• .antidemote off - Disable protection\n` +
+                `• .antidemote status - Check status\n` +
+                `• .antidemote revert - Undo last action\n` +
+                `• .antidemote kick @user - Remove member\n` +
+                `• .antidemote ban @user - Ban member\n` +
+                `• .antidemote unban @user - Unban member\n` +
+                `• .antidemote stats - View statistics`;
             await sock.sendMessage(chatId, { text: usage }, { quoted: message });
             return;
         }
 
         switch (action) {
             case 'on':
-                await setAntidemote(chatId, 'on');
+                await setAntidemote(chatId, 'on', senderId);
                 await sock.sendMessage(chatId, { 
-                    text: '🛡️ Antidemote has been turned ON\n\nAdmins cannot be demoted in this group!' 
+                    text: '🛡️ *Antidemote Activated*\n\n✅ Admins are now protected from demotion!\n❌ No one can demote group admins.' 
                 }, { quoted: message });
                 break;
 
             case 'off':
-                await removeAntidemote(chatId);
+                await removeAntidemote(chatId, senderId);
                 await sock.sendMessage(chatId, { 
-                    text: '❌ Antidemote has been turned OFF\n\nAdmins can now be demoted normally' 
+                    text: '❌ *Antidemote Deactivated*\n\n⚠️ Admins can now be demoted normally.' 
                 }, { quoted: message });
                 break;
 
             case 'status':
             case 'get':
-                const config = await getAntidemote(chatId);
-                const statusText = `🛡️ *Antidemote Status*\n\nStatus: ${config.enabled ? '✅ ON' : '❌ OFF'}\n\n${config.enabled ? 'Admins are protected from demotion' : 'No protection active'}`;
+                const statusConfig = await getAntidemote(chatId);
+                const statusText = `🛡️ *ANTIDEMOTE STATUS*\n\n` +
+                    `📌 Group: ${chatId.split('@')[0]}\n` +
+                    `🔰 Status: ${statusConfig.enabled ? '✅ ACTIVE' : '❌ INACTIVE'}\n` +
+                    `🛡️ Protections: ${statusConfig.protectedCount || 0}\n` +
+                    `👢 Total Kicks: ${statusConfig.kickCount || 0}\n` +
+                    `📅 Last Updated: ${statusConfig.updatedAt ? new Date(statusConfig.updatedAt).toLocaleString() : 'Never'}\n\n` +
+                    `${statusConfig.enabled ? '🟢 Admins are protected from demotion' : '🔴 No protection active'}`;
                 await sock.sendMessage(chatId, { text: statusText }, { quoted: message });
+                break;
+
+            case 'revert':
+            case 'undo':
+                const revertResult = await revertLastAction(chatId);
+                await sock.sendMessage(chatId, { 
+                    text: `🔄 *REVERT ${revertResult.success ? 'SUCCESSFUL' : 'FAILED'}*\n\n${revertResult.message}` 
+                }, { quoted: message });
+                break;
+
+            case 'kick':
+                if (!args[1]) {
+                    await sock.sendMessage(chatId, { 
+                        text: '❌ Please mention the user to kick.\n\n📝 *Usage:* `.antidemote kick @user`' 
+                    }, { quoted: message });
+                    return;
+                }
+
+                const mentionedKick = message.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+                if (!mentionedKick) {
+                    await sock.sendMessage(chatId, { 
+                        text: '❌ Please mention a valid user with @.' 
+                    }, { quoted: message });
+                    return;
+                }
+
+                // Check if target is admin
+                const targetIsAdmin = await isAdmin(sock, chatId, mentionedKick);
+                if (targetIsAdmin && config.enabled) {
+                    await sock.sendMessage(chatId, { 
+                        text: '🛡️ *ANTIDEMOTE PROTECTION*\n\n❌ Cannot kick admins while antidemote is enabled!\n⚠️ Disable antidemote first with `.antidemote off`' 
+                    }, { quoted: message });
+                    return;
+                }
+
+                if (mentionedKick === senderId) {
+                    await sock.sendMessage(chatId, { 
+                        text: '❌ You cannot kick yourself!' 
+                    }, { quoted: message });
+                    return;
+                }
+
+                try {
+                    await sock.groupParticipantsUpdate(chatId, [mentionedKick], 'remove');
+                    await addKickRecord(chatId, mentionedKick, senderId, 'manual');
+                    
+                    await sock.sendMessage(chatId, { 
+                        text: `👢 *USER KICKED*\n\n✅ @${mentionedKick.split('@')[0]} has been removed from the group.\n👮 Kicked by: @${senderId.split('@')[0]}`,
+                        mentions: [mentionedKick, senderId]
+                    }, { quoted: message });
+                } catch (kickError) {
+                    await sock.sendMessage(chatId, { 
+                        text: '❌ Failed to kick user. Make sure I am an admin!' 
+                    }, { quoted: message });
+                }
+                break;
+
+            case 'ban':
+                if (!args[1]) {
+                    await sock.sendMessage(chatId, { 
+                        text: '❌ Please mention the user to ban.\n\n📝 *Usage:* `.antidemote ban @user`' 
+                    }, { quoted: message });
+                    return;
+                }
+
+                const mentionedBan = message.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+                if (!mentionedBan) {
+                    await sock.sendMessage(chatId, { 
+                        text: '❌ Please mention a valid user with @.' 
+                    }, { quoted: message });
+                    return;
+                }
+
+                if (mentionedBan === senderId) {
+                    await sock.sendMessage(chatId, { 
+                        text: '❌ You cannot ban yourself!' 
+                    }, { quoted: message });
+                    return;
+                }
+
+                // Check if already banned
+                const alreadyBanned = await isUserBanned(chatId, mentionedBan);
+                if (alreadyBanned) {
+                    await sock.sendMessage(chatId, { 
+                        text: `⚠️ @${mentionedBan.split('@')[0]} is already banned.`,
+                        mentions: [mentionedBan]
+                    }, { quoted: message });
+                    return;
+                }
+
+                try {
+                    await sock.groupParticipantsUpdate(chatId, [mentionedBan], 'remove');
+                    await addBannedUser(chatId, mentionedBan, senderId, 'manual');
+                    await addKickRecord(chatId, mentionedBan, senderId, 'ban');
+                    
+                    await sock.sendMessage(chatId, { 
+                        text: `🚫 *USER BANNED*\n\n✅ @${mentionedBan.split('@')[0]} has been banned from the group.\n👮 Banned by: @${senderId.split('@')[0]}\n📌 Use \`.antidemote unban\` to remove ban.`,
+                        mentions: [mentionedBan, senderId]
+                    }, { quoted: message });
+                } catch (banError) {
+                    await sock.sendMessage(chatId, { 
+                        text: '❌ Failed to ban user. Make sure I am an admin!' 
+                    }, { quoted: message });
+                }
+                break;
+
+            case 'unban':
+                if (!args[1]) {
+                    await sock.sendMessage(chatId, { 
+                        text: '❌ Please mention the user to unban.\n\n📝 *Usage:* `.antidemote unban @user`' 
+                    }, { quoted: message });
+                    return;
+                }
+
+                const mentionedUnban = message.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+                if (!mentionedUnban) {
+                    await sock.sendMessage(chatId, { 
+                        text: '❌ Please mention a valid user with @.' 
+                    }, { quoted: message });
+                    return;
+                }
+
+                const unbanned = await removeBannedUser(chatId, mentionedUnban);
+                if (unbanned) {
+                    await sock.sendMessage(chatId, { 
+                        text: `✅ @${mentionedUnban.split('@')[0]} has been unbanned and can now join the group.`,
+                        mentions: [mentionedUnban]
+                    }, { quoted: message });
+                } else {
+                    await sock.sendMessage(chatId, { 
+                        text: `❌ @${mentionedUnban.split('@')[0]} is not in the ban list.`,
+                        mentions: [mentionedUnban]
+                    }, { quoted: message });
+                }
+                break;
+
+            case 'stats':
+            case 'history':
+                const stats = await getKickStats(chatId);
+                const groupMetadata = await sock.groupMetadata(chatId);
+                
+                let statsText = `📊 *ANTIDEMOTE STATISTICS*\n\n`;
+                statsText += `👥 Group: ${groupMetadata.subject}\n`;
+                statsText += `🆔 ID: ${chatId.split('@')[0]}\n\n`;
+                statsText += `🛡️ *Protections:* ${stats.protectedCount || 0}\n`;
+                statsText += `👢 *Total Kicks:* ${stats.totalKicks}\n`;
+                statsText += `🚫 *Banned Users:* ${config.bannedUsers?.filter(b => b.active).length || 0}\n\n`;
+                
+                if (stats.recentKicks.length > 0) {
+                    statsText += `*📋 RECENT ACTIONS (Last 5):*\n`;
+                    stats.recentKicks.slice(0, 5).forEach((kick, i) => {
+                        const date = new Date(kick.timestamp).toLocaleString();
+                        const action = kick.reason === 'demote' ? '🛡️ Protected' : 
+                                      kick.reason === 'ban' ? '🚫 Banned' : '👢 Kicked';
+                        statsText += `${i+1}. ${action}: @${kick.userId.split('@')[0]}\n`;
+                        statsText += `   👮 By: @${kick.kickedBy?.split('@')[0] || 'System'}\n`;
+                        statsText += `   📅 ${date}\n\n`;
+                    });
+                    
+                    const mentions = stats.recentKicks.slice(0, 5).flatMap(k => [k.userId, k.kickedBy]).filter(Boolean);
+                    await sock.sendMessage(chatId, { 
+                        text: statsText,
+                        mentions: mentions
+                    }, { quoted: message });
+                } else {
+                    statsText += `*📋 No recent actions recorded*`;
+                    await sock.sendMessage(chatId, { 
+                        text: statsText
+                    }, { quoted: message });
+                }
                 break;
 
             default:
                 await sock.sendMessage(chatId, { 
-                    text: '❌ Invalid command. Use:\n• on\n• off\n• status' 
+                    text: '❌ *Invalid Command*\n\nUse `.antidemote` to see all available commands.' 
                 }, { quoted: message });
         }
     } catch (error) {
         console.error('Error in antidemote command:', error);
         await sock.sendMessage(chatId, { 
-            text: '❌ An error occurred while processing the command' 
+            text: '❌ An error occurred while processing the command.\nPlease try again later.' 
         }, { quoted: message });
     }
 }
@@ -64,27 +260,33 @@ async function handleAntidemote(sock, chatId, participants, author) {
 
         // Check if the author (who demoted) is admin
         const authorIsAdmin = await isAdmin(sock, chatId, author);
-        if (!authorIsAdmin) return false; // Only protect against admin demotions
+        if (!authorIsAdmin) return false;
 
         // Get group participants info
         const groupMetadata = await sock.groupMetadata(chatId);
+        let repromoted = false;
         
         // Only re-promote if they were admins before
         for (const participant of participants) {
             const wasAdmin = groupMetadata.participants.find(p => p.id === participant)?.admin;
             if (wasAdmin) {
                 await sock.groupParticipantsUpdate(chatId, [participant], 'promote');
+                await addKickRecord(chatId, participant, author, 'demote');
+                await incrementProtectedCount(chatId);
+                
                 console.log(`[ANTIDEMOTE] Re-promoted ${participant} in ${chatId}`);
                 
                 // Send notification
                 await sock.sendMessage(chatId, {
-                    text: `🛡️ *Antidemote Active*\n\n@${participant.split('@')[0]} was re-promoted to admin.\nAdmins are protected in this group!`,
-                    mentions: [participant]
+                    text: `🛡️ *ANTIDEMOTE ACTIVE*\n\n✅ @${participant.split('@')[0]} was re-promoted to admin.\n⚠️ ${author.split('@')[0]} tried to demote an admin!\n\n📌 Admins are protected in this group!`,
+                    mentions: [participant, author]
                 });
+                
+                repromoted = true;
             }
         }
 
-        return true;
+        return repromoted;
     } catch (error) {
         console.error('Error in handleAntidemote:', error);
         return false;
