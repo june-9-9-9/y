@@ -1,28 +1,24 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { createFakeContact } = require('../lib/fakecontact');
 
 async function clearSessionCommand(sock, chatId, msg) {
     try {
         // Check if sender is owner
         if (!msg.key.fromMe) {
             await sock.sendMessage(chatId, { 
-                text: '❌ This command can only be used by the owner!',
-                ...channelInfo
-            });
+                text: '❌ This command can only be used by the owner!'
+            }, { quoted: msg });
             return;
         }
 
         // Define session directory
         const sessionDir = path.join(__dirname, '../session');
-        const fake = createFakeContact();
 
         if (!fs.existsSync(sessionDir)) {
             await sock.sendMessage(chatId, { 
-                text: '❌ Session directory not found!',
-                ...channelInfo
-            });
+                text: '❌ Session directory not found!'
+            }, { quoted: msg });
             return;
         }
 
@@ -33,7 +29,7 @@ async function clearSessionCommand(sock, chatId, msg) {
         // Send initial status
         await sock.sendMessage(chatId, { 
             text: `🗝️ Optimizing session files for better performance...`
-        }, { quoted: fake});
+        }, { quoted: msg });
 
         const files = fs.readdirSync(sessionDir);
         
@@ -71,15 +67,15 @@ async function clearSessionCommand(sock, chatId, msg) {
                        (errors > 0 ? `\n⚠️ Errors encountered: ${errors}\n${errorDetails.join('\n')}` : '');
 
         await sock.sendMessage(chatId, { 
-            text: `${message}`
-        },{ quoted: fake });
+            text: message
+        }, { quoted: msg });
 
     } catch (error) {
         console.error('Error in clearsession command:', error);
         await sock.sendMessage(chatId, { 
             text: '❌ Failed to clear session files!'
-        }, { quoted: message });
+        }, { quoted: msg });
     }
 }
 
-module.exports = clearSessionCommand; 
+module.exports = clearSessionCommand;
