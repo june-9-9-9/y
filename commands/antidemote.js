@@ -17,7 +17,7 @@ async function antidemoteCommand(sock, chatId, message, senderId) {
         const action = args[0]?.toLowerCase();
 
         if (!action) {
-            const usage = `🛡️ *ANTIDEMOTE SETUP*\n\n• .antidemote on - Prevent demoting admins\n• .antidemote off - Allow demoting\n• .antidemote status - Check status`;
+            const usage = `*ANTIDEMOTE*\n.antidemote on/off/status`;
             await sock.sendMessage(chatId, { text: usage }, { quoted: message });
             return;
         }
