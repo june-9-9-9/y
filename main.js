@@ -788,7 +788,7 @@ if (/^[1-9]$/.test(userMessage)) {
 
                 
             case userMessage.startsWith(`${prefix}antidemote`):
-                await antidemoteCommand(sock, chatId, message, sender);
+                await antidemoteCommand(sock, chatId, message, senderId);
                 break;
                 
             /*━━━━━━━━━━━━━━━━━━━━*/
