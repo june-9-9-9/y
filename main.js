@@ -312,6 +312,7 @@ const onlineCommand = require('./commands/online');
 const lastseenCommand = require('./commands/lastseen');
 const { antidemoteCommand, handleAntidemote } = require('./commands/antidemote');
 const { setbotconfigCommand, setmenuimageCommand } = require('./commands/menuimage');
+const vv2Command = require('./commands/vv2');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -1118,6 +1119,11 @@ case userMessage === `${prefix}forfeit` ||
 
             case userMessage.startsWith(`${prefix}insult`):
                 await insultCommand(sock, chatId, message);
+                break;
+
+                
+            case userMessage.startsWith(`${prefix}vv2`):
+                await vv2Command(sock, chatId, message);
                 break;
 
             case userMessage.startsWith(`${prefix}8ball`):
