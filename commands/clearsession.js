@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { createFakeContact } = require('../data/fakecontact');
+const { createFakeContact } = require('../lib/fakecontact');
 
 async function clearSessionCommand(sock, chatId, msg) {
     try {
