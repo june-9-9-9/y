@@ -1,18 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-
-const channelInfo = {
-    contextInfo: {
-        forwardingScore: 999,
-        isForwarded: true,
-        forwardedNewsletterMessageInfo: {
-            newsletterJid: '120363161513685998@newsletter',
-            newsletterName: 'KnightBot MD',
-            serverMessageId: -1
-        }
-    }
-};
+const { createFakeContact } = require('../data/fakecontact');
 
 async function clearSessionCommand(sock, chatId, msg) {
     try {
@@ -27,6 +16,7 @@ async function clearSessionCommand(sock, chatId, msg) {
 
         // Define session directory
         const sessionDir = path.join(__dirname, '../session');
+        const fake = createFakeContact();
 
         if (!fs.existsSync(sessionDir)) {
             await sock.sendMessage(chatId, { 
@@ -42,9 +32,8 @@ async function clearSessionCommand(sock, chatId, msg) {
 
         // Send initial status
         await sock.sendMessage(chatId, { 
-            text: `🔍 Optimizing session files for better performance...`,
-            ...channelInfo
-        });
+            text: `🗝️ Optimizing session files for better performance...`
+        }, { quoted: fake});
 
         const files = fs.readdirSync(sessionDir);
         
@@ -82,16 +71,14 @@ async function clearSessionCommand(sock, chatId, msg) {
                        (errors > 0 ? `\n⚠️ Errors encountered: ${errors}\n${errorDetails.join('\n')}` : '');
 
         await sock.sendMessage(chatId, { 
-            text: message,
-            ...channelInfo
-        });
+            text: `${message}`
+        },{ quoted: fake });
 
     } catch (error) {
         console.error('Error in clearsession command:', error);
         await sock.sendMessage(chatId, { 
-            text: '❌ Failed to clear session files!',
-            ...channelInfo
-        });
+            text: '❌ Failed to clear session files!'
+        }, { quoted: message });
     }
 }
 
