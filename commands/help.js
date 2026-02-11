@@ -7,8 +7,8 @@ const os = require('os');
 const { getMenuStyle, getMenuSettings, MENU_STYLES } = require('./menuSettings');
 const { generateWAMessageFromContent } = require('@whiskeysockets/baileys');
 const { getPrefix, handleSetPrefixCommand } = require('./setprefix');
-
 const { getOwnerName, handleSetOwnerCommand } = require('./setowner');
+const { getBotName, getMenuImage, setMenuImage, getConfig, updateConfig } = require('../lib/botConfig');
 
 const more = String.fromCharCode(8206);
 const readmore = more.repeat(4001);
@@ -167,28 +167,32 @@ const generateMenu = (pushname, currentMode, hostName, ping, uptimeFormatted, pr
 // Helper function to safely load thumbnail
 async function loadThumbnail(thumbnailPath) {
     try {
+        if (thumbnailPath && (thumbnailPath.startsWith('http://') || thumbnailPath.startsWith('https://'))) {
+            const fetch = require('node-fetch');
+            const response = await fetch(thumbnailPath);
+            if (response.ok) {
+                return Buffer.from(await response.arrayBuffer());
+            }
+            return Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+        }
         if (fs.existsSync(thumbnailPath)) {
             return fs.readFileSync(thumbnailPath);
         } else {
-            console.log(`Thumbnail not found: ${thumbnailPath}, using fallback`);
-            // Create a simple 1x1 pixel buffer as fallback
             return Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
         }
     } catch (error) {
-        console.error('Error loading thumbnail:', error);
-        // Return fallback buffer
+        console.error('Error loading thumbnail:', error.message);
         return Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
     }
 }
 
-// Create fake contact for enhanced replies
 function createFakeContact(message) {
     return {
         key: {
             participants: "0@s.whatsapp.net",
             remoteJid: "status@broadcast",
             fromMe: false,
-            id: "JUNE-X-MENU"
+            id: "JUNE-X"
         },
         message: {
             contactMessage: {
@@ -199,14 +203,13 @@ function createFakeContact(message) {
     };
 }
 
-// YOUR EXACT MENU STYLE FUNCTION WITH FIXED tylorkids AND fkontak FOR ALL STYLES
 async function sendMenuWithStyle(sock, chatId, message, menulist, menustyle, thumbnailBuffer, pushname) {
     const fkontak = createFakeContact(message);
-    const botname = "JUNE-X BOT";
-    const ownername = pushname;
-    const tylorkids = thumbnailBuffer; // Fixed: using thumbnails from assets
-    const plink = "https://github.com/vinpink2";
-    
+    const botName = 'JUNE-X';
+    const ownerName = pushname;
+    const thumbnail = thumbnailBuffer;
+    const sourceUrl = "https://github.com/vinoink2";
+
     if (menustyle === '1') {
         await sock.sendMessage(chatId, {
             document: {
@@ -214,15 +217,15 @@ async function sendMenuWithStyle(sock, chatId, message, menulist, menustyle, thu
             },
             caption: menulist,
             mimetype: "application/zip",
-            fileName: `${botname}`,
+            fileName: `${botName}`,
             fileLength: "9999999",
             contextInfo: {
                 externalAdReply: {
                     showAdAttribution: false,
                     title: "",
                     body: "",
-                    thumbnail: tylorkids,
-                    sourceUrl: plink,
+                    thumbnail: thumbnail,
+                    sourceUrl: sourceUrl,
                     mediaType: 1,
                     renderLargerThumbnail: true,
                 },
@@ -238,10 +241,10 @@ async function sendMenuWithStyle(sock, chatId, message, menulist, menustyle, thu
             contextInfo: {
                 externalAdReply: {
                     showAdAttribution: false,
-                    title: botname,
-                    body: ownername,
-                    thumbnail: tylorkids,
-                    sourceUrl: plink,
+                    title: botName,
+                    body: ownerName,
+                    thumbnail: thumbnail,
+                    sourceUrl: sourceUrl,
                     mediaType: 1,
                     renderLargerThumbnail: true,
                 },
@@ -249,7 +252,7 @@ async function sendMenuWithStyle(sock, chatId, message, menulist, menustyle, thu
         }, { quoted: fkontak });
     } else if (menustyle === '4') {
         await sock.sendMessage(chatId, {
-            image: tylorkids,
+            image: thumbnail,
             caption: menulist,
         }, { quoted: fkontak });
     } else if (menustyle === '5') {
@@ -293,76 +296,75 @@ async function sendMenuWithStyle(sock, chatId, message, menulist, menustyle, thu
             },
         }, {});
     } else {
-        // Default fallback
         await sock.sendMessage(chatId, { 
             text: menulist 
         }, { quoted: fkontak });
     }
 }
 
-// Main help command function
 async function helpCommand(sock, chatId, message) {
-    const pushname = message.pushName || "Unknown User"; 
+    const pushname = message.pushName || "User"; 
     const menuStyle = getMenuStyle();
 
-    console.log('Current menu style:', menuStyle);
+    console.log('Menu style:', menuStyle);
 
     let data = JSON.parse(fs.readFileSync('./data/messageCount.json'));
-    
-    // Create fake contact for enhanced reply
+
     const fkontak = createFakeContact(message);
-    
+
     const start = Date.now();
     await sock.sendMessage(chatId, { 
-        text: '_Wait loading menu..._' 
+        text: '_Wait Loading Menu..._' 
     }, { quoted: fkontak });
     const end = Date.now();
     const ping = Math.round((end - start) / 2);
 
     const uptimeInSeconds = process.uptime();
-    const uptimeFormatted = formatTime(uptimeInSeconds);
-    const currentMode = data.isPublic ? 'public' : 'private';
+    const uptimeFormatted = formatUptime(uptimeInSeconds);
+    const currentMode = data.mode || data.isPublic ? 'public' : 'private';
     const hostName = detectPlatform();
-    
+
     const menulist = generateMenu(pushname, currentMode, hostName, ping, uptimeFormatted);
 
-    // Random thumbnail selection from local files
-    const thumbnailFiles = [
-        'menu1.jpg',
-        'menu2.jpg', 
-        'menu3.jpg',
-        'menu4.jpg',
-        'menu5.jpg'
-    ];
-    const randomThumbFile = thumbnailFiles[Math.floor(Math.random() * thumbnailFiles.length)];
-    const thumbnailPath = path.join(__dirname, '../assets', randomThumbFile);
+    const customMenuImage = getMenuImage();
+    let thumbnailPath;
+    if (customMenuImage && !customMenuImage.startsWith('http')) {
+        thumbnailPath = customMenuImage;
+    } else if (customMenuImage && customMenuImage.startsWith('http')) {
+        thumbnailPath = customMenuImage;
+    } else {
+        const thumbnailFiles = [
+            'menu1.jpg',
+            'menu2.jpg', 
+            'menu3.jpg',
+            'menu4.jpg',
+            'menu5.jpg'
+        ];
+        const randomThumbFile = thumbnailFiles[Math.floor(Math.random() * thumbnailFiles.length)];
+        thumbnailPath = path.join(__dirname, '../assets', randomThumbFile);
+    }
 
-    // Send reaction
     await sock.sendMessage(chatId, {
-        react: { text: '🔐', key: message.key }
+        react: { text: '🗝️', key: message.key }
     });
 
     try {
-        // Load thumbnail using helper function
         const thumbnailBuffer = await loadThumbnail(thumbnailPath);
 
-        // Send menu using YOUR EXACT menu style function
         await sendMenuWithStyle(sock, chatId, message, menulist, menuStyle, thumbnailBuffer, pushname);
 
-        // Success reaction
         await sock.sendMessage(chatId, {
-            react: { text: '🏷️', key: message.key }
+            react: { text: '✅', key: message.key }
         });
 
     } catch (error) {
-        console.error('Error in help command:', error);
-        // Fallback to simple text
+        console.error('Menu error:', error);
         try {
             await sock.sendMessage(chatId, { 
                 text: menulist 
             }, { quoted: fkontak });
         } catch (fallbackError) {
-            console.error('Even fallback failed:', fallbackError);
+            console.error('Fallback error:', fallbackError);
         }
     }
 }
