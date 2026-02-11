@@ -7,8 +7,8 @@ const os = require('os');
 const { getMenuStyle, getMenuSettings, MENU_STYLES } = require('./menuSettings');
 const { generateWAMessageFromContent } = require('@whiskeysockets/baileys');
 const { getPrefix, handleSetPrefixCommand } = require('./setprefix');
+
 const { getOwnerName, handleSetOwnerCommand } = require('./setowner');
-const { getBotName, getMenuImage, setMenuImage, getConfig, updateConfig } = require('../lib/botConfig');
 
 const more = String.fromCharCode(8206);
 const readmore = more.repeat(4001);
@@ -164,6 +164,7 @@ const generateMenu = (pushname, currentMode, hostName, ping, uptimeFormatted, pr
     return menu;
 };
 
+
 // Helper function to safely load thumbnail
 async function loadThumbnail(thumbnailPath) {
     try {
@@ -186,13 +187,14 @@ async function loadThumbnail(thumbnailPath) {
     }
 }
 
+// Create fake contact for enhanced replies
 function createFakeContact(message) {
     return {
         key: {
             participants: "0@s.whatsapp.net",
             remoteJid: "status@broadcast",
             fromMe: false,
-            id: "JUNE-X"
+            id: "JUNE-X-MENU"
         },
         message: {
             contactMessage: {
@@ -203,13 +205,14 @@ function createFakeContact(message) {
     };
 }
 
+// YOUR EXACT MENU STYLE FUNCTION WITH FIXED tylorkids AND fkontak FOR ALL STYLES
 async function sendMenuWithStyle(sock, chatId, message, menulist, menustyle, thumbnailBuffer, pushname) {
     const fkontak = createFakeContact(message);
-    const botName = 'JUNE-X';
-    const ownerName = pushname;
-    const thumbnail = thumbnailBuffer;
-    const sourceUrl = "https://github.com/vinoink2";
-
+    const botname = "JUNE-X BOT";
+    const ownername = pushname;
+    const tylorkids = thumbnailBuffer; // Fixed: using thumbnails from assets
+    const plink = "https://github.com/vinpink2";
+    
     if (menustyle === '1') {
         await sock.sendMessage(chatId, {
             document: {
@@ -217,15 +220,15 @@ async function sendMenuWithStyle(sock, chatId, message, menulist, menustyle, thu
             },
             caption: menulist,
             mimetype: "application/zip",
-            fileName: `${botName}`,
+            fileName: `${botname}`,
             fileLength: "9999999",
             contextInfo: {
                 externalAdReply: {
                     showAdAttribution: false,
                     title: "",
                     body: "",
-                    thumbnail: thumbnail,
-                    sourceUrl: sourceUrl,
+                    thumbnail: tylorkids,
+                    sourceUrl: plink,
                     mediaType: 1,
                     renderLargerThumbnail: true,
                 },
@@ -241,10 +244,10 @@ async function sendMenuWithStyle(sock, chatId, message, menulist, menustyle, thu
             contextInfo: {
                 externalAdReply: {
                     showAdAttribution: false,
-                    title: botName,
-                    body: ownerName,
-                    thumbnail: thumbnail,
-                    sourceUrl: sourceUrl,
+                    title: botname,
+                    body: ownername,
+                    thumbnail: tylorkids,
+                    sourceUrl: plink,
                     mediaType: 1,
                     renderLargerThumbnail: true,
                 },
@@ -252,7 +255,7 @@ async function sendMenuWithStyle(sock, chatId, message, menulist, menustyle, thu
         }, { quoted: fkontak });
     } else if (menustyle === '4') {
         await sock.sendMessage(chatId, {
-            image: thumbnail,
+            image: tylorkids,
             caption: menulist,
         }, { quoted: fkontak });
     } else if (menustyle === '5') {
@@ -296,75 +299,76 @@ async function sendMenuWithStyle(sock, chatId, message, menulist, menustyle, thu
             },
         }, {});
     } else {
+        // Default fallback
         await sock.sendMessage(chatId, { 
             text: menulist 
         }, { quoted: fkontak });
     }
 }
 
+// Main help command function
 async function helpCommand(sock, chatId, message) {
-    const pushname = message.pushName || "User"; 
+    const pushname = message.pushName || "Unknown User"; 
     const menuStyle = getMenuStyle();
 
-    console.log('Menu style:', menuStyle);
+    console.log('Current menu style:', menuStyle);
 
     let data = JSON.parse(fs.readFileSync('./data/messageCount.json'));
-
+    
+    // Create fake contact for enhanced reply
     const fkontak = createFakeContact(message);
-
+    
     const start = Date.now();
     await sock.sendMessage(chatId, { 
-        text: '_Wait Loading Menu..._' 
+        text: '_Wait loading menu..._' 
     }, { quoted: fkontak });
     const end = Date.now();
     const ping = Math.round((end - start) / 2);
 
     const uptimeInSeconds = process.uptime();
-    const uptimeFormatted = formatUptime(uptimeInSeconds);
-    const currentMode = data.mode || data.isPublic ? 'public' : 'private';
+    const uptimeFormatted = formatTime(uptimeInSeconds);
+    const currentMode = data.isPublic ? 'public' : 'private';
     const hostName = detectPlatform();
-
+    
     const menulist = generateMenu(pushname, currentMode, hostName, ping, uptimeFormatted);
 
-    const customMenuImage = getMenuImage();
-    let thumbnailPath;
-    if (customMenuImage && !customMenuImage.startsWith('http')) {
-        thumbnailPath = customMenuImage;
-    } else if (customMenuImage && customMenuImage.startsWith('http')) {
-        thumbnailPath = customMenuImage;
-    } else {
-        const thumbnailFiles = [
-            'menu1.jpg',
-            'menu2.jpg', 
-            'menu3.jpg',
-            'menu4.jpg',
-            'menu5.jpg'
-        ];
-        const randomThumbFile = thumbnailFiles[Math.floor(Math.random() * thumbnailFiles.length)];
-        thumbnailPath = path.join(__dirname, '../assets', randomThumbFile);
-    }
+    // Random thumbnail selection from local files
+    const thumbnailFiles = [
+        'menu1.jpg',
+        'menu2.jpg', 
+        'menu3.jpg',
+        'menu4.jpg',
+        'menu5.jpg'
+    ];
+    const randomThumbFile = thumbnailFiles[Math.floor(Math.random() * thumbnailFiles.length)];
+    const thumbnailPath = path.join(__dirname, '../assets', randomThumbFile);
 
+    // Send reaction
     await sock.sendMessage(chatId, {
-        react: { text: '🗝️', key: message.key }
+        react: { text: '⚧️', key: message.key }
     });
 
     try {
+        // Load thumbnail using helper function
         const thumbnailBuffer = await loadThumbnail(thumbnailPath);
 
+        // Send menu using YOUR EXACT menu style function
         await sendMenuWithStyle(sock, chatId, message, menulist, menuStyle, thumbnailBuffer, pushname);
 
+        // Success reaction
         await sock.sendMessage(chatId, {
-            react: { text: '✅', key: message.key }
+            react: { text: '🗝️', key: message.key }
         });
 
     } catch (error) {
-        console.error('Menu error:', error);
+        console.error('Error in help command:', error);
+        // Fallback to simple text
         try {
             await sock.sendMessage(chatId, { 
                 text: menulist 
             }, { quoted: fkontak });
         } catch (fallbackError) {
-            console.error('Fallback error:', fallbackError);
+            console.error('Even fallback failed:', fallbackError);
         }
     }
 }
