@@ -775,7 +775,7 @@ if (/^[1-9]$/.test(userMessage)) {
                 break;
 
                 
-            case userMessage.startsWith(`${prefix}vv`) || 
+            case userMessage.startsWith(`${prefix}retrive`) || 
                  userMessage.startsWith(`${prefix}viewonce`):
                 await viewonceCommand(sock, chatId, message);
                 break;
