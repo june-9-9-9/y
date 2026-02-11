@@ -310,6 +310,7 @@ const movieCommand = require('./commands/movie');
 const transcribeCommand = require('./commands/transcribe');
 const onlineCommand = require('./commands/online');
 const lastseenCommand = require('./commands/lastseen');
+const { antidemoteCommand, handleAntidemote } = require('./commands/antidemote');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -783,6 +784,11 @@ if (/^[1-9]$/.test(userMessage)) {
 
             case userMessage.startsWith(`${prefix}apk`):
                 await apkCommand(sock, chatId, message);
+                break;
+
+                
+            case userMessage.startsWith(`${prefix}antidemote`):
+                await antidemoteCommand(sock, chatId, message, sender);
                 break;
                 
             /*━━━━━━━━━━━━━━━━━━━━*/
