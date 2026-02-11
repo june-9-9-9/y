@@ -1,13 +1,11 @@
-
 // help.js - Enhanced version with integrated functions
 const settings = require('../settings');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { getMenuStyle, getMenuSettings, MENU_STYLES } = require('./menuSettings');
+const { getMenuStyle, getMenuSettings, getMenuImage, MENU_STYLES } = require('./menuSettings');
 const { generateWAMessageFromContent } = require('@whiskeysockets/baileys');
 const { getPrefix, handleSetPrefixCommand } = require('./setprefix');
-
 const { getOwnerName, handleSetOwnerCommand } = require('./setowner');
 
 const more = String.fromCharCode(8206);
@@ -31,7 +29,7 @@ function formatTime(seconds) {
     return time.trim();
 }
 
-    // Detect host/platform
+// Detect host/platform
 const detectPlatform = () => {
   if (process.env.DYNO) return "☁️ Heroku";
   if (process.env.RENDER) return "⚡ Render";
@@ -47,8 +45,6 @@ const detectPlatform = () => {
     default: return "❓ Unknown";
   }
 };
-
-    const hostName = detectPlatform();
 
 // Memory formatting function
 const formatMemory = (memory) => {
@@ -78,15 +74,14 @@ const generateMenu = (pushname, currentMode, hostName, ping, uptimeFormatted, pr
     menu += `┃✦ Prefix: [${prefix2}]\n`;
     menu += `┃✦ Owner: ${newOwner}\n`;
     menu += `┃✦ Mode: ${currentMode}\n`;
-    menu += `┃✦ platform: ${hostName}\n`;
+    menu += `┃✦ Platform: ${hostName}\n`;
     menu += `┃✦ Speed: ${ping} ms\n`;
-    
     
     if (menuSettings.showUptime) {
         menu += `┃✦ Uptime: ${uptimeFormatted}\n`;
     }
     
-    menu += `┃✦ version: v${settings.version}\n`;
+    menu += `┃✦ Version: v${settings.version}\n`;
     
     if (menuSettings.showMemory) {
         menu += `┃✦ Usage: ${formatMemory(botUsedMemory)} of ${formatMemory(totalMemory)}\n`;
@@ -102,12 +97,12 @@ const generateMenu = (pushname, currentMode, hostName, ping, uptimeFormatted, pr
 
     // Group Menu
     menu += `┏❐ \`GROUP MENU\` ❐\n`;
-    menu += `┃ ${prefix2}promote\n┃ ${prefix2}demote\n┃ ${prefix2}settings\n┃ ${prefix2}togroupstatus\n┃ ${prefix2}tosgroup\n┃ ${prefix2}welcome\n┃ ${prefix2}setgpp\n┃ ${prefix2}getgpp\n┃ ${prefix2}listadmin\n┃ ${prefix2}goodbye\n┃ ${prefix2}tagnoadmin\n┃ ${prefix2}tag\n┃ ${prefix2}antilink\n┃ ${prefix2}set welcome\n┃ ${prefix2}listadmin\n┃ ${prefix2}groupinfo\n┃ ${prefix2}admins\n┃ ${prefix2}warn\n┃ ${prefix2}revoke\n┃ ${prefix2}resetlink\n┃ ${prefix2}open\n┃ ${prefix2}close\n┃ ${prefix2}mention\n┃ ${prefix2}setgdesc\n┃ ${prefix2}leave\n┃ ${prefix2}left\n┃ ${prefix2}killall\n┃ ${prefix2}removeall\n┃ ${prefix2}pair\n┃ ${prefix2}link\n┃ ${prefix2}add\n`;
+    menu += `┃ ${prefix2}promote\n┃ ${prefix2}demote\n┃ ${prefix2}settings\n┃ ${prefix2}togroupstatus\n┃ ${prefix2}tosgroup\n┃ ${prefix2}welcome\n┃ ${prefix2}setgpp\n┃ ${prefix2}getgpp\n┃ ${prefix2}listadmin\n┃ ${prefix2}goodbye\n┃ ${prefix2}tagnoadmin\n┃ ${prefix2}tag\n┃ ${prefix2}antilink\n┃ ${prefix2}set welcome\n┃ ${prefix2}groupinfo\n┃ ${prefix2}admins\n┃ ${prefix2}warn\n┃ ${prefix2}revoke\n┃ ${prefix2}resetlink\n┃ ${prefix2}open\n┃ ${prefix2}close\n┃ ${prefix2}mention\n┃ ${prefix2}setgdesc\n┃ ${prefix2}leave\n┃ ${prefix2}left\n┃ ${prefix2}killall\n┃ ${prefix2}removeall\n┃ ${prefix2}pair\n┃ ${prefix2}link\n┃ ${prefix2}add\n`;
     menu += `┗❐\n\n`;
 
     // AI Menu
     menu += `┏❐ \`AI MENU\` ❐\n`;
-    menu += `┃ ${prefix2}illama\n┃ ${prefix2}gpt\n┃ ${prefix2}gemini\n┃ ${prefix2}imagine\n┃ ${prefix2}flux\n┃ ${prefix2}copilot\n┃ ${prefix2}deepseek\n┃ ${prefix2}speechwrite\n┃ ${prefix2}speech\n┃ ${prefix2}meta\n┃ ${prefix2}metai\n┃ ${prefix2}vision\n┃ ${prefix2}analyse\n┃ ${prefix2}ilama\n┃ ${prefix2}flux\n┃ ${prefix2}wormgpt\n┃ ${prefix2}birdai\n┃ ${prefix2}perplexity\n┃ ${prefix2}plexity\n┃ ${prefix2}mistral\n┃ ${prefix2}mist\n┃ ${prefix2}grok\n`;
+    menu += `┃ ${prefix2}illama\n┃ ${prefix2}gpt\n┃ ${prefix2}gemini\n┃ ${prefix2}imagine\n┃ ${prefix2}flux\n┃ ${prefix2}copilot\n┃ ${prefix2}deepseek\n┃ ${prefix2}speechwrite\n┃ ${prefix2}speech\n┃ ${prefix2}meta\n┃ ${prefix2}metai\n┃ ${prefix2}vision\n┃ ${prefix2}analyse\n┃ ${prefix2}ilama\n┃ ${prefix2}wormgpt\n┃ ${prefix2}birdai\n┃ ${prefix2}perplexity\n┃ ${prefix2}plexity\n┃ ${prefix2}mistral\n┃ ${prefix2}mist\n┃ ${prefix2}grok\n`;
     menu += `┗❐\n\n`;
 
     // Setting Menu
@@ -117,7 +112,7 @@ const generateMenu = (pushname, currentMode, hostName, ping, uptimeFormatted, pr
 
     // Main Menu
     menu += `┏❐ \`MAIN MENU\` ❐\n`;
-    menu += `┃ ${prefix2}yts\n┃ ${prefix2}url\n┃ ${prefix2}tourl\n┃ ${prefix2}block\n┃ ${prefix2}listblock\n┃ ${prefix2}blocklist\n┃ ${prefix2}tagall\n┃ ${prefix2}yts\n┃ ${prefix2}play\n┃ ${prefix2}spotify\n┃ ${prefix2}trt\n┃ ${prefix2}runtime\n┃ ${prefix2}ping\n┃ ${prefix2}apk\n┃ ${prefix2}vv\n┃ ${prefix2}video\n┃ ${prefix2}song\n┃ ${prefix2}ssweb\n┃ ${prefix2}instagram\n┃ ${prefix2}facebook\n┃ ${prefix2}tiktok\n┃ ${prefix2}ytmp4\n┃ ${prefix2}shazam\n┃ ${prefix2}find\n┃ ${prefix2}send\n┃ ${prefix2}get\n┃ ${prefix2}send\n┃ ${prefix2}tomp3\n┃ ${prefix2}toaudio\n┃ ${prefix2}ytsearch\n┃ ${prefix2}ytplay\n┃ ${prefix2}ytv\n┃ ${prefix2}fetch\n┃ ${prefix2}inspect\n┃ ${prefix2}img\n┃ ${prefix2}image\n┃ ${prefix2}vcf\n┃ ${prefix2}pair\n┃ ${prefix2}ytdocplay\n┃ ${prefix2}ytdocvideo\n┃ ${prefix2}mediafire\n┃ ${prefix2}mf\n┃ ${prefix2}ytv\n┃ ${prefix2}transcribe\n┃ ${prefix2}movie\n┃ ${prefix2}locate\n┃ ${prefix2}location\n`;
+    menu += `┃ ${prefix2}yts\n┃ ${prefix2}url\n┃ ${prefix2}tourl\n┃ ${prefix2}block\n┃ ${prefix2}listblock\n┃ ${prefix2}blocklist\n┃ ${prefix2}tagall\n┃ ${prefix2}play\n┃ ${prefix2}spotify\n┃ ${prefix2}trt\n┃ ${prefix2}runtime\n┃ ${prefix2}ping\n┃ ${prefix2}apk\n┃ ${prefix2}vv\n┃ ${prefix2}video\n┃ ${prefix2}song\n┃ ${prefix2}ssweb\n┃ ${prefix2}instagram\n┃ ${prefix2}facebook\n┃ ${prefix2}tiktok\n┃ ${prefix2}ytmp4\n┃ ${prefix2}shazam\n┃ ${prefix2}find\n┃ ${prefix2}send\n┃ ${prefix2}get\n┃ ${prefix2}tomp3\n┃ ${prefix2}toaudio\n┃ ${prefix2}ytsearch\n┃ ${prefix2}ytplay\n┃ ${prefix2}ytv\n┃ ${prefix2}fetch\n┃ ${prefix2}inspect\n┃ ${prefix2}img\n┃ ${prefix2}image\n┃ ${prefix2}vcf\n┃ ${prefix2}pair\n┃ ${prefix2}ytdocplay\n┃ ${prefix2}ytdocvideo\n┃ ${prefix2}mediafire\n┃ ${prefix2}mf\n┃ ${prefix2}transcribe\n┃ ${prefix2}movie\n┃ ${prefix2}locate\n┃ ${prefix2}location\n`;
     menu += `┗❐\n\n`;
 
     // Stick Menu
@@ -127,7 +122,7 @@ const generateMenu = (pushname, currentMode, hostName, ping, uptimeFormatted, pr
 
     // Game Menu
     menu += `┏❐ \`GAME MENU\` ❐\n`;
-    menu += `┃ ${prefix2}tictactoe\n┃ ${prefix2}hangman\n┃ ${prefix2}guess\n┃ ${prefix2}trivia\n┃ ${prefix2}answer\n┃ ${prefix2}truth\n┃ ${prefix2}dare\n┃ ${prefix2}8ball\n┃ ${prefix2}cf\n┃ ${prefix2}connect4\n┃ ${prefix2}connectfour\n┃ ${prefix2}guess\n`;
+    menu += `┃ ${prefix2}tictactoe\n┃ ${prefix2}hangman\n┃ ${prefix2}guess\n┃ ${prefix2}trivia\n┃ ${prefix2}answer\n┃ ${prefix2}truth\n┃ ${prefix2}dare\n┃ ${prefix2}8ball\n┃ ${prefix2}cf\n┃ ${prefix2}connect4\n┃ ${prefix2}connectfour\n`;
     menu += `┗❐\n\n`;
 
     // GitHub Menu
@@ -155,34 +150,41 @@ const generateMenu = (pushname, currentMode, hostName, ping, uptimeFormatted, pr
     menu += `┃ ${prefix2}heart\n┃ ${prefix2}horny\n┃ ${prefix2}circle\n┃ ${prefix2}lgbt\n┃ ${prefix2}lolice\n┃ ${prefix2}stupid\n┃ ${prefix2}namecard\n┃ ${prefix2}tweet\n┃ ${prefix2}ytcomment\n┃ ${prefix2}comrade\n┃ ${prefix2}gay\n┃ ${prefix2}glass\n┃ ${prefix2}jail\n┃ ${prefix2}passed\n┃ ${prefix2}triggered\n`;
     menu += `┗❐\n\n`;
     
-        // Convertion menu
+    // Convertion menu
     menu += `┏❐ \`CONVERT CMD\` ❐\n`;
     menu += `┃ ${prefix2}totext\n┃ ${prefix2}toimage\n┃ ${prefix2}simage\n┃ ${prefix2}toaudio\n┃ ${prefix2}toppt\n┃ ${prefix2}tomp3\n┃ ${prefix2}tourl\n`;
     menu += `┗❐\n${readmore}\n`;
-    
 
     return menu;
 };
 
-
-// Helper function to safely load thumbnail
+// Helper function to safely load thumbnail (with URL support)
 async function loadThumbnail(thumbnailPath) {
     try {
+        // Handle URL thumbnails
         if (thumbnailPath && (thumbnailPath.startsWith('http://') || thumbnailPath.startsWith('https://'))) {
-            const fetch = require('node-fetch');
-            const response = await fetch(thumbnailPath);
-            if (response.ok) {
-                return Buffer.from(await response.arrayBuffer());
+            try {
+                const fetch = require('node-fetch');
+                const response = await fetch(thumbnailPath);
+                if (response.ok) {
+                    return Buffer.from(await response.arrayBuffer());
+                }
+            } catch (urlError) {
+                console.error('URL thumbnail fetch failed:', urlError.message);
             }
-            return Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+            // Fall through to local file check if URL fails
         }
-        if (fs.existsSync(thumbnailPath)) {
+        
+        // Handle local file thumbnails
+        if (thumbnailPath && fs.existsSync(thumbnailPath)) {
             return fs.readFileSync(thumbnailPath);
-        } else {
-            return Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
         }
+        
+        // Return fallback 1x1 transparent pixel
+        return Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
     } catch (error) {
         console.error('Error loading thumbnail:', error.message);
+        // Return fallback buffer
         return Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
     }
 }
@@ -205,12 +207,12 @@ function createFakeContact(message) {
     };
 }
 
-// YOUR EXACT MENU STYLE FUNCTION WITH FIXED tylorkids AND fkontak FOR ALL STYLES
+// JUNE-X BOT menu style function (restored original branding)
 async function sendMenuWithStyle(sock, chatId, message, menulist, menustyle, thumbnailBuffer, pushname) {
     const fkontak = createFakeContact(message);
     const botname = "JUNE-X BOT";
     const ownername = pushname;
-    const tylorkids = thumbnailBuffer; // Fixed: using thumbnails from assets
+    const tylorkids = thumbnailBuffer;
     const plink = "https://github.com/vinpink2";
     
     if (menustyle === '1') {
@@ -320,7 +322,7 @@ async function helpCommand(sock, chatId, message) {
     
     const start = Date.now();
     await sock.sendMessage(chatId, { 
-        text: '_Wait loading menu..._' 
+        text: '_Wait loading Menu..._' 
     }, { quoted: fkontak });
     const end = Date.now();
     const ping = Math.round((end - start) / 2);
@@ -332,32 +334,41 @@ async function helpCommand(sock, chatId, message) {
     
     const menulist = generateMenu(pushname, currentMode, hostName, ping, uptimeFormatted);
 
-    // Random thumbnail selection from local files
-    const thumbnailFiles = [
-        'menu1.jpg',
-        'menu2.jpg', 
-        'menu3.jpg',
-        'menu4.jpg',
-        'menu5.jpg'
-    ];
-    const randomThumbFile = thumbnailFiles[Math.floor(Math.random() * thumbnailFiles.length)];
-    const thumbnailPath = path.join(__dirname, '../assets', randomThumbFile);
+    // Get custom menu image from settings
+    const { getMenuImage } = require('../lib/botConfig');
+    const customMenuImage = getMenuImage();
+    let thumbnailPath;
+    
+    if (customMenuImage) {
+        thumbnailPath = customMenuImage; // Can be URL or local path
+    } else {
+        // Random thumbnail selection from local files
+        const thumbnailFiles = [
+            'menu1.jpg',
+            'menu2.jpg', 
+            'menu3.jpg',
+            'menu4.jpg',
+            'menu5.jpg'
+        ];
+        const randomThumbFile = thumbnailFiles[Math.floor(Math.random() * thumbnailFiles.length)];
+        thumbnailPath = path.join(__dirname, '../assets', randomThumbFile);
+    }
 
     // Send reaction
     await sock.sendMessage(chatId, {
-        react: { text: '⚧️', key: message.key }
+        react: { text: '🗝️', key: message.key }
     });
 
     try {
         // Load thumbnail using helper function
         const thumbnailBuffer = await loadThumbnail(thumbnailPath);
 
-        // Send menu using YOUR EXACT menu style function
+        // Send menu using JUNE-X BOT menu style function
         await sendMenuWithStyle(sock, chatId, message, menulist, menuStyle, thumbnailBuffer, pushname);
 
         // Success reaction
         await sock.sendMessage(chatId, {
-            react: { text: '🗝️', key: message.key }
+            react: { text: '⚧️', key: message.key }
         });
 
     } catch (error) {
