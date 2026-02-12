@@ -1,63 +1,79 @@
-const fs = require("fs");
 const axios = require('axios');
-const path = require('path');
 
 async function gitcloneCommand(sock, chatId, message) {
     try {
-        await sock.sendMessage(chatId, {
-            react: { text: '📥', key: message.key }
-        });
-
         const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
         const parts = text.split(' ');
         const query = parts.slice(1).join(' ').trim();
 
         if (!query) return await sock.sendMessage(chatId, {
-            text: '🔗 Provide a GitHub repository URL!\nExample: .gitclone https://github.com/vinpink2/repo...'
+            text: 'Provide a GitHub repository URL!\nExample: .gitclone https://github.com/username/repo'
         }, { quoted: message });
 
-        if (!query.includes('github.com')) return await sock.sendMessage(chatId, {
-            text: '❌ Not a valid GitHub link!'
+        const githubRegex = /(?:https?:\/\/)?(?:www\.)?github\.com[\/:]([^\/\n\r]+)\/([^\/\n\r#?]+)(?:[\/]?|[\/]tree[\/]([^\/\n\r]+)?)?/i;
+        const match = query.match(githubRegex);
+        
+        if (!match) return await sock.sendMessage(chatId, {
+            text: 'Invalid GitHub URL!\n\nSupported formats:\n• https://github.com/username/repo\n• https://github.com/username/repo/tree/branch\n• github.com/username/repo\n• git@github.com:username/repo.git'
         }, { quoted: message });
 
-        // Extract GitHub username and repository name
-        const regex = /(?:https|git)(?::\/\/|@)github\.com[\/:]([^\/:]+)\/(.+)/i;
-        let [, user, repo] = query.match(regex) || [];
-
+        let [, user, repo, branch] = match;
         if (!user || !repo) return await sock.sendMessage(chatId, {
-            text: '⚠️ Invalid repository format. Use: https://github.com/username/repo...'
+            text: 'Could not extract repository information. Please use format: https://github.com/username/repo'
         }, { quoted: message });
 
-        repo = repo.replace(/.git$/, '');
-        const zipUrl = `https://api.github.com/repos/${user}/${repo}/zipball`;
+        repo = repo.replace(/.git$/, '').replace(/[^a-zA-Z0-9\-_]/g, '');
+        branch = branch || 'main';
 
-        // Get filename from GitHub API response
+        try {
+            await axios.head(`https://api.github.com/repos/${user}/${repo}/branches/${branch}`);
+        } catch {
+            try {
+                await axios.head(`https://api.github.com/repos/${user}/${repo}/branches/master`);
+                branch = 'master';
+            } catch {
+                return await sock.sendMessage(chatId, {
+                    text: 'Repository or branch not found! Please check the URL.'
+                }, { quoted: message });
+            }
+        }
+
+        const zipUrl = `https://github.com/${user}/${repo}/archive/refs/heads/${branch}.zip`;
+        const apiUrl = `https://api.github.com/repos/${user}/${repo}`;
+        const repoInfo = await axios.get(apiUrl);
+
+        const timestamp = new Date().toISOString().slice(0,10).replace(/-/g, '');
+        const filename = `${repo}-${branch}-${timestamp}.zip`;
+
         const head = await axios.head(zipUrl);
-        const contentDisp = head.headers['content-disposition'];
-        const filenameMatch = contentDisp?.match(/attachment; filename=(.*)/);
-        const filename = filenameMatch ? filenameMatch[1] : `${repo}.zip`;
+        const fileSize = head.headers['content-length'];
+        let sizeText = '';
+        if (fileSize) {
+            const sizeMB = (fileSize / (1024 * 1024)).toFixed(2);
+            sizeText = ` (${sizeMB} MB)`;
+        }
 
-        // Send the ZIP file
         await sock.sendMessage(chatId, {
             document: { url: zipUrl },
-            fileName: `${repo}-main.zip`,
-            mimetype: 'application/zip',
-            caption: `> _© June x_`
+            fileName: filename,
+            mimetype: 'application/zip'
         }, { quoted: message });
 
     } catch (error) {
         console.error("Gitclone command error:", error);
+        let errorMessage = `Error: ${error.message}`;
         
-        let errorMessage = `🚫 Error: ${error.message}`;
         if (error.response?.status === 404) {
-            errorMessage = "❌ Repository not found! Check the URL.";
+            errorMessage = "Repository not found! Check the URL and make sure it's public.";
         } else if (error.response?.status === 403) {
-            errorMessage = "⏳ GitHub API rate limit exceeded. Try again later.";
+            errorMessage = "GitHub API rate limit exceeded. Try again later or add authentication.";
+        } else if (error.response?.status === 500) {
+            errorMessage = "GitHub server error. Try again later.";
+        } else if (error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
+            errorMessage = "Network error. Check your internet connection.";
         }
 
-        return await sock.sendMessage(chatId, {
-            text: errorMessage
-        }, { quoted: message });
+        return await sock.sendMessage(chatId, { text: errorMessage }, { quoted: message });
     }
 }
 
