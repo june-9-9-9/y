@@ -208,7 +208,7 @@ function cleanupJunkFiles(botSocket) {
 }
 
 // --- JUNE MD ORIGINAL CODE START ---
-global.botname = "JUNE MD"
+global.botname = "JUNE X"
 global.themeemoji = "•"
 const pairingCode = !!global.phoneNumber || process.argv.includes("--pairing-code")
 const useMobile = process.argv.includes("--mobile")
@@ -303,12 +303,12 @@ async function checkAndHandleSessionFormat() {
 async function getLoginMethod() {
     const lastMethod = await getLastLoginMethod();
     if (lastMethod && sessionExists()) {
-        log(`Last login method detected: ${lastMethod}. Using it automatically.`, 'yellow');
+        log(`Last login method detected: ${lastMethod}. Using it automatically.`, 'blue');
         return lastMethod;
     }
     
     if (!sessionExists() && fs.existsSync(loginFile)) {
-        log(`Session files missing. Removing old login preference for clean re-login.`, 'yellow');
+        log(`Session files missing. Removing old login preference for clean re-login.`, 'blue');
         fs.unlinkSync(loginFile);
     }
 
@@ -576,7 +576,7 @@ async function startXeonBotInc() {
                 clearSessionFiles();
                 
                 log('Session, login preference, and error count cleaned...','red');
-                log('Initiating full process restart in 5 seconds...', 'yellow');
+                log('Initiating full process restart in 5 seconds...', 'blue');
                 await delay(5000);
                 
                 // CRITICAL FIX: Use process.exit(1) to trigger a clean restart by the Daemon
@@ -597,8 +597,8 @@ async function startXeonBotInc() {
             }
         } else if (connection === 'open') {           
             console.log(chalk.yellow(`💅Connected to => ` + JSON.stringify(XeonBotInc.user, null, 2)))
-            log('JUNE X Connected', 'green');      
-            log(`Github: Vinpink2`, 'green');
+            log('JUNE X Connected', 'yellow');      
+            log(`Github: Vinpink2`, 'yellow');
             
             // Send the welcome message (which includes the 10s stability delay and error reset)
      await sendWelcomeMessage(XeonBotInc);
@@ -775,8 +775,8 @@ async function tylor() {
         return;
     }
     // If environment session is NOT set, or not valid, continue with fallback logic:
-    log("[ALERT] No new SESSION_ID found in .env", 'yellow');
-    log("Falling back to stored session....", 'yellow');
+    log("[ALERT] No new SESSION_ID found in .env", 'blue');
+    log("Falling back to stored session....", 'blue');
 
     // 5. Run the mandatory integrity check and cleanup
     await checkSessionIntegrityAndClean();
@@ -784,7 +784,7 @@ async function tylor() {
     // 6. Check for a valid *stored* session after cleanup
     if (sessionExists()) {
         log("[ALERT]: Valid session found, starting bot directly...", 'green'); 
-        log('[ALERT]: Waiting 3 seconds for stable connection...', 'yellow');
+        log('[ALERT]: Waiting 3 seconds for stable connection...', 'blue');
         await delay(3000);
         await startXeonBotInc();
         
