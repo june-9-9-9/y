@@ -22,10 +22,9 @@ async function setbotconfigCommand(sock, chatId, message) {
                 `Current Settings:\n` +
                 `Bot Name: ${config.botName}\n` +
                 `Menu Image: ${config.menuImage ? 'Set' : 'Not set'}\n` +
-                `Antidelete Private: ${config.antideletePrivate ? 'ON' : 'OFF'}\n\n` +
                 `Commands:\n` +
-                `.setmenuimage - Reply to image to set menu image\n` +
-                `.botconfig get - View current config`;
+                `.menuimage - Reply to image to set menu image\n` +
+                `.configimage get - View current config`;
             await sock.sendMessage(chatId, { text: usage }, { quoted: message });
             return;
         }
