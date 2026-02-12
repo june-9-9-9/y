@@ -58,7 +58,7 @@ async function videoCommand(sock, chatId, message) {
         let videoTitle = video.title;
         
         const apis = [
-            `https://apiskeith.vercel.app/download/video?url=${encodeURIComponent(video.url)}`,
+            `https://apiskeith.top/download/video?url=${encodeURIComponent(video.url)}`,
             `https://api.ryzendesu.vip/api/downloader/ytmp4?url=${encodeURIComponent(video.url)}`,
             `https://api.giftedtech.co.ke/api/download/ytv?apikey=gifted&url=${encodeURIComponent(video.url)}`
         ];
