@@ -26,11 +26,11 @@ async function xvdlCommand(sock, chatId, message) {
 
 
         const video = searchResult;
-        const apiUrl = `https://iamtkm.vercel.app/downloaders/xnxx?apikey=tkm&query=${encodeURIComponent(video.url)}`;
+        const apiUrl = `https://api.giftedtech.co.ke/api/download/xvideosdl?apikey=gifted&url=${encodeURIComponent(video.url)}`;
         const response = await axios.get(apiUrl);
         const apiData = response.data;
 
-        if (!apiData.status || !apiData.result || !apiData.result.url) {
+        if (!apiData.status || !apiData.result || !apiData.result.download_url) {
             throw new Error("API failed to fetch video!");
         }
 
