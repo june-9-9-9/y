@@ -17,79 +17,56 @@ async function tiktokCommand(sock, chatId, message) {
             });
         }
 
-        const url = text.split(' ').slice(1).join(' ').trim();
-        if (!url) {
+        // Filter and extract TikTok URL from text
+        const tiktokPattern = /(https?:\/\/(?:www\.|vm\.|vt\.|m\.)?tiktok\.com\/(?:@[\w.-]+\/video\/\d+|t\/\w+|\w+|\/video\/\d+|\w+\?.*))/i;
+        const urlMatch = text.match(tiktokPattern);
+        
+        if (!urlMatch) {
             return await sock.sendMessage(chatId, { 
-                text: "Please provide a TikTok link for the video."
+                text: "❌ No valid TikTok link found. Please provide a valid TikTok video link."
             });
         }
 
-        const tiktokPatterns = [
-            /https?:\/\/(?:www\.)?tiktok\.com\//,
-            /https?:\/\/(?:vm\.)?tiktok\.com\//,
-            /https?:\/\/(?:vt\.)?tiktok\.com\//,
-            /https?:\/\/(?:www\.)?tiktok\.com\/@/,
-            /https?:\/\/(?:www\.)?tiktok\.com\/t\//
-        ];
-
-        const isValidUrl = tiktokPatterns.some(pattern => pattern.test(url));
-        if (!isValidUrl) {
-            return await sock.sendMessage(chatId, { 
-                text: "That is not a valid TikTok link. Please provide a valid TikTok video link."
-            });
-        }
+        const url = urlMatch[0]; // Extract only the TikTok URL
 
         await sock.sendMessage(chatId, {
-            react: { text: '↘️', key: message.key }
+            react: { text: '⬇️', key: message.key }
         });
 
         try {
-            // ✅ New API for TikTok download (with watermark)
+            // API for TikTok download (no watermark version)
             const apiResponse = await axios.get(`https://iamtkm.vercel.app/downloaders/tiktokdl?apikey=tkm&url=${encodeURIComponent(url)}`);
             const data = apiResponse.data;
 
-            if (data && data.status && data.result && data.result.watermark) {
-                const videoUrl = data.result.no_watermark;
-                const caption = data.result.title || "";
-                const TtAudio = data.result.music;
+            if (data && data.status && data.result && data.result.nowm) {
+                const videoUrl = data.result.nowm; // No watermark video only
+                const caption = data.result.title || "🎬 TikTok Video";
                 
-                // Send video first
+                // Send video only (no audio)
                 await sock.sendMessage(chatId, {
                     video: { url: videoUrl },
                     mimetype: "video/mp4",
                     caption: caption
                 }, { quoted: message });
                 
-                // Then send audio after a short delay
-                if (TtAudio) {
-                    setTimeout(async () => {
-                        try {
-                            await sock.sendMessage(chatId, {
-                                audio: { url: TtAudio },
-                                mimetype: "audio/mpeg",
-                                ptt: false
-                            }, { quoted: message });
-                        } catch (audioError) {
-                            console.error('Error sending audio:', audioError);
-                        }
-                    }, 1000); // 1 second delay
-                }
+                // Remove audio sending completely
+                
             } else {
                 return await sock.sendMessage(chatId, {
-                    text: "Failed to fetch video. Please check the link or try again later."
+                    text: "❌ Failed to fetch video. Please check the link or try again later."
                 });
             }
 
         } catch (error) {
             console.error('Error in TikTok API:', error);
             await sock.sendMessage(chatId, {
-                text: "Failed to download the TikTok video. Please try again later."
+                text: "❌ Failed to download the TikTok video. Please try again later."
             });
         }
     } catch (error) {
         console.error('Error in TikTok command:', error);
         await sock.sendMessage(chatId, {
-            text: "An unexpected error occurred. Please try again."
+            text: "❌ An unexpected error occurred. Please try again."
         });
     }
 }
