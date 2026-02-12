@@ -31,7 +31,7 @@ async function playCommand(sock, chatId, message) {
         const apis = [
             `https://apiskeith.vercel.app/download/audio?url=${encodeURIComponent(video.url)}`,
             `https://api.ryzendesu.vip/api/downloader/ytmp3?url=${encodeURIComponent(video.url)}`,
-            `https://api.agatz.xyz/api/ytmp3?url=${encodeURIComponent(video.url)}`
+            `https://api.giftedtech.co.ke/api/download/ytmp3?apikey=gifted&url=${encodeURIComponent(video.url)}`
         ];
         
         for (const api of apis) {
@@ -50,9 +50,9 @@ async function playCommand(sock, chatId, message) {
                         videoTitle = response.data.title || video.title;
                         break;
                     }
-                } else if (api.includes('agatz')) {
-                    if (response.data?.status && response.data?.result?.url) {
-                        downloadUrl = response.data.result.url;
+                } else if (api.includes('gifted')) {
+                    if (response.data?.status && response.data?.result?.download_url) {
+                        downloadUrl = response.data.result.download_url;
                         videoTitle = response.data.result.title || video.title;
                         break;
                     }
