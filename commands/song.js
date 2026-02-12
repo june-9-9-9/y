@@ -29,14 +29,12 @@ async function songCommand(sock, chatId, message) {
             } else if (quoted.extendedTextMessage?.text) {
                 query = quoted.extendedTextMessage.text.trim();
             } else if (quoted.audioMessage) {
-                // If audio is quoted, just resend it
                 return await sock.sendMessage(chatId, {
                     audio: quoted.audioMessage,
                     mimetype: "audio/mpeg",
                     fileName: "quoted_audio.mp3"
                 }, { quoted: message });
             } else if (quoted.videoMessage) {
-                // If video is quoted, resend video or use caption as query
                 const caption = quoted.videoMessage.caption || "";
                 if (caption) query = caption.trim();
                 else {
@@ -70,23 +68,64 @@ async function songCommand(sock, chatId, message) {
         }
 
         const video = searchResult;
-        const apiUrl = `https://apiskeith.top/download/audio?url=${encodeURIComponent(video.url)}`;
-        const response = await axios.get(apiUrl);
-        const apiData = response.data;
-
-        if (!apiData.status || !apiData.result) throw new Error("API failed to fetch track!");
+        
+        // Try multiple APIs with fallbacks for large files
+        let downloadUrl;
+        let videoTitle;
+        
+        const apis = [
+            `https://apiskeith.top/download/audio?url=${encodeURIComponent(video.url)}`,
+            `https://api.ryzendesu.vip/api/downloader/ytmp3?url=${encodeURIComponent(video.url)}`,
+            `https://api.agatz.xyz/api/ytmp3?url=${encodeURIComponent(video.url)}`
+        ];
+        
+        for (const api of apis) {
+            try {
+                const response = await axios.get(api, { timeout: 30000 });
+                
+                if (api.includes('apiskeith')) {
+                    if (response.data?.status && response.data?.result) {
+                        downloadUrl = response.data.result;
+                        videoTitle = response.data.title || video.title;
+                        break;
+                    }
+                } else if (api.includes('ryzendesu')) {
+                    if (response.data?.status && response.data?.url) {
+                        downloadUrl = response.data.url;
+                        videoTitle = response.data.title || video.title;
+                        break;
+                    }
+                } else if (api.includes('gifted')) {
+                    if (response.data?.status && response.data?.result?.download_url) {
+                        downloadUrl = response.data.result.download_url;
+                        videoTitle = response.data.result.title || video.title;
+                        break;
+                    }
+                }
+            } catch (e) {
+                continue;
+            }
+        }
+        
+        if (!downloadUrl) throw new Error("API failed to fetch track!");
 
         const timestamp = Date.now();
         const fileName = `audio_${timestamp}.mp3`;
         const filePath = path.join(tempDir, fileName);
 
-        // Download MP3
+        // Download MP3 with support for files over 100MB
         const audioResponse = await axios({
             method: "get",
-            url: apiData.result,
+            url: downloadUrl,
             responseType: "stream",
-            timeout: 600000
+            timeout: 900000, // 15 minutes for large files
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
         });
+        
         const writer = fs.createWriteStream(filePath);
         audioResponse.data.pipe(writer);
         await new Promise((resolve, reject) => {
@@ -99,7 +138,7 @@ async function songCommand(sock, chatId, message) {
         }
 
         await sock.sendMessage(chatId, {
-            text: `_🎶 Playing:_\n_${apiData.title || video.title}_`
+            text: `_🎶 Playing:_\n_${videoTitle || video.title}_`
         });
 
         // Send audio
@@ -113,7 +152,7 @@ async function songCommand(sock, chatId, message) {
         await sock.sendMessage(chatId, {
             document: { url: filePath },
             mimetype: "audio/mpeg",
-            fileName: `${(apiData.title || video.title).substring(0, 100)}.mp3`
+            fileName: `${(videoTitle || video.title).substring(0, 100)}.mp3`
         }, { quoted: message });
 
         // Cleanup
