@@ -64,7 +64,7 @@ async function videoCommand(sock, chatId, message) {
         }
 
         const apiData = response.data;
-        if (!apiData || !apiData.result.tittle) {
+        if (!apiData || !apiData.result.title) {
             throw new Error("API failed to fetch video!");
         }
 
