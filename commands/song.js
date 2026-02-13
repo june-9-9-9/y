@@ -2,6 +2,7 @@ const fs = require("fs");
 const axios = require("axios");
 const yts = require("yt-search");
 const path = require("path");
+const os = require("os");
 
 async function songCommand(sock, chatId, message) {
     try {
@@ -9,8 +10,9 @@ async function songCommand(sock, chatId, message) {
             react: { text: "🎼", key: message.key }
         });
 
-        const tempDir = path.join(__dirname, "temp");
-        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+        // Use system temp directory instead of __dirname
+        const tempDir = path.join(os.tmpdir(), "song_temp");
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
         // Extract query from direct text or quoted message
         let text = message.message?.conversation || message.message?.extendedTextMessage?.text;
@@ -69,7 +71,7 @@ async function songCommand(sock, chatId, message) {
 
         const video = searchResult;
         
-        // Try multiple APIs with fallbacks for large files
+        // Try multiple APIs with fallbacks
         let downloadUrl;
         let videoTitle;
         
@@ -113,16 +115,16 @@ async function songCommand(sock, chatId, message) {
         const fileName = `audio_${timestamp}.mp3`;
         const filePath = path.join(tempDir, fileName);
 
-        // Download MP3 with support for files over 100MB
+        // Download MP3
         const audioResponse = await axios({
             method: "get",
             url: downloadUrl,
             responseType: "stream",
-            timeout: 900000, // 15 minutes for large files
+            timeout: 900000,
             maxContentLength: Infinity,
             maxBodyLength: Infinity,
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
             }
         });
         
