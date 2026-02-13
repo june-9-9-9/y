@@ -146,11 +146,13 @@ const {
     cleanupInactiveGroups
 } = require('./commands/welcoe');
    
-const {
- goodbyeCommand,
- handleLeaveEvent
+/**
+*const {
+*goodbyeCommand,
+* handleLeaveEvent
 } = require('./commands/goodbye');
-  
+  */
+
 const {
  handleAntideleteCommand,
  handleMessageRevocation,
