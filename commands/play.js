@@ -2,6 +2,7 @@ const fs = require("fs");
 const axios = require('axios');
 const yts = require('yt-search');
 const path = require('path');
+const os = require("os");
 
 async function playCommand(sock, chatId, message) {
     try { 
@@ -9,8 +10,18 @@ async function playCommand(sock, chatId, message) {
             react: { text: '🎼', key: message.key }
         });
         
+        // Use a safe temp directory
         const tempDir = path.join(__dirname, "temp");
-        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        } else {
+            const stat = fs.statSync(tempDir);
+            if (!stat.isDirectory()) {
+                // If "temp" exists but is a file, delete it and recreate as directory
+                fs.unlinkSync(tempDir);
+                fs.mkdirSync(tempDir, { recursive: true });
+            }
+        }
         
         const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
         const parts = text.split(' ');
