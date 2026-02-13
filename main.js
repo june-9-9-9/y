@@ -130,28 +130,15 @@ const {
   
 const {
     welcomeCommand,
-    handleJoinEvent,
-    isWelcomeOn,
-    getWelcome,
-    handleWelcome,
-    loadWelcomeData,
-    saveWelcomeData,
-    goodbyeCommand,
-    handleLeaveEvent,
-    isGoodbyeOn,
-    getGoodbye,
-    handleGoodbye,
-    loadGoodbyeData,
-    saveGoodbyeData,
-    cleanupInactiveGroups
-} = require('./commands/welcoe');
+    handleJoinEvent
+} = require('./commands/welcome');
    
-/**
-*const {
-*goodbyeCommand,
-* handleLeaveEvent
+
+const {
+goodbyeCommand,
+handleLeaveEvent
 } = require('./commands/goodbye');
-  */
+  
 
 const {
  handleAntideleteCommand,
