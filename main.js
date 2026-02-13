@@ -2080,7 +2080,7 @@ case userMessage === `${prefix}forfeit` ||
             });
         }
 
-        if (userMessage.startsWith('.')) {
+        if (userMessage.startsWith(' ')) {
             // After command is processed successfully
             await addCommandReaction(sock, message);
         }
