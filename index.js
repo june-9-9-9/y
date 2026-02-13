@@ -606,6 +606,15 @@ async function startXeonBotInc() {
     });
 
     XeonBotInc.ev.on('creds.update', saveCreds);
+
+    XeonBotInc.ev.on('group-participants.update', async (update) => {
+        try {
+            await handleGroupParticipantUpdate(XeonBotInc, update);
+        } catch (e) {
+            log(`Group participant update error: ${e.message}`, 'red', true);
+        }
+    });
+
     XeonBotInc.public = true;
     // This relies on smsg being loaded
     XeonBotInc.serializeM = (m) => smsg(XeonBotInc, m, store); 

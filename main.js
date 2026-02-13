@@ -52,6 +52,45 @@ const { isSudo } = require('./lib/index');
 const isAdmin = require('./lib/isAdmin');
 const { Antilink } = require('./lib/antilink');
 const { tictactoeCommand, handleTicTacToeMove } = require('./commands/tictactoe');
+const { normalizeJid, compareJids } = require('./lib/jid');
+
+const _cache = {
+    groupMeta: new Map(),
+    groupMetaTTL: 120000,
+    modeData: null,
+    modeDataTime: 0,
+    modeDataTTL: 5000
+};
+
+function getCachedGroupMeta(sock, chatId) {
+    const cached = _cache.groupMeta.get(chatId);
+    if (cached && Date.now() - cached.time < _cache.groupMetaTTL) {
+        return Promise.resolve(cached.data);
+    }
+    return sock.groupMetadata(chatId).then(data => {
+        _cache.groupMeta.set(chatId, { data, time: Date.now() });
+        if (_cache.groupMeta.size > 200) {
+            const oldest = _cache.groupMeta.keys().next().value;
+            _cache.groupMeta.delete(oldest);
+        }
+        return data;
+    }).catch(() => ({}));
+}
+
+function getCachedModeData() {
+    const now = Date.now();
+    if (_cache.modeData && now - _cache.modeDataTime < _cache.modeDataTTL) {
+        return _cache.modeData;
+    }
+    try {
+        _cache.modeData = JSON.parse(fs.readFileSync('./data/messageCount.json'));
+        _cache.modeDataTime = now;
+    } catch (e) {
+        _cache.modeData = { isPublic: true, mode: 'public' };
+        _cache.modeDataTime = now;
+    }
+    return _cache.modeData;
+}
 
 /*━━━━━━━━━━━━━━━━━━━━*/
 // -----Command imports - Handlers-----
@@ -358,12 +397,12 @@ async function handleMessages(sock, messageUpdate, printLog) {
         //handleantisyatusmention
         await handleAntiStatusMention(sock, message);
 
-        
-         // Handle incoming calls
-         sock.ev.on('call', async (callData) => {
-         await handleIncomingCall(sock, callData);
-         });
-        
+        if (!sock._callListenerBound) {
+            sock.ev.on('call', async (callData) => {
+                await handleIncomingCall(sock, callData);
+            });
+            sock._callListenerBound = true;
+        }
 
         // Store message for antidelete feature
         if (message.message) {
@@ -435,22 +474,18 @@ const fake = createFakeContact(message);
             /*━━━━━━━━━━━━━━━━━━━━*/
             // Safe decoding of jid     
             /*━━━━━━━━━━━━━━━━━━━━*/
-            sock.decodeJid = (jid) => {
-                if (!jid) return jid;
-                if (/:\d+@/gi.test(jid)) {
-                    let decode = jidDecode(jid) || {};
-                    return decode.user && decode.server ? `${decode.user}@${decode.server}` : jid;
-                } else return jid;
-            };
+            if (!sock.decodeJid) {
+                sock.decodeJid = (jid) => normalizeJid(jid);
+            }
 
             /*━━━━━━━━━━━━━━━━━━━━*/
             // Console log imports only  
             /*━━━━━━━━━━━━━━━━━━━━*/
             const groupMetadata = isGroup
-                ? await sock.groupMetadata(chatId).catch(() => ({}))
+                ? await getCachedGroupMeta(sock, chatId)
                 : {};
-            const from = sock.decodeJid(message.key.remoteJid);
-            const participant = sock.decodeJid(message.key.participant || from);
+            const from = normalizeJid(message.key.remoteJid);
+            const participant = normalizeJid(message.key.participant || from);
             const body = message.message.conversation || message.message.extendedTextMessage?.text || '';
             const pushname = message.pushName || "Unknown User";
             const chatType = chatId.endsWith('@g.us') ? 'Group' : 'Private';
@@ -469,25 +504,13 @@ const fake = createFakeContact(message);
 
         // Enforce private mode BEFORE any replies (except owner/sudo)
         try {
+            const data = getCachedModeData();
 
-            const data = JSON.parse(fs.readFileSync('./data/messageCount.json'));
-
-            
-
-            if (data.mode === 'group' && !isGroup) return;       // ignore PMs
-
-            if (data.mode === 'pm' && isGroup) return;           // ignore groups
-
-           if (data.mode === 'private' && !message.key.fromMe && !senderIsSudo) return; // only owner
-
-// public mode → no restriction
-
+            if (data.mode === 'group' && !isGroup) return;
+            if (data.mode === 'pm' && isGroup) return;
+            if (data.mode === 'private' && !message.key.fromMe && !senderIsSudo) return;
         } catch (error) {
-
             console.error('Error checking access mode:', error);
-
-            // Default to public mode if there's an error reading the file
-
         }
 
         // Check if user is banned (skip ban check for unban command)
@@ -2083,10 +2106,9 @@ async function handleGroupParticipantUpdate(sock, update) {
         // Respect bot mode: only announce promote/demote in public mode
         let isPublic = true;
         try {
-            const modeData = JSON.parse(fs.readFileSync('./data/messageCount.json'));
+            const modeData = getCachedModeData();
             if (typeof modeData.isPublic === 'boolean') isPublic = modeData.isPublic;
         } catch (e) {
-            // If reading fails, default to public behavior
         }
 
         // Handle promotion events
