@@ -1,4 +1,3 @@
-
 const { isWelcomeOn, getWelcome, handleWelcome } = require('../lib/welcome');
 const { channelInfo } = require('../lib/messageConfig');
 const fetch = require('node-fetch');
@@ -47,6 +46,26 @@ async function handleJoinEvent(sock, id, participants) {
             } catch (nameError) {
                 console.log('Could not fetch display name, using phone number');
             }
+
+            // Get user profile picture
+            let profilePicUrl = '';
+            let profilePicBuffer = null;
+            try {
+                profilePicUrl = await sock.profilePictureUrl(participantString, 'image');
+                // Fetch the profile picture buffer
+                const picResponse = await fetch(profilePicUrl);
+                if (picResponse.ok) {
+                    profilePicBuffer = await picResponse.buffer();
+                }
+            } catch (profileError) {
+                console.log('No profile picture available for user:', displayName);
+                // Use default avatar if no profile picture
+                profilePicUrl = 'https://img.pyrocdn.com/dbKUgahg.png';
+                const defaultResponse = await fetch(profilePicUrl);
+                if (defaultResponse.ok) {
+                    profilePicBuffer = await defaultResponse.buffer();
+                }
+            }
             
             // Process custom message with variables
             let finalMessage;
@@ -71,46 +90,60 @@ async function handleJoinEvent(sock, id, participants) {
                 finalMessage = `╭╼━≪•NEW-MEMBER•≫━╾╮\n┃WELCOME: @${displayName} 👋\n┃Member count: #${groupMetadata.participants.length}\n┃𝚃𝙸𝙼𝙴: ${timeString}⏰\n╰━━━━━━━━━━━━━━━╯\n\n*@${displayName}* Welcome to *${groupName}*! 🎉\n*𝙳𝙴𝚂𝙲𝚁𝙸𝙿𝚃𝙸𝙾𝙽*\n${groupDesc}\n\n`;
             }
             
-            // Try to send with image first (always try images)
+            // Try to send with image first
             try {
-                // Get user profile picture
-                let profilePicUrl = `https://img.pyrocdn.com/dbKUgahg.png`; // Default avatar
-                try {
-                    const profilePic = await sock.profilePictureUrl(participantString, 'image');
-                    if (profilePic) {
-                        profilePicUrl = profilePic;
-                    }
-                } catch (profileError) {
-                    // No profile picture available, using default
-                }
-                
-                // Construct API URL for welcome image
-                const apiUrl = `https://api.some-random-api.com/welcome/img/2/gaming3?type=join&textcolor=green&username=${encodeURIComponent(displayName)}&guildName=${encodeURIComponent(groupName)}&memberCount=${groupMetadata.participants.length}&avatar=${encodeURIComponent(profilePicUrl)}`;
-                
-                // Fetch the welcome image
-                const response = await fetch(apiUrl);
-                if (response.ok) {
-                    const imageBuffer = await response.buffer();
-                    
-                    // Send welcome image with caption (custom or default message)
+                if (profilePicBuffer) {
+                    // Option 1: Send profile picture as an image with caption
                     await sock.sendMessage(id, {
-                        image: imageBuffer,
+                        image: profilePicBuffer,
                         caption: finalMessage,
                         mentions: [participantString],
                         ...channelInfo
                     });
-                    continue; // Skip to next participant
+                } else {
+                    // Option 2: Try API-generated welcome image with profile picture
+                    const apiUrl = `https://api.some-random-api.com/welcome/img/2/gaming3?type=join&textcolor=green&username=${encodeURIComponent(displayName)}&guildName=${encodeURIComponent(groupName)}&memberCount=${groupMetadata.participants.length}&avatar=${encodeURIComponent(profilePicUrl || 'https://img.pyrocdn.com/dbKUgahg.png')}`;
+                    
+                    const response = await fetch(apiUrl);
+                    if (response.ok) {
+                        const imageBuffer = await response.buffer();
+                        
+                        // Send welcome image with caption
+                        await sock.sendMessage(id, {
+                            image: imageBuffer,
+                            caption: finalMessage,
+                            mentions: [participantString],
+                            ...channelInfo
+                        });
+                    } else {
+                        throw new Error('API image generation failed');
+                    }
                 }
             } catch (imageError) {
-                console.log('Image generation failed, falling back to text');
+                console.log('Image sending failed, falling back to text with profile picture');
+                
+                // Fallback: Send profile picture separately with text
+                try {
+                    if (profilePicBuffer) {
+                        // Send profile picture first
+                        await sock.sendMessage(id, {
+                            image: profilePicBuffer,
+                            caption: `📸 Profile picture of @${displayName}`,
+                            mentions: [participantString],
+                            ...channelInfo
+                        });
+                    }
+                } catch (picError) {
+                    console.log('Could not send profile picture separately');
+                }
+                
+                // Send welcome text message
+                await sock.sendMessage(id, {
+                    text: finalMessage,
+                    mentions: [participantString],
+                    ...channelInfo
+                });
             }
-            
-            // Send text message (either custom message or fallback)
-            await sock.sendMessage(id, {
-                text: finalMessage,
-                mentions: [participantString],
-                ...channelInfo
-            });
         } catch (error) {
             console.error('Error sending welcome message:', error);
             // Fallback to text message
