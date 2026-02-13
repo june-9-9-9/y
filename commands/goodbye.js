@@ -1,4 +1,3 @@
-
 const { isGoodByeOn, getGoodbye, handleGoodbye } = require('../lib/welcome');
 const fetch = require('node-fetch');
 const { normalizeJid, findParticipant } = require('../lib/jid');
@@ -57,28 +56,24 @@ async function handleLeaveEvent(sock, id, participants) {
                 finalMessage = ` *@${displayName}* we will never miss you! `;
             }
             
-            // Try to send with image first (always try images)
+            // Try to send with the individual's profile picture
             try {
-                // Get user profile picture
-                let profilePicUrl = `https://img.pyrocdn.com/dbKUgahg.png`; // Default avatar
+                // Get the leaving participant's profile picture
+                let profilePicUrl;
                 try {
-                    const profilePic = await sock.profilePictureUrl(participantString, 'image');
-                    if (profilePic) {
-                        profilePicUrl = profilePic;
-                    }
+                    profilePicUrl = await sock.profilePictureUrl(participantString, 'image');
                 } catch (profileError) {
-                    // No profile picture available, using default
+                    // If no profile picture, use a default avatar
+                    console.log('No profile picture available for user, using default');
+                    profilePicUrl = 'https://img.pyrocdn.com/dbKUgahg.png';
                 }
                 
-                // Construct API URL for goodbye image
-                const apiUrl = `https://api.some-random-api.com/welcome/img/2/gaming1?type=leave&textcolor=red&username=${encodeURIComponent(displayName)}&guildName=${encodeURIComponent(groupName)}&memberCount=${groupMetadata.participants.length}&avatar=${encodeURIComponent(profilePicUrl)}`;
-                
-                // Fetch the goodbye image
-                const response = await fetch(apiUrl);
-                if (response.ok) {
-                    const imageBuffer = await response.buffer();
+                // Fetch the profile picture to use as image
+                const picResponse = await fetch(profilePicUrl);
+                if (picResponse.ok) {
+                    const imageBuffer = await picResponse.buffer();
                     
-                    // Send goodbye image with caption (custom or default message)
+                    // Send the profile picture with goodbye message as caption
                     await sock.sendMessage(id, {
                         image: imageBuffer,
                         caption: finalMessage,
@@ -87,10 +82,10 @@ async function handleLeaveEvent(sock, id, participants) {
                     continue; // Skip to next participant
                 }
             } catch (imageError) {
-                console.log('Image generation failed, falling back to text');
+                console.log('Failed to send profile picture, falling back to text', imageError);
             }
             
-            // Send text message (either custom message or fallback)
+            // Fallback to text message if image fails
             await sock.sendMessage(id, {
                 text: finalMessage,
                 mentions: [participantString]
