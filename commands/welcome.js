@@ -3,7 +3,7 @@ const { isWelcomeOn, getWelcome, handleWelcome } = require('../lib/welcome');
 const { channelInfo } = require('../lib/messageConfig');
 const fetch = require('node-fetch');
 
-async function welcomeCommand(sock, chatId, message, match) {
+async function welcomeCommand(sock, chatId, message) {
     // Check if it's a group
     if (!chatId.endsWith('@g.us')) {
         await sock.sendMessage(chatId, { text: 'This command can only be used in groups.' },{ quoted: message });
