@@ -128,10 +128,23 @@ const {
  handleChatbotResponse
 } = require('./commands/chatbot');
   
-const { 
-  welcomeCommand,
-  handleJoinEvent
-} = require('./commands/welcome');
+const {
+    welcomeCommand,
+    handleJoinEvent,
+    isWelcomeOn,
+    getWelcome,
+    handleWelcome,
+    loadWelcomeData,
+    saveWelcomeData,
+    goodbyeCommand,
+    handleLeaveEvent,
+    isGoodbyeOn,
+    getGoodbye,
+    handleGoodbye,
+    loadGoodbyeData,
+    saveGoodbyeData,
+    cleanupInactiveGroups
+} = require('./commands/welcoe');
    
 const {
  goodbyeCommand,
