@@ -1,419 +1,563 @@
-const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
-const fetch = require('node-fetch');
-const ffmpeg = require('fluent-ffmpeg');
-const { downloadMediaMessage } = require('@whiskeysockets/baileys');
-const FormData = require('form-data');
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JUNE-X | WABOT - Deployment Successful</title>
 
-// JSON file paths
-const DATA_DIR = path.join(__dirname, '../data');
-const SETTINGS_FILE = path.join(DATA_DIR, 'chatbot_settings.json');
-const MESSAGES_FILE = path.join(DATA_DIR, 'chatbot_messages.json');
+    <!-- Metadata for SEO -->
+    <meta name="description" content="JUNE-X WhatsApp Bot - Active and Running">
+    <meta property="og:title" content="JUNE-X | ©Supreme">
+    <meta property="og:description" content="Hey Dude, JUNE X is Active and Running">
+    <meta property="og:image" content="https://telegra.ph/file/c2a4d8d65722553da4c89.jpg">
+    <link rel="icon" href="https://telegra.ph/file/c2a4d8d65722553da4c89.jpg">
 
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
-// Initialize JSON files if they don't exist
-if (!fs.existsSync(SETTINGS_FILE)) {
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify({ 
-        chatbot_enabled: 'false',
-        chatbot_settings: {
-            groups_allowed: 'false', // Whether chatbot works in groups
-            admin_only_toggle: 'true' // Only admins can toggle chatbot
-        }
-    }, null, 2));
-}
-
-if (!fs.existsSync(MESSAGES_FILE)) {
-    fs.writeFileSync(MESSAGES_FILE, JSON.stringify({}, null, 2));
-}
-
-/* ================== JSON DATABASE FUNCTIONS ================== */
-function readSettings() {
-    try {
-        const data = fs.readFileSync(SETTINGS_FILE, 'utf8');
-        return JSON.parse(data);
-    } catch (err) {
-        console.error('Error reading settings:', err.message);
-        return { 
-            chatbot_enabled: 'false',
-            chatbot_settings: {
-                groups_allowed: 'false',
-                admin_only_toggle: 'true'
-            }
-        };
-    }
-}
-
-function writeSettings(settings) {
-    try {
-        fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
-        return true;
-    } catch (err) {
-        console.error('Error writing settings:', err.message);
-        return false;
-    }
-}
-
-function readMessages() {
-    try {
-        const data = fs.readFileSync(MESSAGES_FILE, 'utf8');
-        return JSON.parse(data);
-    } catch (err) {
-        console.error('Error reading messages:', err.message);
-        return {};
-    }
-}
-
-function writeMessages(messages) {
-    try {
-        fs.writeFileSync(MESSAGES_FILE, JSON.stringify(messages, null, 2));
-        return true;
-    } catch (err) {
-        console.error('Error writing messages:', err.message);
-        return false;
-    }
-}
-
-/* ================== SETTINGS FUNCTIONS ================== */
-async function getSetting(key) {
-    const settings = readSettings();
-    return settings[key] || 'false';
-}
-
-async function getChatbotSettings() {
-    const settings = readSettings();
-    return settings.chatbot_settings || {
-        groups_allowed: 'false',
-        admin_only_toggle: 'true'
-    };
-}
-
-async function setSetting(key, value) {
-    const settings = readSettings();
-    settings[key] = value;
-    return writeSettings(settings);
-}
-
-async function updateChatbotSettings(newSettings) {
-    const settings = readSettings();
-    settings.chatbot_settings = { ...settings.chatbot_settings, ...newSettings };
-    return writeSettings(settings);
-}
-
-/* ================== MESSAGE FUNCTIONS ================== */
-async function storeUserMessage(userId, message) {
-    try {
-        const messages = readMessages();
-        
-        if (!messages[userId]) {
-            messages[userId] = [];
-        }
-        
-        // Add new message with timestamp
-        messages[userId].push({
-            text: message,
-            timestamp: Date.now(),
-            role: 'user'
-        });
-        
-        // Keep only last 50 messages per user to prevent file from growing too large
-        if (messages[userId].length > 50) {
-            messages[userId] = messages[userId].slice(-50);
-        }
-        
-        writeMessages(messages);
-        return true;
-    } catch (err) {
-        console.error('Error storing message:', err.message);
-        return false;
-    }
-}
-
-async function getUserMessages(userId, limit = 10) {
-    try {
-        const messages = readMessages();
-        
-        if (!messages[userId] || messages[userId].length === 0) {
-            return [];
-        }
-        
-        // Get last 'limit' messages
-        return messages[userId].slice(-limit);
-    } catch (err) {
-        console.error('Error getting messages:', err.message);
-        return [];
-    }
-}
-
-async function clearUserMessages(userId) {
-    try {
-        const messages = readMessages();
-        delete messages[userId];
-        writeMessages(messages);
-        return true;
-    } catch (err) {
-        console.error('Error clearing messages:', err.message);
-        return false;
-    }
-}
-
-/* ================== TYPING INDICATOR ================== */
-async function showTypingIndicator(sock, chatId) {
-    try {
-        await sock.sendPresenceUpdate('composing', chatId);
-    } catch {}
-}
-
-async function stopTypingIndicator(sock, chatId) {
-    try {
-        await sock.sendPresenceUpdate('paused', chatId);
-    } catch {}
-}
-
-/* ================== SPEECH TO TEXT ================== */
-async function speechToText(audioPath) {
-    try {
-        const form = new FormData();
-        form.append('file', fs.createReadStream(audioPath));
-
-        const res = await fetch('https://apiskeith.top/ai/transcribe', {
-            method: 'POST',
-            body: form,
-            headers: form.getHeaders()
-        });
-
-        const data = await res.json();
-        console.log('STT Response:', data); // debug
-
-        return data?.result || data?.text || null;
-    } catch (err) {
-        console.error('STT Error:', err.message);
-        return null;
-    }
-}
-
-/* ================== CHECK ADMIN FUNCTION ================== */
-async function isUserAdmin(sock, chatId, userId) {
-    try {
-        // For private chats, always return true (user is admin of their own chat)
-        if (!chatId.endsWith('@g.us')) {
-            return true;
-        }
-        
-        // For groups, check if user is admin
-        const groupMetadata = await sock.groupMetadata(chatId);
-        const participant = groupMetadata.participants.find(p => p.id === userId);
-        return participant?.admin === 'admin' || participant?.admin === 'superadmin';
-    } catch (err) {
-        console.error('Error checking admin status:', err.message);
-        return false;
-    }
-}
-
-/* ================== CHATBOT COMMAND ================== */
-async function handleChatbotCommand(sock, chatId, message, match, isAdmin) {
-    let enabled = await getSetting('chatbot_enabled');
-    let chatbotSettings = await getChatbotSettings();
-    const senderId = message.key.participant || message.key.remoteJid;
-    const isGroup = chatId.endsWith('@g.us');
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    // Enhanced admin check - use passed isAdmin or check again
-    const userIsAdmin = isAdmin || await isUserAdmin(sock, chatId, senderId);
-
-    if (!match) {
-        let statusText = `*CHATBOT SETUP*
-
-*Current Status:* ${enabled === 'true' ? '🟢 ON' : '🔴 OFF'}
-
-*Available Commands:*`;
-
-        if (userIsAdmin) {
-            statusText += `
-
-*.chatbot on* - Enable chatbot
-*.chatbot off* - Disable chatbot
-*.chatbot group on* - Allow chatbot in groups
-*.chatbot group off* - Disable chatbot in groups
-*.chatbot toggle admin* - Restrict toggle to admins only`;
+    <style>
+        :root {
+            --primary: #8a2be2;
+            --secondary: #00d4ff;
+            --success: #00ff88;
+            --dark: #0a0a0a;
+            --darker: #050505;
+            --light: #f0f0f0;
+            --gray: #888;
         }
-
-        statusText += `
-
-*.chatbot clear* - Clear your conversation history
-
-*Group Settings:* ${chatbotSettings.groups_allowed === 'true' ? '✅ Allowed' : '❌ Not allowed'}
-*Admin Toggle:* ${chatbotSettings.admin_only_toggle === 'true' ? '✅ Admins only' : '✅ Everyone'}`;
-
-        return sock.sendMessage(chatId, {
-            text: statusText,
-            quoted: message
-        });
-    }
-
-    // Handle clear command (available to everyone)
-    if (match === 'clear') {
-        await clearUserMessages(senderId.split('@')[0]);
-        return sock.sendMessage(chatId, {
-            text: '🧹 Your conversation history has been cleared',
-            quoted: message
-        });
-    }
-
-    // All other commands require admin privileges
-    if (!userIsAdmin) {
-        return sock.sendMessage(chatId, {
-            text: '❌ This command is restricted to group admins only!',
-            quoted: message
-        });
-    }
-
-    // Handle group settings
-    if (match.startsWith('group ')) {
-        const groupSetting = match.split(' ')[1];
         
-        if (groupSetting === 'on') {
-            await updateChatbotSettings({ groups_allowed: 'true' });
-            return sock.sendMessage(chatId, {
-                text: '✅ Chatbot will now respond in groups',
-                quoted: message
-            });
-        } else if (groupSetting === 'off') {
-            await updateChatbotSettings({ groups_allowed: 'false' });
-            return sock.sendMessage(chatId, {
-                text: '✅ Chatbot will not respond in groups',
-                quoted: message
-            });
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Arial, sans-serif;
         }
-    }
-
-    // Handle admin toggle setting
-    if (match === 'toggle admin') {
-        const newSetting = chatbotSettings.admin_only_toggle !== 'true';
-        await updateChatbotSettings({ admin_only_toggle: newSetting ? 'true' : 'false' });
-        return sock.sendMessage(chatId, {
-            text: `✅ Chatbot toggle is now ${newSetting ? 'restricted to admins' : 'available to everyone'}`,
-            quoted: message
-        });
-    }
-
-    // Handle on/off commands
-    if (match === 'on') {
-        await setSetting('chatbot_enabled', 'true');
-        return sock.sendMessage(chatId, {
-            text: '🤖 Chatbot ENABLED successfully',
-            quoted: message
-        });
-    }
-
-    if (match === 'off') {
-        await setSetting('chatbot_enabled', 'false');
-        return sock.sendMessage(chatId, {
-            text: '🤖 Chatbot DISABLED',
-            quoted: message
-        });
-    }
-}
-
-/* ================== CHATBOT RESPONSE ================== */
-async function handleChatbotResponse(sock, chatId, message, userMessage, senderId) {
-    try {
-        // ❌ Ignore bot's own messages
-        if (message.key.fromMe) return;
-
-        let enabled = await getSetting('chatbot_enabled');
-        if (enabled !== 'true') return;
-
-        const isGroup = chatId.endsWith('@g.us');
-        const chatbotSettings = await getChatbotSettings();
-
-        // Handle group chat restrictions
-        if (isGroup && chatbotSettings.groups_allowed !== 'true') {
-            return; // Don't respond in groups if not allowed
+        
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: var(--dark);
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(138, 43, 226, 0.15) 0%, transparent 20%),
+                radial-gradient(circle at 90% 80%, rgba(0, 212, 255, 0.1) 0%, transparent 20%);
+            color: white;
+            flex-direction: column;
+            padding: 20px;
+            overflow-x: hidden;
         }
-
-        let finalText = userMessage;
-
-        /* ===== VOICE NOTE HANDLING ===== */
-        if (message.message?.audioMessage?.ptt) {
-            await showTypingIndicator(sock, chatId);
-
-            // Create tmp directory if it doesn't exist
-            const tmpDir = path.join(__dirname, '../tmp');
-            if (!fs.existsSync(tmpDir)) {
-                fs.mkdirSync(tmpDir, { recursive: true });
+        
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 40px;
+        }
+        
+        /* Header Section */
+        .header {
+            text-align: center;
+            padding: 20px;
+            width: 100%;
+        }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .logo {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid var(--primary);
+            box-shadow: 0 0 20px rgba(138, 43, 226, 0.5);
+        }
+        
+        .bot-name {
+            font-size: 2.8rem;
+            font-weight: 800;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: 1px;
+        }
+        
+        .bot-subtitle {
+            font-size: 1.2rem;
+            color: var(--gray);
+            margin-top: -5px;
+            letter-spacing: 2px;
+        }
+        
+        /* Status Section */
+        .status-card {
+            background: rgba(20, 20, 30, 0.8);
+            border-radius: 20px;
+            padding: 40px 30px;
+            width: 100%;
+            max-width: 800px;
+            text-align: center;
+            border: 1px solid rgba(138, 43, 226, 0.3);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .status-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+        }
+        
+        .status-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            color: var(--success);
+            filter: drop-shadow(0 0 10px rgba(0, 255, 136, 0.5));
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .status-text {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, var(--success), var(--secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .status-subtext {
+            font-size: 1.2rem;
+            color: var(--gray);
+            margin-bottom: 30px;
+        }
+        
+        /* Info Display */
+        .info-display {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+            width: 100%;
+        }
+        
+        .info-box {
+            background: rgba(30, 30, 40, 0.7);
+            border-radius: 15px;
+            padding: 20px;
+            min-width: 200px;
+            flex: 1;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .info-box:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .info-title {
+            font-size: 1rem;
+            color: var(--gray);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .info-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: white;
+        }
+        
+        #timeValue {
+            color: var(--secondary);
+        }
+        
+        #dateValue {
+            color: #ff9d00;
+        }
+        
+        #dayValue {
+            color: var(--primary);
+        }
+        
+        /* Stats Section */
+        .stats-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            width: 100%;
+            max-width: 800px;
+        }
+        
+        .stat-box {
+            background: rgba(30, 30, 40, 0.7);
+            border-radius: 15px;
+            padding: 20px;
+            flex: 1;
+            min-width: 180px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--secondary);
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--gray);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        /* Developer Section */
+        .developer-section {
+            text-align: center;
+            padding: 30px;
+            width: 100%;
+            max-width: 800px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            margin-top: 20px;
+        }
+        
+        .developer-label {
+            font-size: 1rem;
+            color: var(--gray);
+            margin-bottom: 10px;
+        }
+        
+        .developer-name {
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--primary), #ff00ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: var(--gray);
+            font-size: 0.9rem;
+            width: 100%;
+            max-width: 800px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            margin-top: 20px;
+        }
+        
+        .social-icons {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 15px;
+        }
+        
+        .social-icon {
+            color: var(--gray);
+            font-size: 1.5rem;
+            transition: color 0.3s, transform 0.3s;
+        }
+        
+        .social-icon:hover {
+            color: var(--secondary);
+            transform: scale(1.2);
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .bot-name {
+                font-size: 2rem;
             }
-
-            const audioPath = path.join(tmpDir, `${Date.now()}.ogg`);
-            const buffer = await downloadMediaMessage(
-                message,
-                'buffer',
-                {},
-                { logger: console }
-            );
-
-            fs.writeFileSync(audioPath, buffer);
-
-            finalText = await speechToText(audioPath);
-            fs.unlinkSync(audioPath);
-
-            if (!finalText) {
-                await stopTypingIndicator(sock, chatId);
-                return sock.sendMessage(chatId, {
-                    text: "🤖 I couldn't understand the voice note.",
-                }, { quoted: message });
-            }
-        }
-
-        // ❌ Ignore empty text or commands
-        if (!finalText || finalText.startsWith('.')) return;
-
-        /* ===== MEMORY ===== */
-        await storeUserMessage(senderId, finalText);
-        const history = await getUserMessages(senderId, 10);
-
-        /* ===== AI REQUEST ===== */
-        const query = encodeURIComponent(finalText);
-        const prompt = encodeURIComponent(
-            "always speak in english but if someone speak to you using any languge reply using that language. you are xhypher ai whatsapp bot made by xhypher tech (superstar). a tech genius in zimbabwe. act smart and enigmatic about personal stuff about him. He is 17 years (2026). You are friendly, be humble. add some emojis when talking talk like a real human not ai. Don't forget what people told you like names and information store it Don't forget it you are like a computer."
-        );
-
-        const apiUrl = `https://api.bk9.dev/ai/BK93?BK9=${prompt}&q=${query}`;
-
-        await showTypingIndicator(sock, chatId);
-        const { data } = await axios.get(apiUrl);
-        await stopTypingIndicator(sock, chatId);
-
-        if (data?.BK9) {
-            await sock.sendMessage(chatId, { text: data.BK9 }, { quoted: message });
             
-            // Store bot response in history
-            await storeUserMessage(senderId, `Bot: ${data.BK9}`);
-        } else {
-            await sock.sendMessage(chatId, {
-                text: "🤖 I could not respond properly."
-            }, { quoted: message });
+            .status-text {
+                font-size: 1.8rem;
+            }
+            
+            .info-value {
+                font-size: 1.5rem;
+            }
+            
+            .stat-value {
+                font-size: 2rem;
+            }
+            
+            .info-display {
+                flex-direction: column;
+            }
         }
+        
+        @media (max-width: 480px) {
+            .bot-name {
+                font-size: 1.8rem;
+            }
+            
+            .status-card {
+                padding: 30px 20px;
+            }
+            
+            .status-text {
+                font-size: 1.5rem;
+            }
+            
+            .developer-name {
+                font-size: 1.5rem;
+            }
+        }
+        
+        /* Particles Background */
+        #particles-js {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            z-index: -1;
+        }
+    </style>
+</head>
+<body>
+    <!-- Particles Background -->
+    <div id="particles-js"></div>
+    
+    <div class="container">
+        <!-- Header Section -->
+        <div class="header">
+            <div class="logo-container">
+                <img src="https://telegra.ph/file/c2a4d8d65722553da4c89.jpg" alt="GIFTED-MD Logo" class="logo">
+                <div>
+                    <h1 class="bot-name">JUNE-X</h1>
+                    <div class="bot-subtitle">WHATSAPP BOT</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Status Section -->
+        <div class="status-card">
+            <div class="status-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="status-text">DEPLOYMENT SUCCESSFUL</div>
+            <div class="status-subtext">Bot is connected and running optimally</div>
+            
+            <!-- Info Display -->
+            <div class="info-display">
+                <div class="info-box">
+                    <div class="info-title">
+                        <i class="fas fa-clock"></i> Current Time
+                    </div>
+                    <div class="info-value" id="timeValue">Loading...</div>
+                </div>
+                
+                <div class="info-box">
+                    <div class="info-title">
+                        <i class="fas fa-calendar-alt"></i> Date
+                    </div>
+                    <div class="info-value" id="dateValue">Loading...</div>
+                </div>
+                
+                <div class="info-box">
+                    <div class="info-title">
+                        <i class="fas fa-calendar-day"></i> Day
+                    </div>
+                    <div class="info-value" id="dayValue">Loading...</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Stats Section -->
+        <div class="stats-container">
+            <div class="stat-box">
+                <div class="stat-value" id="uptimeValue">00:00:00</div>
+                <div class="stat-label">Uptime</div>
+            </div>
+            
+            <div class="stat-box">
+                <div class="stat-value">24/7</div>
+                <div class="stat-label">Availability</div>
+            </div>
+            
+            <div class="stat-box">
+                <div class="stat-value" id="pingValue">0ms</div>
+                <div class="stat-label">Ping</div>
+            </div>
+        </div>
+        
+        <!-- Developer Section -->
+        <div class="developer-section">
+            <div class="developer-label">Developed with <i class="fas fa-heart" style="color:#ff0055;"></i> by</div>
+            <div class="developer-name">
+                <i class="fas fa-code"></i> Supreme
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <p>JUNE-X © 2026 | All Rights Reserved</p>
+            <p>Powered by JUNE-X | Supreme Edition</p>
+            
+            <div class="social-icons">
+                <a href="#" class="social-icon">
+                    <i class="fab fa-github"></i>
+                </a>
+                <a href="#" class="social-icon">
+                    <i class="fab fa-telegram"></i>
+                </a>
+                <a href="#" class="social-icon">
+                    <i class="fab fa-whatsapp"></i>
+                </a>
+                <a href="#" class="social-icon">
+                    <i class="fas fa-globe"></i>
+                </a>
+            </div>
+        </div>
+    </div>
 
-    } catch (err) {
-        await stopTypingIndicator(sock, chatId);
-        console.error('Chatbot Error:', err.message);
-    }
-}
-
-module.exports = {
-    handleChatbotCommand,
-    handleChatbotResponse,
-    // Export utility functions for testing or manual use
-    getSetting,
-    setSetting,
-    updateChatbotSettings,
-    getChatbotSettings,
-    storeUserMessage,
-    getUserMessages,
-    clearUserMessages,
-    isUserAdmin
-};
+    <!-- Particles.js Library -->
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    
+    <script>
+        // Initialize particles background
+        document.addEventListener('DOMContentLoaded', function() {
+            particlesJS("particles-js", {
+                particles: {
+                    number: { value: 80, density: { enable: true, value_area: 800 } },
+                    color: { value: "#8a2be2" },
+                    shape: { type: "circle" },
+                    opacity: { value: 0.5, random: true },
+                    size: { value: 3, random: true },
+                    line_linked: {
+                        enable: true,
+                        distance: 150,
+                        color: "#00d4ff",
+                        opacity: 0.2,
+                        width: 1
+                    },
+                    move: {
+                        enable: true,
+                        speed: 2,
+                        direction: "none",
+                        random: true,
+                        straight: false,
+                        out_mode: "out",
+                        bounce: false
+                    }
+                },
+                interactivity: {
+                    detect_on: "canvas",
+                    events: {
+                        onhover: { enable: true, mode: "repulse" },
+                        onclick: { enable: true, mode: "push" }
+                    }
+                },
+                retina_detect: true
+            });
+            
+            // Set deployment time for uptime calculation
+            const deploymentTime = new Date();
+            
+            // Update time, date, and day
+            function updateInfo() {
+                const now = new Date();
+                
+                // Update time
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                document.getElementById('timeValue').textContent = `${hours}:${minutes}:${seconds}`;
+                
+                // Update date
+                const date = now.toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                });
+                document.getElementById('dateValue').textContent = date;
+                
+                // Update day
+                const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+                const dayName = dayNames[now.getDay()];
+                document.getElementById('dayValue').textContent = dayName;
+                
+                // Update uptime
+                updateUptime(deploymentTime);
+                
+                // Simulate ping update
+                updatePing();
+            }
+            
+            // Calculate and update uptime
+            function updateUptime(startTime) {
+                const now = new Date();
+                const uptimeMs = now - startTime;
+                
+                const hours = Math.floor(uptimeMs / (1000 * 60 * 60));
+                const minutes = Math.floor((uptimeMs % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((uptimeMs % (1000 * 60)) / 1000);
+                
+                document.getElementById('uptimeValue').textContent = 
+                    `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            }
+            
+            // Simulate ping update
+            function updatePing() {
+                // Simulate realistic ping values between 20-80ms
+                const ping = Math.floor(Math.random() * 60) + 20;
+                document.getElementById('pingValue').textContent = `${ping}ms`;
+            }
+            
+            // Update info every second
+            setInterval(updateInfo, 1000);
+            
+            // Initial call to set info immediately
+            updateInfo();
+            
+            // Add hover effect to status card
+            const statusCard = document.querySelector('.status-card');
+            statusCard.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-10px)';
+                this.style.boxShadow = '0 20px 40px rgba(0, 0, 0, 0.7)';
+            });
+            
+            statusCard.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0)';
+                this.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.5)';
+            });
+        });
+    </script>
+</body>
+</html>
