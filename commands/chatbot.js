@@ -171,12 +171,12 @@ async function speechToText(audioPath) {
 }
 
 /* ================== CHATBOT COMMAND ================== */
-async function handleChatbotCommand(sock, chatId, message, match, isOwner) {
+async function handleChatbotCommand(sock, chatId, message, match, isAdmin) {
     let enabled = await getSetting('chatbot_enabled');
 
     if (!match) {
         return sock.sendMessage(chatId, {
-            text: `*CHATBOT SETUP — OWNER ONLY*
+            text: `*CHATBOT SETUP — ADMIN ONLY*
 
 *.chatbot on*
 Enable chatbot
@@ -192,9 +192,9 @@ Clear your conversation history
         });
     }
 
-    if (!isOwner) {
+    if (!isAdmin) {
         return sock.sendMessage(chatId, {
-            text: '❌ Only the bot owner can control the chatbot!',
+            text: '❌ Only group admins can control the chatbot!',
             quoted: message
         });
     }
