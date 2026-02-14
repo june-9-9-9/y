@@ -18,7 +18,13 @@ if (!fs.existsSync(DATA_DIR)) {
 
 // Initialize JSON files if they don't exist
 if (!fs.existsSync(SETTINGS_FILE)) {
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify({ chatbot_enabled: 'false' }, null, 2));
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify({ 
+        chatbot_enabled: 'false',
+        chatbot_settings: {
+            groups_allowed: 'false', // Whether chatbot works in groups
+            admin_only_toggle: 'true' // Only admins can toggle chatbot
+        }
+    }, null, 2));
 }
 
 if (!fs.existsSync(MESSAGES_FILE)) {
@@ -32,7 +38,13 @@ function readSettings() {
         return JSON.parse(data);
     } catch (err) {
         console.error('Error reading settings:', err.message);
-        return { chatbot_enabled: 'false' };
+        return { 
+            chatbot_enabled: 'false',
+            chatbot_settings: {
+                groups_allowed: 'false',
+                admin_only_toggle: 'true'
+            }
+        };
     }
 }
 
@@ -72,9 +84,23 @@ async function getSetting(key) {
     return settings[key] || 'false';
 }
 
+async function getChatbotSettings() {
+    const settings = readSettings();
+    return settings.chatbot_settings || {
+        groups_allowed: 'false',
+        admin_only_toggle: 'true'
+    };
+}
+
 async function setSetting(key, value) {
     const settings = readSettings();
     settings[key] = value;
+    return writeSettings(settings);
+}
+
+async function updateChatbotSettings(newSettings) {
+    const settings = readSettings();
+    settings.chatbot_settings = { ...settings.chatbot_settings, ...newSettings };
     return writeSettings(settings);
 }
 
@@ -170,35 +196,111 @@ async function speechToText(audioPath) {
     }
 }
 
+/* ================== CHECK ADMIN FUNCTION ================== */
+async function isUserAdmin(sock, chatId, userId) {
+    try {
+        // For private chats, always return true (user is admin of their own chat)
+        if (!chatId.endsWith('@g.us')) {
+            return true;
+        }
+        
+        // For groups, check if user is admin
+        const groupMetadata = await sock.groupMetadata(chatId);
+        const participant = groupMetadata.participants.find(p => p.id === userId);
+        return participant?.admin === 'admin' || participant?.admin === 'superadmin';
+    } catch (err) {
+        console.error('Error checking admin status:', err.message);
+        return false;
+    }
+}
+
 /* ================== CHATBOT COMMAND ================== */
 async function handleChatbotCommand(sock, chatId, message, match, isAdmin) {
     let enabled = await getSetting('chatbot_enabled');
+    let chatbotSettings = await getChatbotSettings();
+    const senderId = message.key.participant || message.key.remoteJid;
+    const isGroup = chatId.endsWith('@g.us');
+    
+    // Enhanced admin check - use passed isAdmin or check again
+    const userIsAdmin = isAdmin || await isUserAdmin(sock, chatId, senderId);
 
     if (!match) {
+        let statusText = `*CHATBOT SETUP*
+
+*Current Status:* ${enabled === 'true' ? '🟢 ON' : '🔴 OFF'}
+
+*Available Commands:*`;
+
+        if (userIsAdmin) {
+            statusText += `
+
+*.chatbot on* - Enable chatbot
+*.chatbot off* - Disable chatbot
+*.chatbot group on* - Allow chatbot in groups
+*.chatbot group off* - Disable chatbot in groups
+*.chatbot toggle admin* - Restrict toggle to admins only`;
+        }
+
+        statusText += `
+
+*.chatbot clear* - Clear your conversation history
+
+*Group Settings:* ${chatbotSettings.groups_allowed === 'true' ? '✅ Allowed' : '❌ Not allowed'}
+*Admin Toggle:* ${chatbotSettings.admin_only_toggle === 'true' ? '✅ Admins only' : '✅ Everyone'}`;
+
         return sock.sendMessage(chatId, {
-            text: `*CHATBOT SETUP — ADMIN ONLY*
-
-*.chatbot on*
-Enable chatbot
-
-*.chatbot off*
-Disable chatbot
-
-*.chatbot clear*
-Clear your conversation history
-
-*Current Status:* ${enabled === 'true' ? '🟢 ON' : '🔴 OFF'}`,
+            text: statusText,
             quoted: message
         });
     }
 
-    if (!isAdmin) {
+    // Handle clear command (available to everyone)
+    if (match === 'clear') {
+        await clearUserMessages(senderId.split('@')[0]);
         return sock.sendMessage(chatId, {
-            text: '❌ Only group admins can control the chatbot!',
+            text: '🧹 Your conversation history has been cleared',
             quoted: message
         });
     }
 
+    // All other commands require admin privileges
+    if (!userIsAdmin) {
+        return sock.sendMessage(chatId, {
+            text: '❌ This command is restricted to group admins only!',
+            quoted: message
+        });
+    }
+
+    // Handle group settings
+    if (match.startsWith('group ')) {
+        const groupSetting = match.split(' ')[1];
+        
+        if (groupSetting === 'on') {
+            await updateChatbotSettings({ groups_allowed: 'true' });
+            return sock.sendMessage(chatId, {
+                text: '✅ Chatbot will now respond in groups',
+                quoted: message
+            });
+        } else if (groupSetting === 'off') {
+            await updateChatbotSettings({ groups_allowed: 'false' });
+            return sock.sendMessage(chatId, {
+                text: '✅ Chatbot will not respond in groups',
+                quoted: message
+            });
+        }
+    }
+
+    // Handle admin toggle setting
+    if (match === 'toggle admin') {
+        const newSetting = chatbotSettings.admin_only_toggle !== 'true';
+        await updateChatbotSettings({ admin_only_toggle: newSetting ? 'true' : 'false' });
+        return sock.sendMessage(chatId, {
+            text: `✅ Chatbot toggle is now ${newSetting ? 'restricted to admins' : 'available to everyone'}`,
+            quoted: message
+        });
+    }
+
+    // Handle on/off commands
     if (match === 'on') {
         await setSetting('chatbot_enabled', 'true');
         return sock.sendMessage(chatId, {
@@ -214,27 +316,24 @@ Clear your conversation history
             quoted: message
         });
     }
-    
-    if (match === 'clear') {
-        await clearUserMessages(chatId.split('@')[0]);
-        return sock.sendMessage(chatId, {
-            text: '🧹 Your conversation history has been cleared',
-            quoted: message
-        });
-    }
 }
 
 /* ================== CHATBOT RESPONSE ================== */
 async function handleChatbotResponse(sock, chatId, message, userMessage, senderId) {
     try {
-        // ❌ Ignore groups
-        if (chatId.endsWith('@g.us')) return;
-
-        // ❌ Ignore bot & commands
+        // ❌ Ignore bot's own messages
         if (message.key.fromMe) return;
 
         let enabled = await getSetting('chatbot_enabled');
         if (enabled !== 'true') return;
+
+        const isGroup = chatId.endsWith('@g.us');
+        const chatbotSettings = await getChatbotSettings();
+
+        // Handle group chat restrictions
+        if (isGroup && chatbotSettings.groups_allowed !== 'true') {
+            return; // Don't respond in groups if not allowed
+        }
 
         let finalText = userMessage;
 
@@ -311,7 +410,10 @@ module.exports = {
     // Export utility functions for testing or manual use
     getSetting,
     setSetting,
+    updateChatbotSettings,
+    getChatbotSettings,
     storeUserMessage,
     getUserMessages,
-    clearUserMessages
+    clearUserMessages,
+    isUserAdmin
 };
