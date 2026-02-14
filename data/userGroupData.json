@@ -5,7 +5,7 @@
   "antibadword": {},
   "warnings": {},
   "sudo": [],
-  "welcome": {},
+  "welcome": false,
   "goodbye": {},
   "chatbot": {},
   "autoReaction": false
