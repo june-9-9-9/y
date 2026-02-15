@@ -1,150 +1,660 @@
-const fs = require('fs');
-const path = require('path');
-const fetch = require('node-fetch');
-const axios = require('axios');
+const fs = require("fs");
+const axios = require("axios");
+const path = require("path");
 
-const USER_GROUP_DATA = path.join(__dirname, '../data/userGroupData.json');
-const CHATBOT_SETTINGS = path.join(__dirname, '../data/chatbotSettings.json');
-const CONVERSATION_HISTORY = path.join(__dirname, '../data/conversations.json');
+// In-memory storage for settings and conversation history
+let chatbotSettings = {
+    status: 'on',
+    mode: 'both',
+    trigger: 'dm',
+    default_response: 'text',
+    voice: 'nova'
+};
 
-// Available voices for text-to-speech
-const availableVoices = [
-  'african', 'american', 'arabic', 'australian', 'bangla', 'bengali', 'british',
-  'canadian', 'chinese', 'default', 'dutch', 'english', 'filipino', 'french',
-  'german', 'gujarati', 'haryanvi', 'hindi', 'indian', 'indonesian', 'irish',
-  'italian', 'japanese', 'kannada', 'korean', 'malayalam', 'mexican', 'odia',
-  'portuguese', 'rajasthani', 'russian', 'sanskrit', 'spanish', 'tamil', 'telugu',
-  'turkish', 'urdu'
-];
+let conversationHistory = new Map();
+const availableVoices = ['nova', 'alloy', 'echo', 'fable', 'onyx', 'shimmer'];
 
-// Load user group data
-function loadUserGroupData() {
+/**
+ * Create context object from message and client
+ */
+function createContext(message, client, from) {
+    const getMessageContent = () => {
+        if (message.message?.conversation) {
+            return message.message.conversation;
+        } else if (message.message?.extendedTextMessage?.text) {
+            return message.message.extendedTextMessage.text;
+        } else if (message.message?.imageMessage?.caption) {
+            return message.message.imageMessage.caption;
+        } else if (message.message?.videoMessage?.caption) {
+            return message.message.videoMessage.caption;
+        }
+        return '';
+    };
+
+    const getQuotedMessage = () => {
+        const contextInfo = message.message?.extendedTextMessage?.contextInfo;
+        if (contextInfo?.quotedMessage) {
+            return contextInfo.quotedMessage;
+        }
+        return null;
+    };
+
+    const text = getMessageContent();
+    
+    // Extract command and query
+    const parts = text.split(" ");
+    const command = parts[0]?.toLowerCase() || '';
+    const q = parts.slice(1).join(" ").trim();
+
+    return {
+        reply: async (text) => {
+            return await client.sendMessage(from, { text }, { quoted: message });
+        },
+        sendMessage: async (content) => {
+            return await client.sendMessage(from, content, { quoted: message });
+        },
+        q: q,
+        command: command,
+        isSuperUser: checkIfSuperUser(message, client), // You'll need to implement this
+        senderId: message.key?.participant || message.key?.remoteJid,
+        chatId: from,
+        message: message,
+        quoted: getQuotedMessage(),
+        client: client
+    };
+}
+
+/**
+ * Check if user is super user (implement based on your needs)
+ */
+function checkIfSuperUser(message, client) {
+    // Implement your super user logic here
+    // Example: Check if sender is in owner list
+    const sender = message.key?.participant || message.key?.remoteJid;
+    const ownerNumbers = ['234XXXXXXXXXX', '123XXXXXXXXXX']; // Add your owner numbers
+    
+    // Extract phone number from JID
+    const senderNumber = sender?.split('@')[0];
+    return ownerNumbers.includes(senderNumber);
+}
+
+/**
+ * Handle chatbot configuration commands
+ */
+async function handleChatbotCommand(sock, chatId, message) {
     try {
-        return JSON.parse(fs.readFileSync(USER_GROUP_DATA));
+        // Create context object
+        const conText = createContext(message, sock, chatId);
+        const { reply, q, isSuperUser } = conText;
+
+        if (!isSuperUser) {
+            return await reply("❌ Owner Only Command!");
+        }
+
+        const args = q?.trim().split(/\s+/) || [];
+        const subcommand = args[0]?.toLowerCase();
+        const value = args.slice(1).join(" ");
+
+        if (!subcommand) {
+            const statusMap = {
+                'on': '✅ ON',
+                'off': '❌ OFF'
+            };
+
+            const modeMap = {
+                'private': '🔒 Private Only',
+                'group': '👥 Group Only',
+                'both': '🌐 Both'
+            };
+
+            const triggerMap = {
+                'dm': '📨 DM Trigger',
+                'all': '🔊 All Messages'
+            };
+
+            const responseMap = {
+                'text': '📝 Text',
+                'audio': '🎵 Audio'
+            };
+
+            return await reply(
+                `*🤖 Chatbot Settings*\n\n` +
+                `🔹 *Status:* ${statusMap[chatbotSettings.status]}\n` +
+                `🔹 *Mode:* ${modeMap[chatbotSettings.mode]}\n` +
+                `🔹 *Trigger:* ${triggerMap[chatbotSettings.trigger]}\n` +
+                `🔹 *Default Response:* ${responseMap[chatbotSettings.default_response]}\n` +
+                `🔹 *Voice:* ${chatbotSettings.voice}\n\n` +
+                `*🎯 Response Types:*\n` +
+                `▸ *Text* - Normal AI conversation\n` +
+                `▸ *Audio* - Add "audio" to get voice response\n` +
+                `▸ *Video* - Add "video" to generate videos\n` +
+                `▸ *Image* - Add "image" to generate images\n` +
+                `▸ *Vision* - Send image + "analyze this"\n\n` +
+                `*Usage Examples:*\n` +
+                `▸ @bot hello how are you? (Text)\n` +
+                `▸ @bot audio tell me a story (Audio response)\n` +
+                `▸ @bot video a cat running (Video generation)\n` +
+                `▸ @bot image a beautiful sunset (Image generation)\n` +
+                `▸ [Send image] "analyze this" (Vision analysis)\n\n` +
+                `*Commands:*\n` +
+                `▸ chatbot on/off\n` +
+                `▸ chatbot mode private/group/both\n` +
+                `▸ chatbot trigger dm/all\n` +
+                `▸ chatbot response text/audio\n` +
+                `▸ chatbot voice <name>\n` +
+                `▸ chatbot voices\n` +
+                `▸ chatbot clear\n` +
+                `▸ chatbot status\n` +
+                `▸ chatbot test <type> <message>`
+            );
+        }
+
+        switch (subcommand) {
+            case 'on':
+            case 'off':
+                chatbotSettings.status = subcommand;
+                return await reply(`✅ Chatbot: *${subcommand.toUpperCase()}*`);
+
+            case 'mode':
+                if (!['private', 'group', 'both'].includes(value)) {
+                    return await reply("❌ Invalid mode! Use: private, group, or both");
+                }
+                chatbotSettings.mode = value;
+                return await reply(`✅ Chatbot mode: *${value.toUpperCase()}*`);
+
+            case 'trigger':
+                if (!['dm', 'all'].includes(value)) {
+                    return await reply("❌ Invalid trigger! Use: dm or all");
+                }
+                chatbotSettings.trigger = value;
+                return await reply(`✅ Chatbot trigger: *${value.toUpperCase()}*`);
+
+            case 'response':
+                if (!['text', 'audio'].includes(value)) {
+                    return await reply("❌ Invalid response type! Use: text or audio");
+                }
+                chatbotSettings.default_response = value;
+                return await reply(`✅ Default response: *${value.toUpperCase()}*`);
+
+            case 'voice':
+                if (!availableVoices.includes(value)) {
+                    return await reply(`❌ Invalid voice! Available voices:\n${availableVoices.join(', ')}`);
+                }
+                chatbotSettings.voice = value;
+                return await reply(`✅ Voice set to: *${value}*`);
+
+            case 'voices':
+                return await reply(`*🎙️ Available Voices:*\n\n${availableVoices.join(', ')}`);
+
+            case 'clear':
+                if (conversationHistory.delete(chatId)) {
+                    return await reply("✅ Chatbot conversation history cleared!");
+                } else {
+                    return await reply("❌ No conversation history to clear!");
+                }
+
+            case 'status':
+                const history = getConversationHistory(chatId, 5);
+                if (history.length === 0) {
+                    return await reply("📝 No recent conversations found.");
+                }
+                
+                let historyText = `*📚 Recent Conversations (${history.length})*\n\n`;
+                history.forEach((conv, index) => {
+                    const typeIcon = getTypeIcon(conv.type);
+                    historyText += `*${index + 1}. ${typeIcon} You:* ${conv.user}\n`;
+                    historyText += `   *AI:* ${conv.type === 'audio' ? '[Voice Message]' : conv.ai}\n\n`;
+                });
+                
+                return await reply(historyText);
+
+            case 'test':
+                return await handleTestCommand(sock, chatId, message, value, chatbotSettings.voice);
+
+            default:
+                return await reply(
+                    "❌ Invalid command!\n\n" +
+                    `▸ chatbot on/off\n` +
+                    `▸ chatbot mode private/group/both\n` +
+                    `▸ chatbot trigger dm/all\n` +
+                    `▸ chatbot response text/audio\n` +
+                    `▸ chatbot voice <name>\n` +
+                    `▸ chatbot voices\n` +
+                    `▸ chatbot clear\n` +
+                    `▸ chatbot status\n` +
+                    `▸ chatbot test <text/audio/video/image> <message>`
+                );
+        }
     } catch (error) {
-        console.error('❌ Error loading user group data:', error.message);
-        return { groups: [], chatbot: {} };
+        console.error("Chatbot command error:", error);
+        return await sock.sendMessage(chatId, {
+            text: `🚫 Error: ${error.message}`
+        }, { quoted: message });
     }
 }
 
-// Save user group data
-function saveUserGroupData(data) {
+/**
+ * Handle automatic chatbot responses to messages
+ */
+async function handleChatbotResponse(sock, chatId, message) {
     try {
-        fs.writeFileSync(USER_GROUP_DATA, JSON.stringify(data, null, 2));
+        // Extract message content
+        let messageText = '';
+        let quotedMessage = null;
+        
+        if (message.message?.conversation) {
+            messageText = message.message.conversation;
+        } else if (message.message?.extendedTextMessage?.text) {
+            messageText = message.message.extendedTextMessage.text;
+            quotedMessage = message.message.extendedTextMessage.contextInfo?.quotedMessage;
+        } else if (message.message?.imageMessage?.caption) {
+            messageText = message.message.imageMessage.caption;
+        } else if (message.message?.videoMessage?.caption) {
+            messageText = message.message.videoMessage.caption;
+        }
+
+        // Skip if no text or if it's a command
+        if (!messageText || messageText.startsWith('.')) return;
+
+        // Determine if in group or private
+        const isGroup = chatId.includes('@g.us');
+        const senderId = message.key?.participant || message.key?.remoteJid;
+
+        // Check if chatbot is enabled
+        if (chatbotSettings.status !== 'on') return;
+
+        // Check mode
+        if (chatbotSettings.mode === 'private' && isGroup) return;
+        if (chatbotSettings.mode === 'group' && !isGroup) return;
+
+        // Check trigger
+        if (chatbotSettings.trigger === 'dm') {
+            const isDM = !isGroup;
+            const isMentioned = message.message?.extendedTextMessage?.contextInfo?.mentionedJid?.includes(sock.user.id?.split(':')[0] + '@s.whatsapp.net');
+            
+            if (!isDM && !isMentioned) return;
+        }
+
+        // Send reaction to show processing
+        await sock.sendMessage(chatId, {
+            react: { text: "🤖", key: message.key }
+        });
+
+        // Determine response type
+        let responseType = chatbotSettings.default_response;
+        const lowercaseText = messageText?.toLowerCase() || '';
+        
+        if (lowercaseText.includes('audio') || lowercaseText.includes('voice')) {
+            responseType = 'audio';
+        } else if (lowercaseText.includes('video')) {
+            responseType = 'video';
+        } else if (lowercaseText.includes('image') || lowercaseText.includes('pic') || lowercaseText.includes('generate')) {
+            responseType = 'image';
+        } else if ((lowercaseText.includes('analyze') || lowercaseText.includes('what')) && quotedMessage?.imageMessage) {
+            responseType = 'vision';
+        }
+
+        // Send typing indicator
+        await sock.sendPresenceUpdate('composing', chatId);
+
+        // Process based on response type
+        switch (responseType) {
+            case 'audio':
+                await handleAudioResponse(sock, chatId, message, messageText, chatbotSettings.voice);
+                break;
+            case 'video':
+                await handleVideoResponse(sock, chatId, message, messageText);
+                break;
+            case 'image':
+                await handleImageResponse(sock, chatId, message, messageText);
+                break;
+            case 'vision':
+                await handleVisionResponse(sock, chatId, message, quotedMessage);
+                break;
+            default:
+                await handleTextResponse(sock, chatId, message, messageText);
+        }
+
+        // Store conversation history
+        storeConversation(chatId, messageText, 'AI Response', responseType);
+
     } catch (error) {
-        console.error('❌ Error saving user group data:', error.message);
+        console.error("Chatbot response error:", error);
+        await sock.sendMessage(chatId, {
+            text: `🤖 Chatbot error: ${error.message}`
+        }, { quoted: message });
     }
 }
 
-// Load chatbot settings
-function getChatbotSettings() {
+/**
+ * Helper function to handle text responses
+ */
+async function handleTextResponse(sock, chatId, message, query) {
     try {
-        return JSON.parse(fs.readFileSync(CHATBOT_SETTINGS));
+        const response = await axios.get(`https://apiskeith.vercel.app/keithai?q=${encodeURIComponent(query)}`, {
+            timeout: 30000
+        });
+
+        if (response.data?.status && response.data?.result) {
+            await sock.sendMessage(chatId, {
+                text: response.data.result
+            }, { quoted: message });
+        } else {
+            throw new Error("Failed to get AI response");
+        }
     } catch (error) {
-        // Default settings
-        const defaultSettings = {
-            status: 'off',
-            mode: 'both',
-            trigger: 'dm',
-            default_response: 'text',
-            voice: 'default'
-        };
-        saveChatbotSettings(defaultSettings);
-        return defaultSettings;
+        throw new Error(`Text response failed: ${error.message}`);
     }
 }
 
-// Save chatbot settings
-function saveChatbotSettings(settings) {
+/**
+ * Helper function to handle audio responses
+ */
+async function handleAudioResponse(sock, chatId, message, query, voice) {
     try {
-        fs.writeFileSync(CHATBOT_SETTINGS, JSON.stringify(settings, null, 2));
+        const tempDir = path.join(__dirname, "temp");
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+
+        // Get AI response first
+        const textResponse = await axios.get(`https://apiskeith.vercel.app/keithai?q=${encodeURIComponent(query)}`, {
+            timeout: 30000
+        });
+
+        if (!textResponse.data?.status || !textResponse.data?.result) {
+            throw new Error("Failed to get AI response");
+        }
+
+        const aiText = textResponse.data.result;
+
+        // Convert to speech
+        const audioResponse = await axios.get(
+            `https://apiskeith.vercel.app/ai/text2speech?q=${encodeURIComponent(aiText)}&voice=${voice}`,
+            { timeout: 30000 }
+        );
+
+        if (!audioResponse.data?.status || !audioResponse.data?.result?.URL) {
+            throw new Error("Failed to generate audio");
+        }
+
+        const timestamp = Date.now();
+        const fileName = `tts_${timestamp}.mp3`;
+        const filePath = path.join(tempDir, fileName);
+
+        // Download audio
+        const downloadResponse = await axios({
+            method: "get",
+            url: audioResponse.data.result.URL,
+            responseType: "stream",
+            timeout: 60000,
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+        });
+
+        const writer = fs.createWriteStream(filePath);
+        downloadResponse.data.pipe(writer);
+        await new Promise((resolve, reject) => {
+            writer.on("finish", resolve);
+            writer.on("error", reject);
+        });
+
+        if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
+            throw new Error("Download failed or empty file!");
+        }
+
+        // Send as voice message
+        await sock.sendMessage(chatId, {
+            audio: { url: filePath },
+            ptt: true, // Send as voice note
+            mimetype: "audio/mpeg"
+        }, { quoted: message });
+
+        // Cleanup
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
     } catch (error) {
-        console.error('❌ Error saving chatbot settings:', error.message);
+        throw new Error(`Audio response failed: ${error.message}`);
     }
 }
 
-// Update chatbot settings
-async function updateChatbotSettings(updates) {
-    const settings = getChatbotSettings();
-    Object.assign(settings, updates);
-    saveChatbotSettings(settings);
-    return settings;
-}
-
-// Load conversation history
-function loadConversations() {
+/**
+ * Helper function to handle video responses
+ */
+async function handleVideoResponse(sock, chatId, message, query) {
     try {
-        return JSON.parse(fs.readFileSync(CONVERSATION_HISTORY));
+        const tempDir = path.join(__dirname, "temp");
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+
+        const videoResponse = await axios.get(
+            `https://apiskeith.vercel.app/text2video?q=${encodeURIComponent(query)}`,
+            { timeout: 120000 } // 2 minutes for video generation
+        );
+
+        if (!videoResponse.data?.success || !videoResponse.data?.results) {
+            throw new Error("Failed to generate video");
+        }
+
+        const timestamp = Date.now();
+        const fileName = `video_${timestamp}.mp4`;
+        const filePath = path.join(tempDir, fileName);
+
+        // Download video
+        const downloadResponse = await axios({
+            method: "get",
+            url: videoResponse.data.results,
+            responseType: "stream",
+            timeout: 300000, // 5 minutes for large videos
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+        });
+
+        const writer = fs.createWriteStream(filePath);
+        downloadResponse.data.pipe(writer);
+        await new Promise((resolve, reject) => {
+            writer.on("finish", resolve);
+            writer.on("error", reject);
+        });
+
+        if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
+            throw new Error("Download failed or empty file!");
+        }
+
+        // Send video
+        await sock.sendMessage(chatId, {
+            video: { url: filePath },
+            caption: `🎥 Generated video: ${query.substring(0, 100)}`,
+            mimetype: "video/mp4"
+        }, { quoted: message });
+
+        // Cleanup
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
     } catch (error) {
-        return {};
+        throw new Error(`Video response failed: ${error.message}`);
     }
 }
 
-// Save conversation history
-function saveConversations(conversations) {
+/**
+ * Helper function to handle image responses
+ */
+async function handleImageResponse(sock, chatId, message, query) {
     try {
-        fs.writeFileSync(CONVERSATION_HISTORY, JSON.stringify(conversations, null, 2));
+        const tempDir = path.join(__dirname, "temp");
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+
+        const timestamp = Date.now();
+        const fileName = `image_${timestamp}.png`;
+        const filePath = path.join(tempDir, fileName);
+
+        // Download image
+        const downloadResponse = await axios({
+            method: "get",
+            url: `https://apiskeith.vercel.app/ai/flux?q=${encodeURIComponent(query)}`,
+            responseType: "stream",
+            timeout: 60000,
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+        });
+
+        const writer = fs.createWriteStream(filePath);
+        downloadResponse.data.pipe(writer);
+        await new Promise((resolve, reject) => {
+            writer.on("finish", resolve);
+            writer.on("error", reject);
+        });
+
+        if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
+            throw new Error("Download failed or empty file!");
+        }
+
+        // Send image
+        await sock.sendMessage(chatId, {
+            image: { url: filePath },
+            caption: `🖼️ Generated image: ${query.substring(0, 100)}`
+        }, { quoted: message });
+
+        // Cleanup
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
     } catch (error) {
-        console.error('❌ Error saving conversations:', error.message);
+        throw new Error(`Image response failed: ${error.message}`);
     }
 }
 
-// Get conversation history for a user
-async function getConversationHistory(userId, limit = 10) {
-    const conversations = loadConversations();
-    const userConvs = conversations[userId] || [];
-    return userConvs.slice(-limit);
+/**
+ * Helper function to handle vision analysis
+ */
+async function handleVisionResponse(sock, chatId, message, quotedMessage) {
+    try {
+        if (!quotedMessage?.imageMessage) {
+            throw new Error("No image found to analyze");
+        }
+
+        await sock.sendMessage(chatId, {
+            text: "🔍 Analyzing image, please wait..."
+        }, { quoted: message });
+
+        // For vision analysis, we need to download the image first
+        // Since we can't directly send the image to the API, we'll use a placeholder response
+        // In a real implementation, you would upload the image to a temporary hosting service
+        // or convert it to base64 and send to a vision API
+        
+        const tempDir = path.join(__dirname, "temp");
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+
+        const timestamp = Date.now();
+        const fileName = `vision_${timestamp}.jpg`;
+        const filePath = path.join(tempDir, fileName);
+
+        // Download the quoted image
+        const media = await sock.downloadMediaMessage({
+            key: message.message.extendedTextMessage.contextInfo.stanzaId,
+            message: quotedMessage
+        });
+
+        if (!media) {
+            throw new Error("Failed to download image");
+        }
+
+        fs.writeFileSync(filePath, media);
+
+        // For now, use a simple analysis response
+        // In production, you would send the image to a vision API
+        const analysisResponse = await axios.get(
+            `https://apiskeith.vercel.app/keithai?q=${encodeURIComponent("Analyze this image briefly: " + filePath)}`,
+            { timeout: 30000 }
+        );
+
+        if (analysisResponse.data?.status && analysisResponse.data?.result) {
+            await sock.sendMessage(chatId, {
+                text: `🔍 *Image Analysis:*\n\n${analysisResponse.data.result}`
+            }, { quoted: message });
+        } else {
+            throw new Error("Failed to analyze image");
+        }
+
+        // Cleanup
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+    } catch (error) {
+        throw new Error(`Vision analysis failed: ${error.message}`);
+    }
 }
 
-// Add conversation to history
-async function addConversation(userId, type, userMessage, aiResponse) {
-    const conversations = loadConversations();
-    if (!conversations[userId]) {
-        conversations[userId] = [];
+/**
+ * Helper function to handle test command
+ */
+async function handleTestCommand(sock, chatId, message, value, voice) {
+    const testArgs = value.split(' ');
+    const testType = testArgs[0]?.toLowerCase();
+    const testMessage = testArgs.slice(1).join(' ') || "Hello, this is a test message";
+
+    await sock.sendMessage(chatId, {
+        text: `🧪 Testing ${testType || 'text'} with: "${testMessage}"`
+    }, { quoted: message });
+
+    try {
+        if (testType === 'audio') {
+            await handleAudioResponse(sock, chatId, message, testMessage, voice);
+        } else if (testType === 'video') {
+            await handleVideoResponse(sock, chatId, message, testMessage);
+        } else if (testType === 'image') {
+            await handleImageResponse(sock, chatId, message, testMessage);
+        } else {
+            await handleTextResponse(sock, chatId, message, testMessage);
+        }
+
+        return await sock.sendMessage(chatId, {
+            text: "✅ Test completed!"
+        }, { quoted: message });
+    } catch (error) {
+        return await sock.sendMessage(chatId, {
+            text: `❌ Test failed: ${error.message}`
+        }, { quoted: message });
+    }
+}
+
+/**
+ * Helper function to store conversation history
+ */
+function storeConversation(chatId, userMessage, aiResponse, type = 'text') {
+    if (!conversationHistory.has(chatId)) {
+        conversationHistory.set(chatId, []);
     }
     
-    conversations[userId].push({
-        type,
-        user: userMessage,
-        ai: aiResponse,
-        timestamp: new Date().toISOString()
+    const history = conversationHistory.get(chatId);
+    history.unshift({
+        user: userMessage.substring(0, 100),
+        ai: aiResponse.substring(0, 100),
+        type: type,
+        timestamp: Date.now()
     });
     
-    // Keep only last 50 conversations per user
-    if (conversations[userId].length > 50) {
-        conversations[userId] = conversations[userId].slice(-50);
-    }
-    
-    saveConversations(conversations);
-}
-
-// Clear conversation history for a user
-async function clearConversationHistory(userId) {
-    const conversations = loadConversations();
-    if (conversations[userId]) {
-        delete conversations[userId];
-        saveConversations(conversations);
-        return true;
-    }
-    return false;
-}
-
-// Download media from URL
-async function downloadMedia(url) {
-    try {
-        const response = await axios({
-            method: 'GET',
-            url: url,
-            responseType: 'arraybuffer'
-        });
-        return Buffer.from(response.data, 'binary');
-    } catch (error) {
-        console.error('❌ Error downloading media:', error.message);
-        return null;
+    // Keep only last 20 conversations
+    if (history.length > 20) {
+        history.pop();
     }
 }
 
-// Get type icon for display
+/**
+ * Helper function to get conversation history
+ */
+function getConversationHistory(chatId, limit = 10) {
+    const history = conversationHistory.get(chatId) || [];
+    return history.slice(0, limit);
+}
+
+/**
+ * Helper function to get type icon
+ */
 function getTypeIcon(type) {
     const icons = {
         'text': '📝',
@@ -156,676 +666,8 @@ function getTypeIcon(type) {
     return icons[type] || '📝';
 }
 
-// Add random delay between 2-5 seconds
-function getRandomDelay() {
-    return Math.floor(Math.random() * 3000) + 2000;
-}
-
-// Add typing indicator
-async function showTyping(sock, chatId) {
-    try {
-        await sock.presenceSubscribe(chatId);
-        await sock.sendPresenceUpdate('composing', chatId);
-        await new Promise(resolve => setTimeout(resolve, getRandomDelay()));
-    } catch (error) {
-        console.error('Typing indicator error:', error);
-    }
-}
-
-// Check if user is admin in group
-async function isGroupAdmin(sock, chatId, userId) {
-    if (!chatId.endsWith('@g.us')) return false;
-    
-    try {
-        const groupMetadata = await sock.groupMetadata(chatId);
-        const participant = groupMetadata.participants.find(p => p.id === userId);
-        return participant && (participant.admin === 'admin' || participant.admin === 'superadmin');
-    } catch (error) {
-        console.error('❌ Error checking admin status:', error.message);
-        return false;
-    }
-}
-
-// In-memory storage for chat history and user info
-const chatMemory = {
-    messages: new Map(), // Stores last 20 messages per user
-    userInfo: new Map()  // Stores user information
-};
-
-// Extract user information from messages
-function extractUserInfo(message) {
-    const info = {};
-    
-    // Extract name
-    if (message.toLowerCase().includes('my name is')) {
-        info.name = message.split('my name is')[1].trim().split(' ')[0];
-    }
-    
-    // Extract age
-    if (message.toLowerCase().includes('i am') && message.toLowerCase().includes('years old')) {
-        info.age = message.match(/\d+/)?.[0];
-    }
-    
-    // Extract location
-    if (message.toLowerCase().includes('i live in') || message.toLowerCase().includes('i am from')) {
-        info.location = message.split(/(?:i live in|i am from)/i)[1].trim().split(/[.,!?]/)[0];
-    }
-    
-    return info;
-}
-
-async function handleChatbotCommand(sock, chatId, message, match) {
-    const settings = getChatbotSettings();
-    const userMessage = match || '';
-    const args = userMessage.trim().split(/\s+/) || [];
-    const subcommand = args[0]?.toLowerCase();
-    const value = args.slice(1).join(" ");
-
-    // Get sender ID
-    const senderId = message.key.participant || message.key.remoteJid;
-    
-    // Get bot's number
-    const botNumber = sock.user.id.split(':')[0] + '@s.whatsapp.net';
-    
-    // Check if sender is bot owner (for special cases)
-    const isOwner = senderId === botNumber;
-    
-    // Check if user is admin (for group commands)
-    const isAdmin = await isGroupAdmin(sock, chatId, senderId);
-
-    // For settings that affect the whole bot, only owner can change
-    const isGlobalSetting = ['mode', 'trigger', 'voice', 'voices'].includes(subcommand);
-    
-    // For group-specific commands, admins can use
-    const isGroupSetting = ['on', 'off', 'clear', 'status', 'test', 'response'].includes(subcommand);
-
-    // Check permissions
-    if (isGlobalSetting && !isOwner) {
-        await showTyping(sock, chatId);
-        return sock.sendMessage(chatId, {
-            text: '❌ Only the bot owner can change global settings.',
-            quoted: message
-        });
-    }
-
-    if (chatId.endsWith('@g.us') && isGroupSetting && !isAdmin && !isOwner) {
-        await showTyping(sock, chatId);
-        return sock.sendMessage(chatId, {
-            text: '❌ Only group admins can change chatbot settings in this group.',
-            quoted: message
-        });
-    }
-
-    if (!subcommand) {
-        const statusMap = {
-            'on': 'ON',
-            'off': 'OFF'
-        };
-
-        const modeMap = {
-            'private': 'Private Only',
-            'group': 'Group Only', 
-            'both': 'Both'
-        };
-
-        const triggerMap = {
-            'dm': 'DM Trigger',
-            'all': 'All Messages'
-        };
-
-        const responseMap = {
-            'text': 'Text',
-            'audio': 'Audio'
-        };
-
-        await showTyping(sock, chatId);
-        return sock.sendMessage(chatId, {
-            text: 
-                `*CHATBOT SETTINGS*\n\n` +
-                `Status: ${statusMap[settings.status]}\n` +
-                `Mode: ${modeMap[settings.mode]}\n` +
-                `Trigger: ${triggerMap[settings.trigger]}\n` +
-                `Default Response: ${responseMap[settings.default_response]}\n` +
-                `Voice: ${settings.voice}\n\n` +
-                `RESPONSE TYPES:\n` +
-                `• Text - Normal AI conversation\n` +
-                `• Audio - Add "audio" to get voice response\n` +
-                `• Video - Add "video" to generate videos\n` +
-                `• Image - Add "image" to generate images\n` +
-                `• Vision - Send image + "analyze this"\n\n` +
-                `USAGE EXAMPLES:\n` +
-                `• @bot hello how are you? (Text)\n` +
-                `• @bot audio tell me a story (Audio response)\n` +
-                `• @bot video a cat running (Video generation)\n` +
-                `• @bot image a beautiful sunset (Image generation)\n` +
-                `• [Send image] "analyze this" (Vision analysis)\n\n` +
-                `COMMANDS:\n` +
-                `• .chatbot on/off\n` +
-                `• .chatbot mode private/group/both\n` +
-                `• .chatbot trigger dm/all\n` +
-                `• .chatbot response text/audio\n` +
-                `• .chatbot voice <name>\n` +
-                `• .chatbot voices\n` +
-                `• .chatbot clear\n` +
-                `• .chatbot status\n` +
-                `• .chatbot test <type> <message>`,
-            quoted: message
-        });
-    }
-
-    switch (subcommand) {
-        case 'on':
-        case 'off':
-            await showTyping(sock, chatId);
-            await updateChatbotSettings({ status: subcommand });
-            
-            // Also update userGroupData for backward compatibility
-            const data = loadUserGroupData();
-            if (subcommand === 'on') {
-                data.chatbot[chatId] = true;
-            } else {
-                delete data.chatbot[chatId];
-            }
-            saveUserGroupData(data);
-            
-            return sock.sendMessage(chatId, {
-                text: `Chatbot: ${subcommand.toUpperCase()}`,
-                quoted: message
-            });
-
-        case 'mode':
-            if (!['private', 'group', 'both'].includes(value)) {
-                await showTyping(sock, chatId);
-                return sock.sendMessage(chatId, {
-                    text: "Invalid mode! Use: private, group, or both",
-                    quoted: message
-                });
-            }
-            await showTyping(sock, chatId);
-            await updateChatbotSettings({ mode: value });
-            return sock.sendMessage(chatId, {
-                text: `Chatbot mode: ${value.toUpperCase()}`,
-                quoted: message
-            });
-
-        case 'trigger':
-            if (!['dm', 'all'].includes(value)) {
-                await showTyping(sock, chatId);
-                return sock.sendMessage(chatId, {
-                    text: "Invalid trigger! Use: dm or all",
-                    quoted: message
-                });
-            }
-            await showTyping(sock, chatId);
-            await updateChatbotSettings({ trigger: value });
-            return sock.sendMessage(chatId, {
-                text: `Chatbot trigger: ${value.toUpperCase()}`,
-                quoted: message
-            });
-
-        case 'response':
-            if (!['text', 'audio'].includes(value)) {
-                await showTyping(sock, chatId);
-                return sock.sendMessage(chatId, {
-                    text: "Invalid response type! Use: text or audio",
-                    quoted: message
-                });
-            }
-            await showTyping(sock, chatId);
-            await updateChatbotSettings({ default_response: value });
-            return sock.sendMessage(chatId, {
-                text: `Default response: ${value.toUpperCase()}`,
-                quoted: message
-            });
-
-        case 'voice':
-            if (!availableVoices.includes(value)) {
-                await showTyping(sock, chatId);
-                return sock.sendMessage(chatId, {
-                    text: `Invalid voice! Available voices:\n${availableVoices.join(', ')}`,
-                    quoted: message
-                });
-            }
-            await showTyping(sock, chatId);
-            await updateChatbotSettings({ voice: value });
-            return sock.sendMessage(chatId, {
-                text: `Voice set to: ${value}`,
-                quoted: message
-            });
-
-        case 'voices':
-            await showTyping(sock, chatId);
-            return sock.sendMessage(chatId, {
-                text: `AVAILABLE VOICES:\n\n${availableVoices.join(', ')}`,
-                quoted: message
-            });
-
-        case 'clear':
-            await showTyping(sock, chatId);
-            const cleared = await clearConversationHistory(senderId);
-            if (cleared) {
-                return sock.sendMessage(chatId, {
-                    text: "Chatbot conversation history cleared!",
-                    quoted: message
-                });
-            } else {
-                return sock.sendMessage(chatId, {
-                    text: "No conversation history to clear!",
-                    quoted: message
-                });
-            }
-
-        case 'status':
-            await showTyping(sock, chatId);
-            const history = await getConversationHistory(senderId, 5);
-            if (history.length === 0) {
-                return sock.sendMessage(chatId, {
-                    text: "No recent conversations found.",
-                    quoted: message
-                });
-            }
-            
-            let historyText = `RECENT CONVERSATIONS (${history.length})\n\n`;
-            history.forEach((conv, index) => {
-                const typeIcon = getTypeIcon(conv.type);
-                historyText += `${index + 1}. ${typeIcon} You: ${conv.user.substring(0, 50)}${conv.user.length > 50 ? '...' : ''}\n`;
-                historyText += `   Bot: ${conv.type === 'audio' ? '[Voice Message]' : conv.ai.substring(0, 50)}${conv.ai.length > 50 ? '...' : ''}\n\n`;
-            });
-            
-            return sock.sendMessage(chatId, {
-                text: historyText,
-                quoted: message
-            });
-
-        case 'test':
-            const testArgs = value.split(' ');
-            const testType = testArgs[0]?.toLowerCase();
-            const testMessage = testArgs.slice(1).join(' ') || "Hello, this is a test message";
-            
-            try {
-                await showTyping(sock, chatId);
-                await sock.sendMessage(chatId, {
-                    text: `Testing ${testType || 'text'} with: "${testMessage}"`,
-                    quoted: message
-                });
-                
-                if (testType === 'audio') {
-                    // Test audio: Get AI response first, then convert to audio
-                    const textResponse = await axios.get(`https://apiskeith.vercel.app/keithai?q=${encodeURIComponent(testMessage)}`);
-                    if (textResponse.data.status) {
-                        const audioResponse = await axios.get(`https://apiskeith.vercel.app/ai/text2speech?q=${encodeURIComponent(textResponse.data.result)}&voice=${settings.voice}`);
-                        if (audioResponse.data.status && audioResponse.data.result.URL) {
-                            const audioBuffer = await downloadMedia(audioResponse.data.result.URL);
-                            if (audioBuffer) {
-                                await sock.sendMessage(chatId, {
-                                    audio: audioBuffer,
-                                    ptt: true,
-                                    mimetype: 'audio/mpeg'
-                                });
-                            }
-                        }
-                    }
-                } else if (testType === 'video') {
-                    const videoResponse = await axios.get(`https://apiskeith.vercel.app/text2video?q=${encodeURIComponent(testMessage)}`);
-                    if (videoResponse.data.success && videoResponse.data.results) {
-                        const videoBuffer = await downloadMedia(videoResponse.data.results);
-                        if (videoBuffer) {
-                            await sock.sendMessage(chatId, {
-                                video: videoBuffer,
-                                caption: `Test video: ${testMessage}`
-                            });
-                        }
-                    }
-                } else if (testType === 'image') {
-                    const imageBuffer = await downloadMedia(`https://apiskeith.vercel.app/ai/flux?q=${encodeURIComponent(testMessage)}`);
-                    if (imageBuffer) {
-                        await sock.sendMessage(chatId, {
-                            image: imageBuffer,
-                            caption: `Test image: ${testMessage}`
-                        });
-                    }
-                } else {
-                    // Text test
-                    const textResponse = await axios.get(`https://apiskeith.vercel.app/keithai?q=${encodeURIComponent(testMessage)}`);
-                    if (textResponse.data.status) {
-                        await sock.sendMessage(chatId, {
-                            text: `Text Response:\n\n${textResponse.data.result}`,
-                            quoted: message
-                        });
-                    }
-                }
-                
-                await sock.sendMessage(chatId, {
-                    text: "Test completed!",
-                    quoted: message
-                });
-            } catch (error) {
-                console.error('❌ Test error:', error.message);
-                await sock.sendMessage(chatId, {
-                    text: "Test failed!",
-                    quoted: message
-                });
-            }
-            return;
-
-        default:
-            await showTyping(sock, chatId);
-            return sock.sendMessage(chatId, {
-                text: 
-                    "Invalid command!\n\n" +
-                    `• .chatbot on/off\n` +
-                    `• .chatbot mode private/group/both\n` +
-                    `• .chatbot trigger dm/all\n` +
-                    `• .chatbot response text/audio\n` +
-                    `• .chatbot voice <name>\n` +
-                    `• .chatbot voices\n` +
-                    `• .chatbot clear\n` +
-                    `• .chatbot status\n` +
-                    `• .chatbot test <text/audio/video/image> <message>`,
-                quoted: message
-            });
-    }
-}
-
-async function handleChatbotResponse(sock, chatId, message, userMessage, senderId) {
-    const settings = getChatbotSettings();
-    const groupData = loadUserGroupData();
-    
-    // Check if chatbot is enabled in this chat (backward compatibility)
-    const isEnabled = settings.status === 'on' || groupData.chatbot[chatId];
-    
-    if (!isEnabled) return;
-
-    // Check mode
-    const isGroup = chatId.endsWith('@g.us');
-    if (settings.mode === 'private' && isGroup) return;
-    if (settings.mode === 'group' && !isGroup) return;
-
-    try {
-        // Get bot's ID for mention detection
-        const botId = sock.user.id;
-        const botNumber = botId.split(':')[0];
-        const botJids = [
-            botId,
-            `${botNumber}@s.whatsapp.net`,
-            `${botNumber}@whatsapp.net`
-        ];
-
-        // Check if bot should respond based on trigger setting
-        let shouldRespond = false;
-        let responseType = settings.default_response;
-
-        // Check for type indicators in message
-        const lowerMessage = userMessage.toLowerCase();
-        if (lowerMessage.startsWith('audio ')) {
-            responseType = 'audio';
-            userMessage = userMessage.substring(6).trim();
-        } else if (lowerMessage.startsWith('video ')) {
-            responseType = 'video';
-            userMessage = userMessage.substring(6).trim();
-        } else if (lowerMessage.startsWith('image ')) {
-            responseType = 'image';
-            userMessage = userMessage.substring(6).trim();
-        }
-
-        // Check for mentions
-        if (message.message?.extendedTextMessage) {
-            const mentionedJid = message.message.extendedTextMessage.contextInfo?.mentionedJid || [];
-            const quotedParticipant = message.message.extendedTextMessage.contextInfo?.participant;
-            
-            const isBotMentioned = mentionedJid.some(jid => {
-                const jidNumber = jid.split('@')[0];
-                return botJids.some(botJid => {
-                    const botJidNumber = botJid.split('@')[0].split(':')[0];
-                    return jidNumber === botJidNumber;
-                });
-            });
-            
-            const isReplyToBot = quotedParticipant ? botJids.some(botJid => {
-                const cleanBot = botJid.replace(/[:@].*$/, '');
-                const cleanQuoted = quotedParticipant.replace(/[:@].*$/, '');
-                return cleanBot === cleanQuoted;
-            }) : false;
-
-            // Determine if bot should respond based on trigger setting
-            if (settings.trigger === 'dm') {
-                shouldRespond = isBotMentioned || isReplyToBot;
-            } else if (settings.trigger === 'all') {
-                shouldRespond = true;
-            }
-        } else if (message.message?.conversation) {
-            const isBotMentioned = userMessage.includes(`@${botNumber}`);
-            
-            if (settings.trigger === 'dm') {
-                shouldRespond = isBotMentioned;
-            } else if (settings.trigger === 'all') {
-                shouldRespond = true;
-            }
-        }
-
-        if (!shouldRespond) return;
-
-        // Clean the message from mentions
-        if (userMessage.includes(`@${botNumber}`)) {
-            userMessage = userMessage.replace(new RegExp(`@${botNumber}`, 'g'), '').trim();
-        }
-
-        // Initialize user's chat memory if not exists
-        if (!chatMemory.messages.has(senderId)) {
-            chatMemory.messages.set(senderId, []);
-            chatMemory.userInfo.set(senderId, {});
-        }
-
-        // Extract and update user information
-        const userInfo = extractUserInfo(userMessage);
-        if (Object.keys(userInfo).length > 0) {
-            chatMemory.userInfo.set(senderId, {
-                ...chatMemory.userInfo.get(senderId),
-                ...userInfo
-            });
-        }
-
-        // Add message to history (keep last 20 messages)
-        const messages = chatMemory.messages.get(senderId);
-        messages.push(userMessage);
-        if (messages.length > 20) {
-            messages.shift();
-        }
-        chatMemory.messages.set(senderId, messages);
-
-        // Show typing indicator
-        await showTyping(sock, chatId);
-
-        // Get AI response with context
-        const aiResponse = await getAIResponse(userMessage, {
-            messages: chatMemory.messages.get(senderId),
-            userInfo: chatMemory.userInfo.get(senderId)
-        });
-
-        if (!aiResponse) {
-            await sock.sendMessage(chatId, { 
-                text: "Hmm, let me think about that... I'm having trouble processing your request right now.",
-                quoted: message
-            });
-            return;
-        }
-
-        // Store in conversation history
-        await addConversation(senderId, responseType, userMessage, aiResponse);
-
-        // Handle different response types
-        if (responseType === 'audio') {
-            try {
-                const audioResponse = await axios.get(`https://apiskeith.vercel.app/ai/text2speech?q=${encodeURIComponent(aiResponse)}&voice=${settings.voice}`);
-                if (audioResponse.data.status && audioResponse.data.result.URL) {
-                    const audioBuffer = await downloadMedia(audioResponse.data.result.URL);
-                    if (audioBuffer) {
-                        await sock.sendMessage(chatId, {
-                            audio: audioBuffer,
-                            ptt: true,
-                            mimetype: 'audio/mpeg'
-                        });
-                    } else {
-                        // Fallback to text if audio fails
-                        await sock.sendMessage(chatId, {
-                            text: aiResponse,
-                            quoted: message
-                        });
-                    }
-                } else {
-                    // Fallback to text
-                    await sock.sendMessage(chatId, {
-                        text: aiResponse,
-                        quoted: message
-                    });
-                }
-            } catch (error) {
-                console.error('❌ Audio generation error:', error.message);
-                // Fallback to text
-                await sock.sendMessage(chatId, {
-                    text: aiResponse,
-                    quoted: message
-                });
-            }
-        } else if (responseType === 'video') {
-            try {
-                const videoResponse = await axios.get(`https://apiskeith.vercel.app/text2video?q=${encodeURIComponent(userMessage)}`);
-                if (videoResponse.data.success && videoResponse.data.results) {
-                    const videoBuffer = await downloadMedia(videoResponse.data.results);
-                    if (videoBuffer) {
-                        await sock.sendMessage(chatId, {
-                            video: videoBuffer,
-                            caption: aiResponse,
-                            quoted: message
-                        });
-                    } else {
-                        await sock.sendMessage(chatId, {
-                            text: aiResponse,
-                            quoted: message
-                        });
-                    }
-                } else {
-                    await sock.sendMessage(chatId, {
-                        text: aiResponse,
-                        quoted: message
-                    });
-                }
-            } catch (error) {
-                console.error('❌ Video generation error:', error.message);
-                await sock.sendMessage(chatId, {
-                    text: aiResponse,
-                    quoted: message
-                });
-            }
-        } else if (responseType === 'image') {
-            try {
-                const imageBuffer = await downloadMedia(`https://apiskeith.vercel.app/ai/flux?q=${encodeURIComponent(userMessage)}`);
-                if (imageBuffer) {
-                    await sock.sendMessage(chatId, {
-                        image: imageBuffer,
-                        caption: aiResponse,
-                        quoted: message
-                    });
-                } else {
-                    await sock.sendMessage(chatId, {
-                        text: aiResponse,
-                        quoted: message
-                    });
-                }
-            } catch (error) {
-                console.error('❌ Image generation error:', error.message);
-                await sock.sendMessage(chatId, {
-                    text: aiResponse,
-                    quoted: message
-                });
-            }
-        } else {
-            // Text response
-            await sock.sendMessage(chatId, {
-                text: aiResponse,
-                quoted: message
-            });
-        }
-
-    } catch (error) {
-        console.error('❌ Error in chatbot response:', error.message);
-        
-        // Handle session errors - don't try to send error messages
-        if (error.message && error.message.includes('No sessions')) {
-            console.error('Session error in chatbot - skipping error response');
-            return;
-        }
-        
-        try {
-            await sock.sendMessage(chatId, { 
-                text: "Oops! I got a bit confused there. Could you try asking that again?",
-                quoted: message
-            });
-        } catch (sendError) {
-            console.error('Failed to send chatbot error message:', sendError.message);
-        }
-    }
-}
-
-async function getAIResponse(userMessage, userContext) {
-    try {
-        const prompt = `
-You are a helpful WhatsApp chatbot. Keep responses concise and natural.
-
-Previous conversation context:
-${userContext.messages.join('\n')}
-
-User information:
-${JSON.stringify(userContext.userInfo, null, 2)}
-
-Current message: ${userMessage}
-
-Response:
-        `.trim();
-
-        const response = await fetch("https://zellapi.autos/ai/chatbot?text=" + encodeURIComponent(prompt));
-        if (!response.ok) throw new Error("API call failed");
-        
-        const data = await response.json();
-        if (!data.status || !data.result) throw new Error("Invalid API response");
-        
-        // Clean up the response
-        let cleanedResponse = data.result.trim()
-            // Remove any prompt-like text
-            .replace(/Remember:.*$/g, '')
-            .replace(/IMPORTANT:.*$/g, '')
-            .replace(/CORE RULES:.*$/g, '')
-            .replace(/EMOJI USAGE:.*$/g, '')
-            .replace(/RESPONSE STYLE:.*$/g, '')
-            .replace(/EMOTIONAL RESPONSES:.*$/g, '')
-            .replace(/ABOUT YOU:.*$/g, '')
-            .replace(/SLANG EXAMPLES:.*$/g, '')
-            .replace(/Previous conversation context:.*$/g, '')
-            .replace(/User information:.*$/g, '')
-            .replace(/Current message:.*$/g, '')
-            .replace(/You:.*$/g, '')
-            .replace(/Response:.*$/g, '')
-            // Remove any remaining instruction-like text
-            .replace(/^[A-Z\s]+:.*$/gm, '')
-            .replace(/^[•-]\s.*$/gm, '')
-            .replace(/^✅.*$/gm, '')
-            .replace(/^❌.*$/gm, '')
-            // Clean up extra whitespace
-            .replace(/\n\s*\n/g, '\n')
-            .trim();
-        
-        return cleanedResponse;
-    } catch (error) {
-        console.error("AI API error:", error);
-        return null;
-    }
-}
-
+// Export the module
 module.exports = {
     handleChatbotCommand,
-    handleChatbotResponse,
-    getChatbotSettings,
-    updateChatbotSettings,
-    getConversationHistory,
-    clearConversationHistory
+    handleChatbotResponse
 };
