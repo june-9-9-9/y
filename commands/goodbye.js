@@ -5,7 +5,7 @@ const { normalizeJid, findParticipant } = require('../lib/jid');
 async function goodbyeCommand(sock, chatId, message, match) {
     // Check if it's a group
     if (!chatId.endsWith('@g.us')) {
-        await sock.sendMessage(chatId, { text: 'This command can only be used in groups.' },{ quoted: message });
+        await sock.sendMessage(chatId, { text: 'This command can only be used in groups.' }, { quoted: message });
         return;
     }
 
@@ -28,6 +28,7 @@ async function handleLeaveEvent(sock, id, participants) {
     // Get group metadata
     const groupMetadata = await sock.groupMetadata(id);
     const groupName = groupMetadata.subject;
+    const membersCount = groupMetadata.participants.length;
 
     // Send goodbye message for each leaving participant
     for (const participant of participants) {
@@ -41,7 +42,7 @@ async function handleLeaveEvent(sock, id, participants) {
                 if (found && found.name) {
                     displayName = found.name;
                 }
-            } catch (nameError) {
+            } catch {
                 console.log('Could not fetch display name, using phone number');
             }
             
@@ -50,36 +51,33 @@ async function handleLeaveEvent(sock, id, participants) {
             if (customMessage) {
                 finalMessage = customMessage
                     .replace(/{user}/g, `@${displayName}`)
-                    .replace(/{group}/g, groupName);
+                    .replace(/{group}/g, groupName)
+                    .replace(/{bot}/g, 'June X Bot')
+                    .replace(/{members}/g, membersCount.toString());
             } else {
                 // Default message if no custom message is set
-                finalMessage = ` *@${displayName}* we will never miss you! `;
+                finalMessage = `Goodbye @${displayName} from ${groupName}! 👋\nWe now have ${membersCount} members.\n🤖 Powered by June X Bot`;
             }
             
             // Try to send with the individual's profile picture
             try {
-                // Get the leaving participant's profile picture
                 let profilePicUrl;
                 try {
                     profilePicUrl = await sock.profilePictureUrl(participantString, 'image');
-                } catch (profileError) {
-                    // If no profile picture, use a default avatar
-                    console.log('No profile picture available for user, using default');
+                } catch {
+                    console.log('No profile picture available, using default');
                     profilePicUrl = 'https://img.pyrocdn.com/dbKUgahg.png';
                 }
                 
-                // Fetch the profile picture to use as image
                 const picResponse = await fetch(profilePicUrl);
                 if (picResponse.ok) {
                     const imageBuffer = await picResponse.buffer();
-                    
-                    // Send the profile picture with goodbye message as caption
                     await sock.sendMessage(id, {
                         image: imageBuffer,
                         caption: finalMessage,
                         mentions: [participantString]
                     });
-                    continue; // Skip to next participant
+                    continue;
                 }
             } catch (imageError) {
                 console.log('Failed to send profile picture, falling back to text', imageError);
@@ -92,18 +90,18 @@ async function handleLeaveEvent(sock, id, participants) {
             });
         } catch (error) {
             console.error('Error sending goodbye message:', error);
-            // Fallback to text message
             const participantString = typeof participant === 'string' ? participant : (participant.id || participant.toString());
             const user = participantString.split('@')[0];
             
-            // Use custom message if available, otherwise use simple fallback
             let fallbackMessage;
             if (customMessage) {
                 fallbackMessage = customMessage
                     .replace(/{user}/g, `@${user}`)
-                    .replace(/{group}/g, groupName);
+                    .replace(/{group}/g, groupName)
+                    .replace(/{bot}/g, 'June X Bot')
+                    .replace(/{members}/g, membersCount.toString());
             } else {
-                fallbackMessage = `Goodbye @${user}! 👋`;
+                fallbackMessage = `Goodbye @${user}! 👋 Powered by June X Bot. We now have ${membersCount} members.`;
             }
             
             await sock.sendMessage(id, {
