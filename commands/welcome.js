@@ -6,7 +6,7 @@ const { normalizeJid, findParticipant } = require('../lib/jid');
 async function welcomeCommand(sock, chatId, message) {
     // Check if it's a group
     if (!chatId.endsWith('@g.us')) {
-        await sock.sendMessage(chatId, { text: 'This command can only be used in groups.' },{ quoted: message });
+        await sock.sendMessage(chatId, { text: 'This command can only be used in groups.' }, { quoted: message });
         return;
     }
 
@@ -30,6 +30,7 @@ async function handleJoinEvent(sock, id, participants) {
     const groupMetadata = await sock.groupMetadata(id);
     const groupName = groupMetadata.subject;
     const groupDesc = groupMetadata.desc || 'No description available';
+    const membersCount = groupMetadata.participants.length;
 
     // Send welcome message for each new participant
     for (const participant of participants) {
@@ -43,7 +44,7 @@ async function handleJoinEvent(sock, id, participants) {
                 if (found && found.name) {
                     displayName = found.name;
                 }
-            } catch (nameError) {
+            } catch {
                 console.log('Could not fetch display name, using phone number');
             }
 
@@ -52,14 +53,12 @@ async function handleJoinEvent(sock, id, participants) {
             let profilePicBuffer = null;
             try {
                 profilePicUrl = await sock.profilePictureUrl(participantString, 'image');
-                // Fetch the profile picture buffer
                 const picResponse = await fetch(profilePicUrl);
                 if (picResponse.ok) {
                     profilePicBuffer = await picResponse.buffer();
                 }
-            } catch (profileError) {
+            } catch {
                 console.log('No profile picture available for user:', displayName);
-                // Use default avatar if no profile picture
                 profilePicUrl = 'https://img.pyrocdn.com/dbKUgahg.png';
                 const defaultResponse = await fetch(profilePicUrl);
                 if (defaultResponse.ok) {
@@ -73,7 +72,9 @@ async function handleJoinEvent(sock, id, participants) {
                 finalMessage = customMessage
                     .replace(/{user}/g, `@${displayName}`)
                     .replace(/{group}/g, groupName)
-                    .replace(/{description}/g, groupDesc);
+                    .replace(/{description}/g, groupDesc)
+                    .replace(/{bot}/g, 'June X Bot')
+                    .replace(/{members}/g, membersCount.toString());
             } else {
                 // Default message if no custom message is set
                 const now = new Date();
@@ -87,13 +88,22 @@ async function handleJoinEvent(sock, id, participants) {
                     hour12: true
                 });
                 
-                finalMessage = `╭╼━≪•NEW-MEMBER•≫━╾╮\n┃WELCOME: @${displayName} 👋\n┃Member count: #${groupMetadata.participants.length}\n┃𝚃𝙸𝙼𝙴: ${timeString}⏰\n╰━━━━━━━━━━━━━━━╯\n\n*@${displayName}* Welcome to *${groupName}*! 🎉\n*𝙳𝙴𝚂𝙲𝚁𝙸𝙿𝚃𝙸𝙾𝙽*\n${groupDesc}\n\n`;
+                finalMessage = `╭╼━≪•NEW-MEMBER•≫━╾╮
+┃WELCOME: @${displayName} 👋
+┃Member count: #${membersCount}
+┃𝚃𝙸𝙼𝙴: ${timeString}⏰
+╰━━━━━━━━━━━━━━━╯
+
+*@${displayName}* Welcome to *${groupName}*! 🎉
+*𝙳𝙴𝚂𝙲𝙸𝙿𝚃𝙸𝙾𝙽*
+${groupDesc}
+
+🤖 Powered by June X Bot`;
             }
             
             // Try to send with image first
             try {
                 if (profilePicBuffer) {
-                    // Option 1: Send profile picture as an image with caption
                     await sock.sendMessage(id, {
                         image: profilePicBuffer,
                         caption: finalMessage,
@@ -101,14 +111,11 @@ async function handleJoinEvent(sock, id, participants) {
                         ...channelInfo
                     });
                 } else {
-                    // Option 2: Try API-generated welcome image with profile picture
-                    const apiUrl = `https://api.some-random-api.com/welcome/img/2/gaming3?type=join&textcolor=green&username=${encodeURIComponent(displayName)}&guildName=${encodeURIComponent(groupName)}&memberCount=${groupMetadata.participants.length}&avatar=${encodeURIComponent(profilePicUrl || 'https://img.pyrocdn.com/dbKUgahg.png')}`;
+                    const apiUrl = `https://api.some-random-api.com/welcome/img/2/gaming3?type=join&textcolor=green&username=${encodeURIComponent(displayName)}&guildName=${encodeURIComponent(groupName)}&memberCount=${membersCount}&avatar=${encodeURIComponent(profilePicUrl || 'https://img.pyrocdn.com/dbKUgahg.png')}`;
                     
                     const response = await fetch(apiUrl);
                     if (response.ok) {
                         const imageBuffer = await response.buffer();
-                        
-                        // Send welcome image with caption
                         await sock.sendMessage(id, {
                             image: imageBuffer,
                             caption: finalMessage,
@@ -119,25 +126,8 @@ async function handleJoinEvent(sock, id, participants) {
                         throw new Error('API image generation failed');
                     }
                 }
-            } catch (imageError) {
-                console.log('Image sending failed, falling back to text with profile picture');
-                
-                // Fallback: Send profile picture separately with text
-                try {
-                    if (profilePicBuffer) {
-                        // Send profile picture first
-                        await sock.sendMessage(id, {
-                            image: profilePicBuffer,
-                            caption: `📸 Profile picture of @${displayName}`,
-                            mentions: [participantString],
-                            ...channelInfo
-                        });
-                    }
-                } catch (picError) {
-                    console.log('Could not send profile picture separately');
-                }
-                
-                // Send welcome text message
+            } catch {
+                console.log('Image sending failed, falling back to text');
                 await sock.sendMessage(id, {
                     text: finalMessage,
                     mentions: [participantString],
@@ -146,19 +136,19 @@ async function handleJoinEvent(sock, id, participants) {
             }
         } catch (error) {
             console.error('Error sending welcome message:', error);
-            // Fallback to text message
             const participantString = typeof participant === 'string' ? participant : (participant.id || participant.toString());
             const user = participantString.split('@')[0];
             
-            // Use custom message if available, otherwise use simple fallback
             let fallbackMessage;
             if (customMessage) {
                 fallbackMessage = customMessage
                     .replace(/{user}/g, `@${user}`)
                     .replace(/{group}/g, groupName)
-                    .replace(/{description}/g, groupDesc);
+                    .replace(/{description}/g, groupDesc)
+                    .replace(/{bot}/g, 'June X Bot')
+                    .replace(/{members}/g, membersCount.toString());
             } else {
-                fallbackMessage = `Welcome @${user} to ${groupName}! 🎉\nMembers count: ${groupMetadata.participants.length}\n`;
+                fallbackMessage = `Welcome @${user} to ${groupName}! 🎉 Powered by June X Bot. We now have ${membersCount} members.`;
             }
             
             await sock.sendMessage(id, {
