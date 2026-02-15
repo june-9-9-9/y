@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+
 global.APIs = {
     xteam: 'https://api.xteam.xyz',
     dzx: 'https://api.dhamzxploit.my.id',
@@ -24,12 +25,8 @@ global.APIKeys = {
 };
 
 module.exports = {
+    SESSION_ID: global.SESSION_ID || process.env.SESSION_ID,
     WARN_COUNT: 3,
     APIs: global.APIs,
-    APIKeys: global.APIKeys,
-
-    // ✅ Added Environment Variables
-    AI_INTEGRATIONS_OPENAI_API_KEY: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-    AI_INTEGRATIONS_OPENAI_BASE_URL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-    SESSION_SECRET: process.env.SESSION_SECRET
+    APIKeys: global.APIKeys
 };
