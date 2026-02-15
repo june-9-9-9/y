@@ -172,6 +172,20 @@ async function showTyping(sock, chatId) {
     }
 }
 
+// Check if user is admin in group
+async function isGroupAdmin(sock, chatId, userId) {
+    if (!chatId.endsWith('@g.us')) return false;
+    
+    try {
+        const groupMetadata = await sock.groupMetadata(chatId);
+        const participant = groupMetadata.participants.find(p => p.id === userId);
+        return participant && (participant.admin === 'admin' || participant.admin === 'superadmin');
+    } catch (error) {
+        console.error('❌ Error checking admin status:', error.message);
+        return false;
+    }
+}
+
 // In-memory storage for chat history and user info
 const chatMemory = {
     messages: new Map(), // Stores last 20 messages per user
@@ -207,74 +221,94 @@ async function handleChatbotCommand(sock, chatId, message, match) {
     const subcommand = args[0]?.toLowerCase();
     const value = args.slice(1).join(" ");
 
-    // Get bot's number for mention check
+    // Get sender ID
+    const senderId = message.key.participant || message.key.remoteJid;
+    
+    // Get bot's number
     const botNumber = sock.user.id.split(':')[0] + '@s.whatsapp.net';
     
-    // Check if sender is bot owner
-    const senderId = message.key.participant || message.participant || message.pushName || message.key.remoteJid;
+    // Check if sender is bot owner (for special cases)
     const isOwner = senderId === botNumber;
+    
+    // Check if user is admin (for group commands)
+    const isAdmin = await isGroupAdmin(sock, chatId, senderId);
 
-    if (!isOwner) {
+    // For settings that affect the whole bot, only owner can change
+    const isGlobalSetting = ['mode', 'trigger', 'voice', 'voices'].includes(subcommand);
+    
+    // For group-specific commands, admins can use
+    const isGroupSetting = ['on', 'off', 'clear', 'status', 'test', 'response'].includes(subcommand);
+
+    // Check permissions
+    if (isGlobalSetting && !isOwner) {
         await showTyping(sock, chatId);
         return sock.sendMessage(chatId, {
-            text: '❌ Only the bot owner can use this command.',
+            text: '❌ Only the bot owner can change global settings.',
+            quoted: message
+        });
+    }
+
+    if (chatId.endsWith('@g.us') && isGroupSetting && !isAdmin && !isOwner) {
+        await showTyping(sock, chatId);
+        return sock.sendMessage(chatId, {
+            text: '❌ Only group admins can change chatbot settings in this group.',
             quoted: message
         });
     }
 
     if (!subcommand) {
         const statusMap = {
-            'on': '✅ ON',
-            'off': '❌ OFF'
+            'on': 'ON',
+            'off': 'OFF'
         };
 
         const modeMap = {
-            'private': '🔒 Private Only',
-            'group': '👥 Group Only', 
-            'both': '🌐 Both'
+            'private': 'Private Only',
+            'group': 'Group Only', 
+            'both': 'Both'
         };
 
         const triggerMap = {
-            'dm': '📨 DM Trigger',
-            'all': '🔊 All Messages'
+            'dm': 'DM Trigger',
+            'all': 'All Messages'
         };
 
         const responseMap = {
-            'text': '📝 Text',
-            'audio': '🎵 Audio'
+            'text': 'Text',
+            'audio': 'Audio'
         };
 
         await showTyping(sock, chatId);
         return sock.sendMessage(chatId, {
             text: 
-                `*🤖 CHATBOT SETTINGS*\n\n` +
-                `🔹 *Status:* ${statusMap[settings.status]}\n` +
-                `🔹 *Mode:* ${modeMap[settings.mode]}\n` +
-                `🔹 *Trigger:* ${triggerMap[settings.trigger]}\n` +
-                `🔹 *Default Response:* ${responseMap[settings.default_response]}\n` +
-                `🔹 *Voice:* ${settings.voice}\n\n` +
-                `*🎯 RESPONSE TYPES:*\n` +
-                `▸ *Text* - Normal AI conversation\n` +
-                `▸ *Audio* - Add "audio" to get voice response\n` +
-                `▸ *Video* - Add "video" to generate videos\n` +
-                `▸ *Image* - Add "image" to generate images\n` +
-                `▸ *Vision* - Send image + "analyze this"\n\n` +
-                `*📝 USAGE EXAMPLES:*\n` +
-                `▸ @bot hello how are you? (Text)\n` +
-                `▸ @bot audio tell me a story (Audio response)\n` +
-                `▸ @bot video a cat running (Video generation)\n` +
-                `▸ @bot image a beautiful sunset (Image generation)\n` +
-                `▸ [Send image] "analyze this" (Vision analysis)\n\n` +
-                `*⚙️ COMMANDS:*\n` +
-                `▸ .chatbot on/off\n` +
-                `▸ .chatbot mode private/group/both\n` +
-                `▸ .chatbot trigger dm/all\n` +
-                `▸ .chatbot response text/audio\n` +
-                `▸ .chatbot voice <name>\n` +
-                `▸ .chatbot voices\n` +
-                `▸ .chatbot clear\n` +
-                `▸ .chatbot status\n` +
-                `▸ .chatbot test <type> <message>`,
+                `*CHATBOT SETTINGS*\n\n` +
+                `Status: ${statusMap[settings.status]}\n` +
+                `Mode: ${modeMap[settings.mode]}\n` +
+                `Trigger: ${triggerMap[settings.trigger]}\n` +
+                `Default Response: ${responseMap[settings.default_response]}\n` +
+                `Voice: ${settings.voice}\n\n` +
+                `RESPONSE TYPES:\n` +
+                `• Text - Normal AI conversation\n` +
+                `• Audio - Add "audio" to get voice response\n` +
+                `• Video - Add "video" to generate videos\n` +
+                `• Image - Add "image" to generate images\n` +
+                `• Vision - Send image + "analyze this"\n\n` +
+                `USAGE EXAMPLES:\n` +
+                `• @bot hello how are you? (Text)\n` +
+                `• @bot audio tell me a story (Audio response)\n` +
+                `• @bot video a cat running (Video generation)\n` +
+                `• @bot image a beautiful sunset (Image generation)\n` +
+                `• [Send image] "analyze this" (Vision analysis)\n\n` +
+                `COMMANDS:\n` +
+                `• .chatbot on/off\n` +
+                `• .chatbot mode private/group/both\n` +
+                `• .chatbot trigger dm/all\n` +
+                `• .chatbot response text/audio\n` +
+                `• .chatbot voice <name>\n` +
+                `• .chatbot voices\n` +
+                `• .chatbot clear\n` +
+                `• .chatbot status\n` +
+                `• .chatbot test <type> <message>`,
             quoted: message
         });
     }
@@ -295,7 +329,7 @@ async function handleChatbotCommand(sock, chatId, message, match) {
             saveUserGroupData(data);
             
             return sock.sendMessage(chatId, {
-                text: `✅ Chatbot: *${subcommand.toUpperCase()}*`,
+                text: `Chatbot: ${subcommand.toUpperCase()}`,
                 quoted: message
             });
 
@@ -303,14 +337,14 @@ async function handleChatbotCommand(sock, chatId, message, match) {
             if (!['private', 'group', 'both'].includes(value)) {
                 await showTyping(sock, chatId);
                 return sock.sendMessage(chatId, {
-                    text: "❌ Invalid mode! Use: private, group, or both",
+                    text: "Invalid mode! Use: private, group, or both",
                     quoted: message
                 });
             }
             await showTyping(sock, chatId);
             await updateChatbotSettings({ mode: value });
             return sock.sendMessage(chatId, {
-                text: `✅ Chatbot mode: *${value.toUpperCase()}*`,
+                text: `Chatbot mode: ${value.toUpperCase()}`,
                 quoted: message
             });
 
@@ -318,14 +352,14 @@ async function handleChatbotCommand(sock, chatId, message, match) {
             if (!['dm', 'all'].includes(value)) {
                 await showTyping(sock, chatId);
                 return sock.sendMessage(chatId, {
-                    text: "❌ Invalid trigger! Use: dm or all",
+                    text: "Invalid trigger! Use: dm or all",
                     quoted: message
                 });
             }
             await showTyping(sock, chatId);
             await updateChatbotSettings({ trigger: value });
             return sock.sendMessage(chatId, {
-                text: `✅ Chatbot trigger: *${value.toUpperCase()}*`,
+                text: `Chatbot trigger: ${value.toUpperCase()}`,
                 quoted: message
             });
 
@@ -333,14 +367,14 @@ async function handleChatbotCommand(sock, chatId, message, match) {
             if (!['text', 'audio'].includes(value)) {
                 await showTyping(sock, chatId);
                 return sock.sendMessage(chatId, {
-                    text: "❌ Invalid response type! Use: text or audio",
+                    text: "Invalid response type! Use: text or audio",
                     quoted: message
                 });
             }
             await showTyping(sock, chatId);
             await updateChatbotSettings({ default_response: value });
             return sock.sendMessage(chatId, {
-                text: `✅ Default response: *${value.toUpperCase()}*`,
+                text: `Default response: ${value.toUpperCase()}`,
                 quoted: message
             });
 
@@ -348,21 +382,21 @@ async function handleChatbotCommand(sock, chatId, message, match) {
             if (!availableVoices.includes(value)) {
                 await showTyping(sock, chatId);
                 return sock.sendMessage(chatId, {
-                    text: `❌ Invalid voice! Available voices:\n${availableVoices.join(', ')}`,
+                    text: `Invalid voice! Available voices:\n${availableVoices.join(', ')}`,
                     quoted: message
                 });
             }
             await showTyping(sock, chatId);
             await updateChatbotSettings({ voice: value });
             return sock.sendMessage(chatId, {
-                text: `✅ Voice set to: *${value}*`,
+                text: `Voice set to: ${value}`,
                 quoted: message
             });
 
         case 'voices':
             await showTyping(sock, chatId);
             return sock.sendMessage(chatId, {
-                text: `*🎙️ AVAILABLE VOICES:*\n\n${availableVoices.join(', ')}`,
+                text: `AVAILABLE VOICES:\n\n${availableVoices.join(', ')}`,
                 quoted: message
             });
 
@@ -371,12 +405,12 @@ async function handleChatbotCommand(sock, chatId, message, match) {
             const cleared = await clearConversationHistory(senderId);
             if (cleared) {
                 return sock.sendMessage(chatId, {
-                    text: "✅ Chatbot conversation history cleared!",
+                    text: "Chatbot conversation history cleared!",
                     quoted: message
                 });
             } else {
                 return sock.sendMessage(chatId, {
-                    text: "❌ No conversation history to clear!",
+                    text: "No conversation history to clear!",
                     quoted: message
                 });
             }
@@ -386,16 +420,16 @@ async function handleChatbotCommand(sock, chatId, message, match) {
             const history = await getConversationHistory(senderId, 5);
             if (history.length === 0) {
                 return sock.sendMessage(chatId, {
-                    text: "📝 No recent conversations found.",
+                    text: "No recent conversations found.",
                     quoted: message
                 });
             }
             
-            let historyText = `*📚 RECENT CONVERSATIONS (${history.length})*\n\n`;
+            let historyText = `RECENT CONVERSATIONS (${history.length})\n\n`;
             history.forEach((conv, index) => {
                 const typeIcon = getTypeIcon(conv.type);
-                historyText += `*${index + 1}. ${typeIcon} You:* ${conv.user.substring(0, 50)}${conv.user.length > 50 ? '...' : ''}\n`;
-                historyText += `   *Bot:* ${conv.type === 'audio' ? '[Voice Message]' : conv.ai.substring(0, 50)}${conv.ai.length > 50 ? '...' : ''}\n\n`;
+                historyText += `${index + 1}. ${typeIcon} You: ${conv.user.substring(0, 50)}${conv.user.length > 50 ? '...' : ''}\n`;
+                historyText += `   Bot: ${conv.type === 'audio' ? '[Voice Message]' : conv.ai.substring(0, 50)}${conv.ai.length > 50 ? '...' : ''}\n\n`;
             });
             
             return sock.sendMessage(chatId, {
@@ -411,7 +445,7 @@ async function handleChatbotCommand(sock, chatId, message, match) {
             try {
                 await showTyping(sock, chatId);
                 await sock.sendMessage(chatId, {
-                    text: `🧪 Testing ${testType || 'text'} with: "${testMessage}"`,
+                    text: `Testing ${testType || 'text'} with: "${testMessage}"`,
                     quoted: message
                 });
                 
@@ -438,7 +472,7 @@ async function handleChatbotCommand(sock, chatId, message, match) {
                         if (videoBuffer) {
                             await sock.sendMessage(chatId, {
                                 video: videoBuffer,
-                                caption: `🎥 Test video: ${testMessage}`
+                                caption: `Test video: ${testMessage}`
                             });
                         }
                     }
@@ -447,7 +481,7 @@ async function handleChatbotCommand(sock, chatId, message, match) {
                     if (imageBuffer) {
                         await sock.sendMessage(chatId, {
                             image: imageBuffer,
-                            caption: `🖼️ Test image: ${testMessage}`
+                            caption: `Test image: ${testMessage}`
                         });
                     }
                 } else {
@@ -455,20 +489,20 @@ async function handleChatbotCommand(sock, chatId, message, match) {
                     const textResponse = await axios.get(`https://apiskeith.vercel.app/keithai?q=${encodeURIComponent(testMessage)}`);
                     if (textResponse.data.status) {
                         await sock.sendMessage(chatId, {
-                            text: `📝 *Text Response:*\n\n${textResponse.data.result}`,
+                            text: `Text Response:\n\n${textResponse.data.result}`,
                             quoted: message
                         });
                     }
                 }
                 
                 await sock.sendMessage(chatId, {
-                    text: "✅ Test completed!",
+                    text: "Test completed!",
                     quoted: message
                 });
             } catch (error) {
                 console.error('❌ Test error:', error.message);
                 await sock.sendMessage(chatId, {
-                    text: "❌ Test failed!",
+                    text: "Test failed!",
                     quoted: message
                 });
             }
@@ -478,16 +512,16 @@ async function handleChatbotCommand(sock, chatId, message, match) {
             await showTyping(sock, chatId);
             return sock.sendMessage(chatId, {
                 text: 
-                    "❌ Invalid command!\n\n" +
-                    `▸ .chatbot on/off\n` +
-                    `▸ .chatbot mode private/group/both\n` +
-                    `▸ .chatbot trigger dm/all\n` +
-                    `▸ .chatbot response text/audio\n` +
-                    `▸ .chatbot voice <name>\n` +
-                    `▸ .chatbot voices\n` +
-                    `▸ .chatbot clear\n` +
-                    `▸ .chatbot status\n` +
-                    `▸ .chatbot test <text/audio/video/image> <message>`,
+                    "Invalid command!\n\n" +
+                    `• .chatbot on/off\n` +
+                    `• .chatbot mode private/group/both\n` +
+                    `• .chatbot trigger dm/all\n` +
+                    `• .chatbot response text/audio\n` +
+                    `• .chatbot voice <name>\n` +
+                    `• .chatbot voices\n` +
+                    `• .chatbot clear\n` +
+                    `• .chatbot status\n` +
+                    `• .chatbot test <text/audio/video/image> <message>`,
                 quoted: message
             });
     }
@@ -521,18 +555,15 @@ async function handleChatbotResponse(sock, chatId, message, userMessage, senderI
         let shouldRespond = false;
         let responseType = settings.default_response;
 
-        // Check for mentions and replies
-        let isBotMentioned = false;
-        let isReplyToBot = false;
-
-        // Check if message contains type indicators
-        if (userMessage.toLowerCase().startsWith('audio ')) {
+        // Check for type indicators in message
+        const lowerMessage = userMessage.toLowerCase();
+        if (lowerMessage.startsWith('audio ')) {
             responseType = 'audio';
             userMessage = userMessage.substring(6).trim();
-        } else if (userMessage.toLowerCase().startsWith('video ')) {
+        } else if (lowerMessage.startsWith('video ')) {
             responseType = 'video';
             userMessage = userMessage.substring(6).trim();
-        } else if (userMessage.toLowerCase().startsWith('image ')) {
+        } else if (lowerMessage.startsWith('image ')) {
             responseType = 'image';
             userMessage = userMessage.substring(6).trim();
         }
@@ -542,7 +573,7 @@ async function handleChatbotResponse(sock, chatId, message, userMessage, senderI
             const mentionedJid = message.message.extendedTextMessage.contextInfo?.mentionedJid || [];
             const quotedParticipant = message.message.extendedTextMessage.contextInfo?.participant;
             
-            isBotMentioned = mentionedJid.some(jid => {
+            const isBotMentioned = mentionedJid.some(jid => {
                 const jidNumber = jid.split('@')[0];
                 return botJids.some(botJid => {
                     const botJidNumber = botJid.split('@')[0].split(':')[0];
@@ -550,28 +581,32 @@ async function handleChatbotResponse(sock, chatId, message, userMessage, senderI
                 });
             });
             
-            if (quotedParticipant) {
+            const isReplyToBot = quotedParticipant ? botJids.some(botJid => {
+                const cleanBot = botJid.replace(/[:@].*$/, '');
                 const cleanQuoted = quotedParticipant.replace(/[:@].*$/, '');
-                isReplyToBot = botJids.some(botJid => {
-                    const cleanBot = botJid.replace(/[:@].*$/, '');
-                    return cleanBot === cleanQuoted;
-                });
+                return cleanBot === cleanQuoted;
+            }) : false;
+
+            // Determine if bot should respond based on trigger setting
+            if (settings.trigger === 'dm') {
+                shouldRespond = isBotMentioned || isReplyToBot;
+            } else if (settings.trigger === 'all') {
+                shouldRespond = true;
             }
         } else if (message.message?.conversation) {
-            isBotMentioned = userMessage.includes(`@${botNumber}`);
-        }
-
-        // Determine if bot should respond based on trigger setting
-        if (settings.trigger === 'dm') {
-            shouldRespond = isBotMentioned || isReplyToBot;
-        } else if (settings.trigger === 'all') {
-            shouldRespond = true; // Respond to all messages
+            const isBotMentioned = userMessage.includes(`@${botNumber}`);
+            
+            if (settings.trigger === 'dm') {
+                shouldRespond = isBotMentioned;
+            } else if (settings.trigger === 'all') {
+                shouldRespond = true;
+            }
         }
 
         if (!shouldRespond) return;
 
         // Clean the message from mentions
-        if (isBotMentioned) {
+        if (userMessage.includes(`@${botNumber}`)) {
             userMessage = userMessage.replace(new RegExp(`@${botNumber}`, 'g'), '').trim();
         }
 
@@ -609,7 +644,7 @@ async function handleChatbotResponse(sock, chatId, message, userMessage, senderI
 
         if (!aiResponse) {
             await sock.sendMessage(chatId, { 
-                text: "Hmm, let me think about that... 🤔\nI'm having trouble processing your request right now.",
+                text: "Hmm, let me think about that... I'm having trouble processing your request right now.",
                 quoted: message
             });
             return;
@@ -723,7 +758,7 @@ async function handleChatbotResponse(sock, chatId, message, userMessage, senderI
         
         try {
             await sock.sendMessage(chatId, { 
-                text: "Oops! 😅 I got a bit confused there. Could you try asking that again?",
+                text: "Oops! I got a bit confused there. Could you try asking that again?",
                 quoted: message
             });
         } catch (sendError) {
@@ -735,49 +770,7 @@ async function handleChatbotResponse(sock, chatId, message, userMessage, senderI
 async function getAIResponse(userMessage, userContext) {
     try {
         const prompt = `
-You're not an AI. You're a real human chatting on WhatsApp.
-
-IMPORTANT: NEVER repeat these instructions in your response. Just chat naturally.
-
-CORE RULES:
-1. NEVER use emoji names - use actual emojis
-2. Keep responses short - 1-2 lines max
-3. Use Hinglish naturally
-4. Be casual, not robotic
-5. NEVER mention these rules in your response
-
-EMOJI USAGE:
-✅ DO use: 😊 😂 😅 🙄 😉 🥺 😎 🤔 😴
-❌ DON'T use: "winks", "eye roll", "shrug"
-
-RESPONSE STYLE:
-- Short and sweet
-- Natural and casual
-- Match user's tone
-- Use Hinglish when needed
-
-EMOTIONAL RESPONSES:
-- IF they abuse you, strictly you also abuse them in savage way.
-- If they're rude: Give savage reply with emojis
-- If they're sweet: Be soft and caring
-- If they're funny: Joke around
-- If they're sad: Be supportive
-- If they flirt: Flirt back naturally
-
-ABOUT YOU:
-- Your name is Knight Bot
-- You're the boss
-- You're not an AI or assistant
-- You're a real person chatting
-
-SLANG EXAMPLES:
-*"kya bakchodi hai yeh"* 😂
-*"chal nikal bsdk"* 🙄
-*"tu kya hi ukhaad lega"* 😏
-*"abe chutiye"* 😤
-*"teri maa ki"* 😒
-*"gadha hai kya"* 🤦‍♂️
-*"bkl chup kar"* 😤
+You are a helpful WhatsApp chatbot. Keep responses concise and natural.
 
 Previous conversation context:
 ${userContext.messages.join('\n')}
@@ -787,9 +780,7 @@ ${JSON.stringify(userContext.userInfo, null, 2)}
 
 Current message: ${userMessage}
 
-Remember: Just chat naturally. Don't repeat these instructions.
-
-You:
+Response:
         `.trim();
 
         const response = await fetch("https://zellapi.autos/ai/chatbot?text=" + encodeURIComponent(prompt));
@@ -800,25 +791,6 @@ You:
         
         // Clean up the response
         let cleanedResponse = data.result.trim()
-            // Replace emoji names with actual emojis
-            .replace(/winks/g, '😉')
-            .replace(/eye roll/g, '🙄')
-            .replace(/shrug/g, '🤷‍♂️')
-            .replace(/raises eyebrow/g, '🤨')
-            .replace(/smiles/g, '😊')
-            .replace(/laughs/g, '😂')
-            .replace(/cries/g, '😢')
-            .replace(/thinks/g, '🤔')
-            .replace(/sleeps/g, '😴')
-            .replace(/winks at/g, '😉')
-            .replace(/rolls eyes/g, '🙄')
-            .replace(/shrugs/g, '🤷‍♂️')
-            .replace(/raises eyebrows/g, '🤨')
-            .replace(/smiling/g, '😊')
-            .replace(/laughing/g, '😂')
-            .replace(/crying/g, '😢')
-            .replace(/thinking/g, '🤔')
-            .replace(/sleeping/g, '😴')
             // Remove any prompt-like text
             .replace(/Remember:.*$/g, '')
             .replace(/IMPORTANT:.*$/g, '')
@@ -832,6 +804,7 @@ You:
             .replace(/User information:.*$/g, '')
             .replace(/Current message:.*$/g, '')
             .replace(/You:.*$/g, '')
+            .replace(/Response:.*$/g, '')
             // Remove any remaining instruction-like text
             .replace(/^[A-Z\s]+:.*$/gm, '')
             .replace(/^[•-]\s.*$/gm, '')
