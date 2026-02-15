@@ -64,7 +64,8 @@ const COMMAND_CATEGORIES = {
     'OWNER MENU': [
         'mode', 'autostatus', 'antidelete', 'autoread', 'autotyping',
         'autoreact', 'pmblocker', 'setpp', 'clearsession', 'cleartmp',
-        'sudo', 'setprefix', 'setowner', 'setmenu', 'restart'
+        'sudo', 'setprefix', 'setowner', 'setmenu', 'restart', 
+        'menuimage', 'configimage'
     ],
     'GROUP ADMIN': [
         'promote', 'demote', 'kick', 'mute', 'unmute', 'ban', 'unban',
