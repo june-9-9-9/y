@@ -158,7 +158,7 @@ async function handleJoinEvent(sock, id, participants) {
                     .replace(/{group}/g, groupName)
                     .replace(/{description}/g, groupDesc);
             } else {
-                fallbackMessage = `Welcome @${user} to ${groupName}! 🎉`;
+                fallbackMessage = `Welcome @${user} to ${groupName}! 🎉\nMembers count: ${groupMetadata.participants.length}\n`;
             }
             
             await sock.sendMessage(id, {
