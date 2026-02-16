@@ -2,7 +2,7 @@ const fs = require("fs");
 const axios = require("axios");
 const yts = require("yt-search");
 const path = require("path");
-const os = require("os"); // Added os import
+const os = require("os");
 
 async function songCommand(sock, chatId, message) {
     try {
@@ -10,7 +10,7 @@ async function songCommand(sock, chatId, message) {
             react: { text: "🎼", key: message.key }
         });
 
-        const tempDir = path.join(__dirname, "temp"); // Fixed: __dirname instead of dirname
+        const tempDir = path.join(__dirname, "temp");
         if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
         // Extract query from direct text or quoted message
@@ -70,42 +70,26 @@ async function songCommand(sock, chatId, message) {
 
         const video = searchResult;
         
-        // Try multiple APIs with fallbacks for large files
+        // Use only Wolf API
         let downloadUrl;
         let videoTitle;
         
-        const apis = [
-            `https://apis.xwolf.space/download/yta3?url=${encodeURIComponent(video.url)}`,
-            `https://api.ryzendesu.vip/api/downloader/ytmp3?url=${encodeURIComponent(video.url)}`,
-            `https://api.giftedtech.co.ke/api/download/ytmp3?apikey=gifted&url=${encodeURIComponent(video.url)}`
-        ];
-        
-        for (const api of apis) {
-            try {
-                const response = await axios.get(api, { timeout: 30000 });
-                
-                if (api.includes('wolf')) {
-                    if (response.data?.success && response.data?.result) {
-                        downloadUrl = response.data.result.downloadUrl;
-                        videoTitle = response.data.title || video.title;
-                        break;
-                    }
-                } else if (api.includes('ryzendesu')) {
-                    if (response.data?.status && response.data?.url) {
-                        downloadUrl = response.data.url;
-                        videoTitle = response.data.title || video.title;
-                        break;
-                    }
-                } else if (api.includes('gifted')) {
-                    if (response.data?.status && response.data?.result?.download_url) {
-                        downloadUrl = response.data.result.download_url;
-                        videoTitle = response.data.result.title || video.title;
-                        break;
-                    }
-                }
-            } catch (e) {
-                continue;
+        try {
+            const apiUrl = `https://apis.xwolf.space/download/yta3?url=${encodeURIComponent(video.url)}`;
+            const response = await axios.get(apiUrl, { timeout: 30000 });
+            
+            // Extract data from response
+            const { data } = response;
+            
+            if (data?.success && data?.result) {
+                downloadUrl = data.result.downloadUrl;
+                videoTitle = data.title || video.title;
+            } else {
+                throw new Error("Wolf API returned unsuccessful response");
             }
+        } catch (apiError) {
+            console.error("Wolf API error:", apiError.message);
+            throw new Error("Failed to fetch from Wolf API. Please try again later.");
         }
         
         if (!downloadUrl) throw new Error("API failed to fetch track!");
