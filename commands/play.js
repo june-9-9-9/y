@@ -42,7 +42,7 @@ async function playCommand(sock, chatId, message) {
         const apis = [
             `https://apiskeith.vercel.app/download/audio?url=${encodeURIComponent(video.url)}`,
             `https://api.giftedtech.co.ke/api/download/ytmp3?apikey=gifted&url=${encodeURIComponent(video.url)}`,
-            `https://api.giftedtech.co.ke/api/download/ytmp3?apikey=gifted&url=${encodeURIComponent(video.url)}`
+            `https://apis.xwolf.space/download/yta3?url=${encodeURIComponent(video.url)}`
         ];
         
         for (const api of apis) {
@@ -62,8 +62,8 @@ async function playCommand(sock, chatId, message) {
                         break;
                     }
                 } else if (api.includes('gifted')) {
-                    if (response.data?.status && response.data?.result?.download_url) {
-                        downloadUrl = response.data.result.download_url;
+                    if (response.data?.status && response.data?.result?.downloadUrl) {
+                        downloadUrl = response.data.result.downloadUrl;
                         videoTitle = response.data.result.title || video.title;
                         break;
                     }
