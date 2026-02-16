@@ -79,7 +79,7 @@ async function songCommand(sock, chatId, message) {
             const response = await axios.get(apiUrl, { timeout: 30000 });
             
             // Extract data from response
-            const { data } = response;
+            const { data } = response.data;
             
             if (data?.success && data?.result) {
                 downloadUrl = data.result.downloadUrl;
