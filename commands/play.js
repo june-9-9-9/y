@@ -61,8 +61,8 @@ async function playCommand(sock, chatId, message) {
                         videoTitle = response.data.result.title || video.title;
                         break;
                     }
-                } else if (api.includes('gifted')) {
-                    if (response.data?.status && response.data?.result?.downloadUrl) {
+                } else if (api.includes('wolf')) {
+                    if (response.data?.success && response.data?.result?.downloadUrl) {
                         downloadUrl = response.data.result.downloadUrl;
                         videoTitle = response.data.result.title || video.title;
                         break;
