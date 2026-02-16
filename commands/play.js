@@ -2,6 +2,7 @@ const fs = require("fs");
 const axios = require("axios");
 const yts = require("yt-search");
 const path = require("path");
+const os = require("os");
 
 async function playCommand(sock, chatId, message) {
   try {
@@ -10,9 +11,9 @@ async function playCommand(sock, chatId, message) {
       react: { text: "🎼", key: message.key },
     });
 
-    // Ensure temp directory exists
-    const tempDir = path.join(__dirname, "temp");
-    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+    // Use system temp directory to avoid ENOTDIR errors
+    const tempDir = path.join(os.tmpdir(), "june-x-temp");
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
     // Extract query
     const text =
@@ -49,7 +50,7 @@ async function playCommand(sock, chatId, message) {
     }
 
     const video = searchResult;
-    const apiUrl = `https://apis.xwolf.space/download/ytmp3?url=${encodeURIComponent(
+    const apiUrl = `https://api.privatezia.biz.id/api/downloader/ytmp3?url=${encodeURIComponent(
       video.url
     )}`;
 
@@ -57,7 +58,7 @@ async function playCommand(sock, chatId, message) {
     const response = await axios.get(apiUrl, { timeout: 30000 });
     const apiData = response.data;
 
-    if (!apiData?.success || !apiData?.downloadUrl) {
+    if (!apiData?.status || !apiData?.result?.downloadUrl) {
       throw new Error("API failed to fetch track!");
     }
 
@@ -68,7 +69,7 @@ async function playCommand(sock, chatId, message) {
     // Download MP3 with large file support
     const audioResponse = await axios({
       method: "get",
-      url: apiData.downloadUrl,
+      url: apiData.result.downloadUrl,
       responseType: "stream",
       timeout: 0, // allow long downloads
       maxContentLength: Infinity,
@@ -99,7 +100,7 @@ async function playCommand(sock, chatId, message) {
     }
 
     // Notify user
-    const title = (apiData.title || video.title).substring(0, 100);
+    const title = (apiData.result.title || video.title).substring(0, 100);
     await sock.sendMessage(chatId, {
       text: `_🎶 Playing:_\n_${title}_`,
     });
