@@ -1,10 +1,10 @@
 const fs = require("fs");
 const axios = require("axios");
 const path = require("path");
+const fetch = require("node-fetch"); // Ensure node-fetch is installed
 
 async function moviesCommand(sock, chatId, message) {
     try {
-        // Initial reaction
         await sock.sendMessage(chatId, {
             react: { text: "🎬", key: message.key }
         });
@@ -12,7 +12,6 @@ async function moviesCommand(sock, chatId, message) {
         const tempDir = path.join(__dirname, "temp");
         if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
-        // Extract query
         let text = message.message?.conversation || message.message?.extendedTextMessage?.text;
         let query = null;
 
@@ -42,10 +41,22 @@ async function moviesCommand(sock, chatId, message) {
             }, { quoted: message });
         }
 
+        // Browser-like headers
+        const headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+                          "AppleWebKit/537.36 (KHTML, like Gecko) " +
+                          "Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json",
+            "Referer": "https://movieapi.xcasper.space/"
+        };
+
         // Search
-        const searchResponse = await fetch(`https://movieapi.xcasper.space/api/showbox/search?keyword=${encodeURIComponent(query)}&type=movie`);
+        const searchResponse = await fetch(
+            `https://movieapi.xcasper.space/api/showbox/search?keyword=${encodeURIComponent(query)}&type=movie`,
+            { headers }
+        );
         const searchResult = await searchResponse.json();
-        
+
         if (!searchResult.data || searchResult.data.length === 0) {
             return sock.sendMessage(chatId, {
                 text: "😕 Couldn't find that movie. Try another one!"
@@ -53,20 +64,20 @@ async function moviesCommand(sock, chatId, message) {
         }
 
         const movie = searchResult.data[0];
-        
+
         // Stream links
         const streamResponse = await fetch(
-            `https://movieapi.xcasper.space/api/stream?id=${movie.id}&type=movie`
+            `https://movieapi.xcasper.space/api/stream?id=${movie.id}&type=movie`,
+            { headers }
         );
         const streamResult = await streamResponse.json();
-        
+
         if (!streamResult.data || !streamResult.data.links || streamResult.data.links.length === 0) {
             return sock.sendMessage(chatId, {
                 text: "🚫 No streaming links available for this movie!"
             }, { quoted: message });
         }
 
-        // Build result text
         let resultText = `🎬 *${movie.title}* ${movie.releaseDate ? `(${movie.releaseDate})` : ''}\n\n` +
                          `⭐ *Rating:* ${movie.rating || 'N/A'}\n` +
                          `🎭 *Genres:* ${movie.genres ? movie.genres.join(', ') : 'N/A'}\n` +
@@ -78,20 +89,21 @@ async function moviesCommand(sock, chatId, message) {
             resultText += `\n🎥 *${link.provider}*\n📺 ${link.quality || 'Auto'}\n🔗 ${link.url}\n`;
         }
 
-        // Send poster + result in one message
+        // Poster with axios + headers
         if (movie.poster) {
             try {
                 const posterResponse = await axios({
                     method: "get",
                     url: movie.poster,
                     responseType: "stream",
-                    timeout: 30000
+                    timeout: 30000,
+                    headers
                 });
-                
+
                 const posterPath = path.join(tempDir, `poster_${Date.now()}.jpg`);
                 const posterWriter = fs.createWriteStream(posterPath);
                 posterResponse.data.pipe(posterWriter);
-                
+
                 await new Promise((resolve, reject) => {
                     posterWriter.on("finish", resolve);
                     posterWriter.on("error", reject);
@@ -111,7 +123,6 @@ async function moviesCommand(sock, chatId, message) {
             await sock.sendMessage(chatId, { text: resultText }, { quoted: message });
         }
 
-        // Success reaction
         await sock.sendMessage(chatId, {
             react: { text: "✅", key: message.key }
         });
