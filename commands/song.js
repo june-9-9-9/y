@@ -77,7 +77,7 @@ async function songCommand(sock, chatId, message) {
         
         const apis = [
             `https://apiskeith.top/download/audio?url=${encodeURIComponent(video.url)}`,
-            `https://api.ryzendesu.vip/api/downloader/ytmp3?url=${encodeURIComponent(video.url)}`,
+            `https://apis.xwolf.space/download/yta3?url=${encodeURIComponent(video.url)}`,
             `https://api.giftedtech.co.ke/api/download/ytmp3?apikey=gifted&url=${encodeURIComponent(video.url)}`
         ];
         
@@ -91,10 +91,10 @@ async function songCommand(sock, chatId, message) {
                         videoTitle = response.data.title || video.title;
                         break;
                     }
-                } else if (api.includes('ryzendesu')) {
-                    if (response.data?.status && response.data?.url) {
-                        downloadUrl = response.data.url;
-                        videoTitle = response.data.title || video.title;
+                } else if (api.includes('wolf')) {
+                    if (response.data?.success && response.data?.result.downloadUrl) {
+                        downloadUrl = response.data.result.downloadUrl;
+                        videoTitle = response.data.result.title || video.title;
                         break;
                     }
                 } else if (api.includes('gifted')) {
