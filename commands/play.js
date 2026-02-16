@@ -36,7 +36,7 @@ async function playCommand(sock, chatId, message) {
         }
 
         // Search YouTube
-        const searchResult = (await yts(`${query} official`)).videos[0];
+        const searchResult = (await yts(query + " official")).videos[0];
         if (!searchResult) {
             return sock.sendMessage(chatId, {
                 text: "😕 Couldn't find that song. Try another one!"
@@ -98,7 +98,7 @@ async function playCommand(sock, chatId, message) {
             maxContentLength: Infinity,
             maxBodyLength: Infinity,
             headers: {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             }
         });
 
