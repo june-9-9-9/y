@@ -2,7 +2,7 @@ const fs = require("fs");
 const axios = require("axios");
 const yts = require("yt-search");
 const path = require("path");
-const os = require("os");
+const os = require("os"); // Added os import
 
 async function songCommand(sock, chatId, message) {
     try {
@@ -10,9 +10,8 @@ async function songCommand(sock, chatId, message) {
             react: { text: "🎼", key: message.key }
         });
 
-        // Use system temp directory instead of __dirname
-        const tempDir = path.join(os.tmpdir(), "song_temp");
-        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+        const tempDir = path.join(__dirname, "temp"); // Fixed: __dirname instead of dirname
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
         // Extract query from direct text or quoted message
         let text = message.message?.conversation || message.message?.extendedTextMessage?.text;
@@ -71,13 +70,13 @@ async function songCommand(sock, chatId, message) {
 
         const video = searchResult;
         
-        // Try multiple APIs with fallbacks
+        // Try multiple APIs with fallbacks for large files
         let downloadUrl;
         let videoTitle;
         
         const apis = [
-            `https://apiskeith.top/download/audio?url=${encodeURIComponent(video.url)}`,
             `https://apis.xwolf.space/download/yta3?url=${encodeURIComponent(video.url)}`,
+            `https://api.ryzendesu.vip/api/downloader/ytmp3?url=${encodeURIComponent(video.url)}`,
             `https://api.giftedtech.co.ke/api/download/ytmp3?apikey=gifted&url=${encodeURIComponent(video.url)}`
         ];
         
@@ -85,16 +84,16 @@ async function songCommand(sock, chatId, message) {
             try {
                 const response = await axios.get(api, { timeout: 30000 });
                 
-                if (api.includes('apiskeith')) {
-                    if (response.data?.status && response.data?.result) {
-                        downloadUrl = response.data.result;
+                if (api.includes('wolf')) {
+                    if (response.data?.success && response.data?.result) {
+                        downloadUrl = response.data.result.downloadUrl;
                         videoTitle = response.data.title || video.title;
                         break;
                     }
-                } else if (api.includes('wolf')) {
-                    if (response.data?.success && response.data?.result.downloadUrl) {
-                        downloadUrl = response.data.result.downloadUrl;
-                        videoTitle = response.data.result.title || video.title;
+                } else if (api.includes('ryzendesu')) {
+                    if (response.data?.status && response.data?.url) {
+                        downloadUrl = response.data.url;
+                        videoTitle = response.data.title || video.title;
                         break;
                     }
                 } else if (api.includes('gifted')) {
@@ -115,16 +114,16 @@ async function songCommand(sock, chatId, message) {
         const fileName = `audio_${timestamp}.mp3`;
         const filePath = path.join(tempDir, fileName);
 
-        // Download MP3
+        // Download MP3 with support for files over 100MB
         const audioResponse = await axios({
             method: "get",
             url: downloadUrl,
             responseType: "stream",
-            timeout: 900000,
+            timeout: 900000, // 15 minutes for large files
             maxContentLength: Infinity,
             maxBodyLength: Infinity,
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }
         });
         
@@ -140,7 +139,7 @@ async function songCommand(sock, chatId, message) {
         }
 
         await sock.sendMessage(chatId, {
-            text: `_🎶 Playing:_\n_${videoTitle || video.title}_`
+            text: `🎶 Playing:\n${videoTitle || video.title}`
         });
 
         // Send audio
