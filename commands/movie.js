@@ -51,7 +51,7 @@ async function movieCommand(sock, chatId, message) {
         await sock.sendPresenceUpdate('recording', chatId);
 
         // Call Movie API
-        const apiUrl = `https://apiskeith.vercel.app/search/movie?q=${encodeURIComponent(movieTitle)}`;
+        const apiUrl = `https://apiskeith.top/search/movie?q=${encodeURIComponent(movieTitle)}`;
         const response = await axios.get(apiUrl, { timeout: 30000 });
 
         if (
