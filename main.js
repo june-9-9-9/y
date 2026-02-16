@@ -354,6 +354,7 @@ const lastseenCommand = require('./commands/lastseen');
 const { antidemoteCommand, handleAntidemote } = require('./commands/antidemote');
 const { setbotconfigCommand, setmenuimageCommand } = require('./commands/menuimage');
 const vv2Command = require('./commands/vv2');
+const moviesCommand = require('./commands/movies');
 /*━━━━━━━━━━━━━━━━━━━━*/
 // Global settings
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -1382,6 +1383,12 @@ case userMessage === `${prefix}forfeit` ||
         case userMessage.startsWith(`${prefix}xvideo`) || 
              userMessage.startsWith(`${prefix}xvdl`):
              await xvdlCommand(sock, chatId, message);
+               break;
+
+                
+        case userMessage.startsWith(`${prefix}siries`) || 
+             userMessage.startsWith(`${prefix}stream`):
+             await moviesCommand(sock, chatId, message);
                break;
 
                 
