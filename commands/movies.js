@@ -1,14 +1,13 @@
 const fs = require("fs");
 const axios = require("axios");
 const path = require("path");
-const { randomBytes } = require("crypto");
 
 async function moviesCommand(sock, chatId, message) {
     let tempFiles = [];
     
     try {
         await sock.sendMessage(chatId, {
-            react: { text: "🎬", key: message.key }
+            react: { text: "🔍", key: message.key }
         });
 
         const tempDir = path.join(__dirname, "temp");
@@ -17,10 +16,18 @@ async function moviesCommand(sock, chatId, message) {
         // Extract query from message
         let text = message.message?.conversation || message.message?.extendedTextMessage?.text;
         let query = null;
+        let command = text?.split(" ")[0]?.toLowerCase() || ".movies";
 
         if (text) {
             const parts = text.split(" ");
-            query = parts.slice(1).join(" ").trim();
+            // Check if it's a special command
+            if (parts[0].toLowerCase() === ".trending") {
+                return await handleTrending(sock, chatId, message, tempDir, tempFiles);
+            } else if (parts[0].toLowerCase() === ".hot") {
+                return await handleHot(sock, chatId, message, tempDir, tempFiles);
+            } else {
+                query = parts.slice(1).join(" ").trim();
+            }
         }
 
         // Check quoted message
@@ -33,9 +40,15 @@ async function moviesCommand(sock, chatId, message) {
             }
         }
 
+        // Show help if no query
         if (!query) {
             return await sock.sendMessage(chatId, {
-                text: "🎬 Provide a movie name to search\nExample: .movies Avatar"
+                text: "🎬 *Movie Commands*\n\n" +
+                      "🔍 *.movies [name]* - Search for movies\n" +
+                      "📈 *.trending* - Get trending movies/series\n" +
+                      "🔥 *.hot* - Get hot movies & TV shows\n" +
+                      "ℹ️ *.movie [subjectId]* - Get detailed info\n\n" +
+                      "Example: *.movies Avatar*"
             }, { quoted: message });
         }
 
@@ -45,163 +58,243 @@ async function moviesCommand(sock, chatId, message) {
             }, { quoted: message });
         }
 
-        // Generate realistic browser fingerprints
-        const browserVersion = Math.floor(Math.random() * 30) + 100; // 100-129
-        const chromeVersion = `1${Math.floor(Math.random() * 9)}0.0.0`; // 110-190
-        
-        // Rotating user agents that look like real browsers
-        const userAgents = [
-            `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${browserVersion}.0.${Math.floor(Math.random() * 9999)}.${Math.floor(Math.random() * 999)} Safari/537.36`,
-            `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${browserVersion}.0.${Math.floor(Math.random() * 9999)}.${Math.floor(Math.random() * 999)} Safari/537.36`,
-            `Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:${Math.floor(Math.random() * 30) + 100}.0) Gecko/20100101 Firefox/${Math.floor(Math.random() * 30) + 100}.0`,
-            `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${browserVersion}.0.${Math.floor(Math.random() * 9999)}.${Math.floor(Math.random() * 999)} Safari/537.36`
-        ];
-        
-        const randomUA = userAgents[Math.floor(Math.random() * userAgents.length)];
-        
-        // Generate realistic browser headers
+        // Base headers
         const headers = {
-            "User-Agent": randomUA,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Referer": "https://www.google.com/",
-            "Sec-Ch-Ua": `"Chromium";v="${browserVersion}", "Not_A Brand";v="24"`,
-            "Sec-Ch-Ua-Mobile": "?0",
-            "Sec-Ch-Ua-Platform": `"${Math.random() > 0.5 ? 'Windows' : 'macOS'}"`,
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "cross-site",
-            "Sec-Fetch-User": "?1",
-            "Upgrade-Insecure-Requests": "1",
-            "Cache-Control": "max-age=0",
-            "Connection": "keep-alive",
-            "DNT": "1"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json",
+            "Referer": "https://movieapi.xcasper.space/"
         };
 
-        // Add random browser fingerprinting
-        const fingerprint = randomBytes(16).toString('hex');
-        headers["X-Client-Data"] = fingerprint;
+        // Search for movies
+        const searchResponse = await axios.get(
+            `https://movieapi.xcasper.space/api/search?keyword=${encodeURIComponent(query)}&page=1&perPage=5&subjectType=1`,
+            { headers, timeout: 15000 }
+        );
 
-        // Create axios instance with browser-like config
-        const axiosInstance = axios.create({
-            timeout: 30000,
-            headers: headers,
-            maxRedirects: 5,
-            validateStatus: function (status) {
-                return status >= 200 && status < 300; // Default
-            },
-            decompress: true // Handle gzip/deflate
-        });
-
-        // Add cookie jar support
-        const cookieJar = {};
-        axiosInstance.interceptors.response.use((response) => {
-            const setCookie = response.headers['set-cookie'];
-            if (setCookie) {
-                setCookie.forEach(cookie => {
-                    const [name, value] = cookie.split('=');
-                    cookieJar[name] = value.split(';')[0];
-                });
-            }
-            return response;
-        });
-
-        axiosInstance.interceptors.request.use((config) => {
-            if (Object.keys(cookieJar).length > 0) {
-                const cookieString = Object.entries(cookieJar)
-                    .map(([name, value]) => `${name}=${value}`)
-                    .join('; ');
-                config.headers.Cookie = cookieString;
-            }
-            return config;
-        });
-
-        // Add random delay before search (2-5 seconds)
-        await new Promise(resolve => setTimeout(resolve, Math.random() * 3000 + 2000));
-
-        // Search with retry mechanism
-        let searchResult;
-        let retries = 3;
-        
-        while (retries > 0) {
-            try {
-                const searchResponse = await axiosInstance.get(
-                    `https://movieapi.xcasper.space/api/showbox/search?keyword=${encodeURIComponent(query)}&type=movie`
-                );
-                searchResult = searchResponse.data;
-                break;
-            } catch (error) {
-                retries--;
-                if (retries === 0) throw error;
-                // Wait before retry (3-6 seconds)
-                await new Promise(resolve => setTimeout(resolve, Math.random() * 3000 + 3000));
-                // Rotate user agent on retry
-                headers["User-Agent"] = userAgents[Math.floor(Math.random() * userAgents.length)];
-            }
-        }
-
-        if (!searchResult.data || searchResult.data.length === 0) {
+        if (!searchResponse.data.success || !searchResponse.data.data?.items?.length) {
             return sock.sendMessage(chatId, {
                 text: "😕 Couldn't find that movie. Try another one!"
             }, { quoted: message });
         }
 
-        const movie = searchResult.data[0];
+        const items = searchResponse.data.data.items;
 
-        // Add delay before stream request (1-3 seconds)
-        await new Promise(resolve => setTimeout(resolve, Math.random() * 2000 + 1000));
+        // If multiple results, show selection menu
+        if (items.length > 1) {
+            let menuText = `🎬 *Multiple movies found:*\n\n`;
+            items.forEach((item, index) => {
+                const year = item.releaseDate ? `(${item.releaseDate.split('-')[0]})` : '';
+                menuText += `${index + 1}. *${item.title}* ${year}\n`;
+                menuText += `   ⭐ ${item.imdbRatingValue || 'N/A'} | ${item.genre?.split(',')[0] || 'N/A'}\n`;
+                menuText += `   📌 ID: \`${item.subjectId}\`\n\n`;
+            });
+            menuText += `Reply with *.movie [subjectId]* for details`;
+            
+            return await sock.sendMessage(chatId, { text: menuText }, { quoted: message });
+        }
 
-        // Get stream links with retry
-        let streamResult;
-        retries = 3;
-        
-        while (retries > 0) {
+        // Single result - get details
+        const movie = items[0];
+        return await getMovieDetails(sock, chatId, message, movie.subjectId, tempDir, tempFiles);
+
+    } catch (error) {
+        console.error("Movies command error:", error);
+        return await sock.sendMessage(chatId, {
+            text: `🚫 Error: ${error.message}`
+        }, { quoted: message });
+    } finally {
+        // Cleanup temp files
+        for (const file of tempFiles) {
             try {
-                const streamResponse = await axiosInstance.get(
-                    `https://movieapi.xcasper.space/api/stream?id=${movie.id}&type=movie`
-                );
-                streamResult = streamResponse.data;
-                break;
-            } catch (error) {
-                retries--;
-                if (retries === 0) throw error;
-                await new Promise(resolve => setTimeout(resolve, Math.random() * 3000 + 2000));
+                if (fs.existsSync(file)) fs.unlinkSync(file);
+            } catch (e) {
+                console.error("Cleanup error:", e);
             }
         }
+    }
+}
 
-        if (!streamResult.data || !streamResult.data.links || streamResult.data.links.length === 0) {
-            return sock.sendMessage(chatId, {
-                text: "🚫 No streaming links available for this movie!"
-            }, { quoted: message });
+// Handle trending command
+async function handleTrending(sock, chatId, message, tempDir, tempFiles) {
+    try {
+        await sock.sendMessage(chatId, {
+            react: { text: "📈", key: message.key }
+        });
+
+        const headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json"
+        };
+
+        const response = await axios.get(
+            "https://movieapi.xcasper.space/api/trending?page=0&perPage=10",
+            { headers, timeout: 15000 }
+        );
+
+        if (!response.data.success || !response.data.data?.subjectList?.length) {
+            return sock.sendMessage(chatId, { text: "📉 No trending items found" }, { quoted: message });
         }
 
-        // Format movie info with emojis
-        let resultText = `🎬 *${movie.title}* ${movie.releaseDate ? `(${movie.releaseDate})` : ''}\n\n` +
-                         `⭐ *Rating:* ${movie.rating || 'N/A'}\n` +
-                         `🎭 *Genres:* ${movie.genres ? movie.genres.join(', ') : 'N/A'}\n` +
-                         `⏱️ *Duration:* ${movie.duration || 'N/A'}\n` +
-                         `📝 *Description:* ${movie.description || 'No description available'}\n\n` +
-                         `🔗 *Streaming Links:*\n`;
+        const items = response.data.data.subjectList;
+        let text = "📈 *TRENDING NOW*\n\n";
 
-        // Add links with better formatting
-        for (const link of streamResult.data.links) {
-            resultText += `\n━━━━━━━━━━━━━━━━━━\n`;
-            resultText += `🎥 *${link.provider}*\n`;
-            resultText += `📺 *Quality:* ${link.quality || 'Auto'}\n`;
-            resultText += `🔗 Link: ${link.url}\n`;
+        items.slice(0, 10).forEach((item, index) => {
+            const type = item.subjectType === 1 ? "🎬 Movie" : "📺 Series";
+            const year = item.releaseDate ? `(${item.releaseDate.split('-')[0]})` : '';
+            text += `${index + 1}. *${item.title}* ${year}\n`;
+            text += `   ${type} | ⭐ ${item.imdbRatingValue || 'N/A'}\n`;
+            text += `   📌 ID: \`${item.subjectId}\`\n\n`;
+        });
+
+        text += `Use *.movie [subjectId]* for details`;
+
+        await sock.sendMessage(chatId, { text }, { quoted: message });
+        await sock.sendMessage(chatId, { react: { text: "✅", key: message.key } });
+
+    } catch (error) {
+        console.error("Trending error:", error);
+        await sock.sendMessage(chatId, { text: "🚫 Failed to get trending" }, { quoted: message });
+    }
+}
+
+// Handle hot command
+async function handleHot(sock, chatId, message, tempDir, tempFiles) {
+    try {
+        await sock.sendMessage(chatId, {
+            react: { text: "🔥", key: message.key }
+        });
+
+        const headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json"
+        };
+
+        const response = await axios.get(
+            "https://movieapi.xcasper.space/api/hot",
+            { headers, timeout: 15000 }
+        );
+
+        if (!response.data.success) {
+            return sock.sendMessage(chatId, { text: "🔥 No hot items found" }, { quoted: message });
         }
 
-        // Download and send poster with improved headers
-        if (movie.poster) {
+        const movies = response.data.data.movie || [];
+        const tv = response.data.data.tv || [];
+
+        let text = "🔥 *HOT CONTENT*\n\n";
+
+        if (movies.length > 0) {
+            text += "🎬 *HOT MOVIES*\n";
+            movies.slice(0, 5).forEach((movie, index) => {
+                const year = movie.releaseDate ? `(${movie.releaseDate.split('-')[0]})` : '';
+                text += `${index + 1}. *${movie.title}* ${year}\n`;
+                text += `   ⭐ ${movie.imdbRatingValue || 'N/A'} | ${movie.genre?.split(',')[0] || 'N/A'}\n`;
+                text += `   📌 ID: \`${movie.subjectId}\`\n\n`;
+            });
+        }
+
+        if (tv.length > 0) {
+            text += "📺 *HOT TV SHOWS*\n";
+            tv.slice(0, 5).forEach((show, index) => {
+                const year = show.releaseDate ? `(${show.releaseDate.split('-')[0]})` : '';
+                text += `${index + 1}. *${show.title}* ${year}\n`;
+                text += `   ⭐ ${show.imdbRatingValue || 'N/A'} | ${show.genre?.split(',')[0] || 'N/A'}\n`;
+                text += `   📌 ID: \`${show.subjectId}\`\n\n`;
+            });
+        }
+
+        text += `Use *.movie [subjectId]* for details`;
+
+        await sock.sendMessage(chatId, { text }, { quoted: message });
+        await sock.sendMessage(chatId, { react: { text: "✅", key: message.key } });
+
+    } catch (error) {
+        console.error("Hot error:", error);
+        await sock.sendMessage(chatId, { text: "🚫 Failed to get hot content" }, { quoted: message });
+    }
+}
+
+// Get movie details by subjectId
+async function getMovieDetails(sock, chatId, message, subjectId, tempDir, tempFiles) {
+    try {
+        await sock.sendMessage(chatId, {
+            react: { text: "📋", key: message.key }
+        });
+
+        const headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json"
+        };
+
+        const response = await axios.get(
+            `https://movieapi.xcasper.space/api/detail?subjectId=${subjectId}`,
+            { headers, timeout: 15000 }
+        );
+
+        if (!response.data.success || !response.data.data?.subject) {
+            return sock.sendMessage(chatId, { text: "🚫 Movie details not found" }, { quoted: message });
+        }
+
+        const movie = response.data.data.subject;
+        const stars = response.data.data.stars || [];
+
+        // Format duration
+        const duration = movie.duration ? `${Math.floor(movie.duration / 60)}min` : 'N/A';
+        
+        // Format description
+        const description = movie.description || 'No description available';
+        const shortDesc = description.length > 200 ? description.substring(0, 200) + '...' : description;
+
+        // Build movie info
+        let resultText = `🎬 *${movie.title}*\n`;
+        resultText += `📅 *Release:* ${movie.releaseDate || 'N/A'}\n`;
+        resultText += `⭐ *IMDb:* ${movie.imdbRatingValue || 'N/A'} (${movie.imdbRatingCount?.toLocaleString() || '0'} votes)\n`;
+        resultText += `🎭 *Genre:* ${movie.genre?.replace(/,/g, ', ') || 'N/A'}\n`;
+        resultText += `⏱️ *Duration:* ${duration}\n`;
+        resultText += `🌍 *Country:* ${movie.countryName || 'N/A'}\n\n`;
+        resultText += `📝 *Description:*\n${shortDesc}\n`;
+
+        // Add cast if available
+        if (stars.length > 0) {
+            resultText += `\n👥 *Cast:*\n`;
+            stars.slice(0, 5).forEach(star => {
+                resultText += `• ${star.name} as "${star.character || '?'}"\n`;
+            });
+        }
+
+        // Add subtitles if available
+        if (movie.subtitles) {
+            const subs = movie.subtitles.split(',').slice(0, 5).join(', ');
+            resultText += `\n🔤 *Subtitles:* ${subs}${movie.subtitles.split(',').length > 5 ? '...' : ''}\n`;
+        }
+
+        // Add trailer info if available
+        if (movie.trailer?.videoAddress?.url) {
+            resultText += `\n🎥 *Trailer available*\n`;
+        }
+
+        // Add resource info
+        if (movie.hasResource) {
+            resultText += `\n✅ *Available for streaming*\n`;
+        }
+
+        // Add link to view in browser
+        if (movie.detailPath) {
+            resultText += `\n🔗 *Link:* https://h5.aoneroom.com/wefeed-h5-bff/web/subject/detail?subjectId=${subjectId}\n`;
+        }
+
+        // Send poster if available
+        if (movie.cover?.url) {
             try {
-                // Add delay before poster download (1-2 seconds)
-                await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 1000));
-                
-                const posterResponse = await axiosInstance({
+                const posterResponse = await axios({
                     method: "get",
-                    url: movie.poster,
-                    responseType: "stream"
+                    url: movie.cover.url,
+                    responseType: "stream",
+                    timeout: 15000,
+                    headers: {
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        "Referer": "https://h5.aoneroom.com/"
+                    }
                 });
 
                 const posterPath = path.join(tempDir, `poster_${Date.now()}.jpg`);
@@ -233,28 +326,10 @@ async function moviesCommand(sock, chatId, message) {
         });
 
     } catch (error) {
-        console.error("Movies command error:", error);
-        
-        // Check if it's an antibot detection
-        if (error.response && error.response.status === 403) {
-            return await sock.sendMessage(chatId, {
-                text: "🚫 Bot detected! Try again with a more specific movie name."
-            }, { quoted: message });
-        }
-        
-        return await sock.sendMessage(chatId, {
-            text: `🚫 Error: ${error.message}`
+        console.error("Movie details error:", error);
+        await sock.sendMessage(chatId, {
+            text: `🚫 Error getting details: ${error.message}`
         }, { quoted: message });
-        
-    } finally {
-        // Cleanup temp files
-        for (const file of tempFiles) {
-            try {
-                if (fs.existsSync(file)) fs.unlinkSync(file);
-            } catch (e) {
-                console.error("Cleanup error:", e);
-            }
-        }
     }
 }
 
