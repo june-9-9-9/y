@@ -42,7 +42,7 @@ async function songCommand(sock, chatId, message) {
                 else {
                     return await sock.sendMessage(chatId, {
                         video: quoted.videoMessage,
-                       /mp4",
+                        mimetype: "video/mp4",
                         fileName: "quoted_video.mp4"
                     }, { quoted: message });
                 }
@@ -62,7 +62,7 @@ async function songCommand(sock, chatId, message) {
         }
 
         // Search YouTube
-        const searchResult = (await yts(`${query} official`)).videos[0];
+        const searchResult = (await yts(query + " official")).videos[0];
         if (!searchResult) {
             return sock.sendMessage(chatId, {
                 text: "😕 Couldn't find that song. Try another one!"
