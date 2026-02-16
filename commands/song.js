@@ -2,6 +2,7 @@ const fs = require("fs");
 const axios = require("axios");
 const yts = require("yt-search");
 const path = require("path");
+const os = require("os");
 
 async function songCommand(sock, chatId, message) {
     try {
@@ -9,8 +10,9 @@ async function songCommand(sock, chatId, message) {
             react: { text: "🎼", key: message.key }
         });
 
-        const tempDir = path.join(__dirname, "temp");
-        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+        // Use system temp directory to avoid ENOTDIR errors
+        const tempDir = path.join(os.tmpdir(), "june-x-temp");
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
         // Extract query from direct text or quoted message
         let text = message.message?.conversation || message.message?.extendedTextMessage?.text;
@@ -40,7 +42,7 @@ async function songCommand(sock, chatId, message) {
                 else {
                     return await sock.sendMessage(chatId, {
                         video: quoted.videoMessage,
-                        mimetype: "video/mp4",
+                       /mp4",
                         fileName: "quoted_video.mp4"
                     }, { quoted: message });
                 }
@@ -130,7 +132,10 @@ async function songCommand(sock, chatId, message) {
         audioResponse.data.pipe(writer);
         await new Promise((resolve, reject) => {
             writer.on("finish", resolve);
-            writer.on("error", reject);
+            writer.on("error", (err) => {
+                if (fs.existsSync(filePath)) fs.unlinkSync(filePath); // cleanup partial file
+                reject(err);
+            });
         });
 
         if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
