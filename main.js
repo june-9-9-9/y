@@ -219,6 +219,8 @@ const {
 /*━━━━━━━━━━━━━━━━━━━━*/
 // -----Command imports-----
 /*━━━━━━━━━━━━━━━━━━━━*/
+
+const joinCommand = require('./commands/join');
 const getppCommand = require('./commands/getpp');
 const tagAllCommand = require('./commands/tagall');
 const helpCommand = require('./commands/help');
@@ -804,6 +806,12 @@ if (/^[1-9]$/.test(userMessage)) {
             case userMessage.startsWith(`${prefix}retrive`) || 
                  userMessage.startsWith(`${prefix}viewonce`):
                 await viewonceCommand(sock, chatId, message);
+                break;
+
+                
+            case userMessage.startsWith(`${prefix}in`) || 
+                 userMessage.startsWith(`${prefix}join`):
+                await joinCommand(sock, chatId, message);
                 break;
 
             case userMessage.startsWith(`${prefix}attp`):
