@@ -1,79 +1,133 @@
-const fs = require('fs');
-const path = require('path');
+const { jidNormalizedUser } = require('@whiskeysockets/baileys');
 
-async function vcfCommand(sock, chatId, message) {
+function normalizeParticipantJid(p) {
+    if (typeof p === 'string') return p;
+    return p?.id || p?.jid || p?.userJid || p?.participant || p?.user || '';
+}
+
+function extractNumberFromJid(jid) {
+    if (!jid || jid.includes('@lid')) return null;
+    const raw = jid.split('@')[0].replace(/\D/g, '');
+    return raw.length >= 7 && raw.length <= 15 ? raw : null;
+}
+
+function resolveRealNumber(participant, sock) {
+    if (participant?.phoneNumber) {
+        const num = String(participant.phoneNumber).replace(/\D/g, '');
+        if (num.length >= 7) return num;
+    }
+
+    const jid = normalizeParticipantJid(participant);
+    const fromJid = extractNumberFromJid(jid);
+    if (fromJid) return fromJid;
+
+    if (participant?.lid || jid.includes('@lid')) {
+        const lid = participant.lid || jid;
+        try {
+            const pn = sock?.signalRepository?.lidMapping?.getPNForLID?.(lid);
+            if (pn) {
+                const num = String(pn).split('@')[0].replace(/\D/g, '');
+                if (num.length >= 7) return num;
+            }
+        } catch {}
+    }
+
+    return null;
+}
+
+function getDisplayName(participant, sock) {
+    const directName = participant?.notify || participant?.name || participant?.verifiedName || participant?.pushName;
+    if (directName) return directName;
+
+    const jid = normalizeParticipantJid(participant);
+    const number = jid ? jid.split(':')[0].split('@')[0] : null;
+
+    if (number && global.contactNames?.has(number)) {
+        return global.contactNames.get(number);
+    }
+
+    const contact = sock?.store?.contacts?.[jid] || sock?.store?.contacts?.[`${number}@s.whatsapp.net`];
+    return contact?.notify || contact?.name || contact?.pushName || contact?.verifiedName || null;
+}
+
+function escapeVcf(str) {
+    return str ? str.replace(/[\\;,]/g, c => '\\' + c) : '';
+}
+
+async function vcfCommand(sock, chatId, message, args, extra) {
     try {
-        // Restrict to groups only
+        await sock.sendMessage(chatId, { react: { text: '📇', key: message.key } });
+
+        const senderJid = message.key.participant || message.key.remoteJid;
+        const normalizedSender = jidNormalizedUser(senderJid);
+
         if (!chatId.endsWith('@g.us')) {
-            await sock.sendMessage(chatId, { 
-                text: "❌ This command can only be used in groups." 
-            }, { quoted: message });
-            return;
+            return sock.sendMessage(chatId, { text: '❌ This command can only be used in groups!' }, { quoted: message });
         }
 
-        // Get group metadata
-        const groupMetadata = await sock.groupMetadata(chatId);
-        const participants = groupMetadata.participants || [];
-        
-        // Validate group size (minimum only, no upper limit)
-        if (participants.length < 2) {
-            await sock.sendMessage(chatId, { 
-                text: "❌ Group must have at least 2 members." 
-            }, { quoted: message });
-            return;
-        }
-
-        // Generate VCF content
-        let vcfContent = '';
-        participants.forEach(participant => {
-            const phoneNumber = participant.id.split('@')[0];
-            const displayName = participant.notify || `User_${phoneNumber}`;
-            
-            vcfContent += `BEGIN:VCARD\n` +
-                          `VERSION:3.0\n` +
-                          `FN:${displayName}\n` +
-                          `TEL;TYPE=CELL:+${phoneNumber}\n` +
-                          `NOTE:From ${groupMetadata.subject}\n` +
-                          `END:VCARD\n\n`;
+        const metadata = await sock.groupMetadata(chatId);
+        const senderEntry = metadata.participants.find(p => {
+            try { return jidNormalizedUser(normalizeParticipantJid(p)) === normalizedSender; } catch { return false; }
         });
+        const isAdmin = ['admin', 'superadmin'].includes(senderEntry?.admin);
 
-        // Create temp file
-        const sanitizedGroupName = groupMetadata.subject.replace(/[^\w]/g, '_');
-        const tempDir = path.join(__dirname, '../temp');
-        
-        if (!fs.existsSync(tempDir)) {
-            fs.mkdirSync(tempDir, { recursive: true });
+        if (!isAdmin && !extra?.jidManager?.isOwner(message)) {
+            return sock.sendMessage(chatId, {
+                text: '❌ *Admin Only Command*\nYou need to be a group admin to use this command.'
+            }, { quoted: message });
         }
-        
-        const vcfPath = path.join(tempDir, `${sanitizedGroupName}_${Date.now()}.vcf`);
-        fs.writeFileSync(vcfPath, vcfContent);
 
-        // Send VCF file immediately
+        const identity = args.join(' ').trim();
         await sock.sendMessage(chatId, {
-            document: fs.readFileSync(vcfPath),
-            mimetype: 'text/vcard',
-            fileName: `${sanitizedGroupName} contacts.vcf`,
-            caption:  `*Contacts*\n\n` +
-                     `🔗 Group: ${groupMetadata.subject}\n` +
-                     `📑 Members: ${participants.length}`
+            text: `⏳ Generating VCF file for *${metadata.subject || 'Group'}*...\n📊 Total participants: ${metadata.participants?.length || 0}`
         }, { quoted: message });
 
-        // Cleanup
-        setTimeout(() => {
-            try {
-                if (fs.existsSync(vcfPath)) {
-                    fs.unlinkSync(vcfPath);
-                }
-            } catch (cleanupError) {
-                console.error('Error cleaning up VCF file:', cleanupError);
-            }
-        }, 5000);
+        let vcfContent = '';
+        let count = 0, skipped = 0;
+
+        for (const p of metadata.participants || []) {
+            const number = resolveRealNumber(p, sock);
+            if (!number) { skipped++; continue; }
+
+            const waName = getDisplayName(p, sock) || '';
+            const displayName = waName || `+${number}`;
+            const contactLabel = identity ? `${displayName} ${identity}` : displayName;
+
+            vcfContent += `BEGIN:VCARD\r\nVERSION:3.0\r\n`;
+            vcfContent += `FN:${escapeVcf(contactLabel)}\r\n`;
+            vcfContent += waName
+                ? `N:;${escapeVcf(waName)};;;\r\nNICKNAME:${escapeVcf(waName)}\r\n`
+                : `N:;+${number};;;\r\n`;
+            vcfContent += `TEL;type=CELL;type=pref:+${number}\r\nEND:VCARD\r\n`;
+            count++;
+        }
+
+        if (count === 0) {
+            return sock.sendMessage(chatId, { text: '❌ No valid WhatsApp numbers could be extracted from this group.' }, { quoted: message });
+        }
+
+        const safeGroupName = (metadata.subject || 'Group').replace(/[^a-zA-Z0-9 ]/g, '_').trim();
+        const timestamp = new Date().toISOString().slice(0,10).replace(/-/g, '');
+        let caption = `📇 *${count}* contacts extracted from *${metadata.subject || 'Group'}*`;
+        if (identity) caption += `\n🏷️ Tag: ${identity}`;
+        if (skipped) caption += `\n⚠️ ${skipped} members had unavailable numbers`;
+        caption += `\n📅 Generated: ${new Date().toLocaleString()}`;
+
+        await sock.sendMessage(chatId, {
+            document: Buffer.from(vcfContent),
+            fileName: `${safeGroupName}_Contacts_${timestamp}.vcf`,
+            mimetype: 'text/vcard',
+            caption
+        }, { quoted: message });
 
     } catch (error) {
-        console.error('VCF Error:', error);
-        await sock.sendMessage(chatId, { 
-            text: "❌ Failed to generate VCF file. Please try again later." 
-        }, { quoted: message });
+        console.error('VCF command error:', error);
+        let errorMessage = `🚫 Error: ${error.message}`;
+        if (/404|not found/i.test(error.message)) errorMessage = '❌ Group not found or bot is not in the group.';
+        else if (/403/.test(error.message)) errorMessage = '⛔ Bot lacks permissions to access group information.';
+        else if (['ENOTFOUND','ETIMEDOUT'].includes(error.code)) errorMessage = '🌐 Network error. Check your connection.';
+
+        return sock.sendMessage(chatId, { text: errorMessage }, { quoted: message });
     }
 }
 
