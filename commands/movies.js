@@ -4,7 +4,7 @@ const path = require("path");
 const {
   generateWAMessageContent,
   generateWAMessageFromContent,
-} = require("gifted-baileys");
+} = require("@whiskeysockets/baileys");
 const { sendButtons } = require("gifted-btns");
 
 async function moviesCommand(sock, chatId, message) {
