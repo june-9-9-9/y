@@ -2045,10 +2045,10 @@ case userMessage === `${prefix}forfeit` ||
             case userMessage.startsWith('.removebg') || userMessage.startsWith('.rmbg') || userMessage.startsWith(`${prefix}nobg`):
                 await removebgCommand.exec(sock, message, userMessage.split(' ').slice(1));
                 break;
-            case userMessage.startsWith('.remini') || userMessage.startsWith('.enhance') || userMessage.startsWith('.upscale'):
+            case userMessage.startsWith(`${prefix}remini`) || userMessage.startsWith('.enhance') || userMessage.startsWith('.upscale'):
                 await reminiCommand(sock, chatId, message, userMessage.split(' ').slice(1));
                 break;
-            case userMessage.startsWith('.sora'):
+            case userMessage.startsWith(`${prefix}sora`):
                 await soraCommand(sock, chatId, message);
                 break;
             default:
@@ -2087,7 +2087,7 @@ case userMessage === `${prefix}forfeit` ||
             });
         }
 
-        if (userMessage.startsWith(' ')) {
+        if (userMessage.startsWith(`${prefix}`)) {
             // After command is processed successfully
             await addCommandReaction(sock, message);
         }
