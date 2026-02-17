@@ -64,7 +64,7 @@ async function joinCommand(sock, chatId, message) {
                 await sock.sendMessage(chatId, { text: groupInfoMessage }, { quoted: message });
             }
         } catch {
-            await sock.sendMessage(chatId, { text: groupInfoMessage }, { quoted: message });
+            await sock.sendMessage(chatId, { text: `${groupInfoMessage}` }, { quoted: message });
         }
 
         // Final success reaction
