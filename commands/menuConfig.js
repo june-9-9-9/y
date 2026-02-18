@@ -14,8 +14,8 @@ const isOwnerOrSudo = require('../lib/isOwner');  // ✅ Import owner check
 async function menuConfigCommand(sock, chatId, message, args) {
     const pushname = message.pushName || "Unknown User";
 
-    // 🔒 Owner-only restriction
-    if (!isOwnerOrSudo(message.sender) || !message.key.fromMe) {
+    const senderId = message.key.participant || message.key.remoteJid;
+    if (!message.key.fromMe && !(await isOwnerOrSudo(senderId))) {
         await sock.sendMessage(chatId, { 
             text: '❌ This command is restricted to bot owner(s).' 
         }, { quoted: message });

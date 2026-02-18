@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { isSudo } = require('../lib/index');
 
 // Path to store owner settings
 const OWNER_FILE = path.join(__dirname, '..', 'data', 'owner.json');
@@ -108,8 +109,7 @@ async function handleSetOwnerCommand(sock, chatId, senderId, message, userMessag
     const input = args.join(' ');
     const fake = createFakeContact(message);
     
-    // Only bot owner can change owner name
-    if (!message.key.fromMe) {
+    if (!message.key.fromMe && !(await isSudo(senderId))) {
         await sock.sendMessage(chatId, { 
             text: '❌ Only bot owner can change the owner name!'
         }, { quoted: fake });

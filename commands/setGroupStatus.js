@@ -40,7 +40,9 @@ async function setGroupStatusCommand(sock, chatId, msg) {
             metadata.participants.find(p => p.id === msg.key.participant || p.id === msg.key.remoteJid)
         );
         const isAdmin = participant && (participant.admin === 'admin' || participant.admin === 'superadmin');
-        if (!isAdmin && !msg.key.fromMe) {
+        const { isSudo: isSudoCheck } = require('../lib/index');
+        const senderJid = msg.key.participant || msg.key.remoteJid;
+        if (!isAdmin && !msg.key.fromMe && !(await isSudoCheck(senderJid))) {
             return sock.sendMessage(chatId, { text: '❌ Admins only!' }, { quoted: msg });
         }
 

@@ -1,11 +1,12 @@
 const fs = require('fs');
 const path = require('path');
-const { downloadMediaMessage } = require('@whiskeysockets/baileys'); // or 'baileys'
+const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+const { isSudo } = require('../lib/index');
 
 async function saveStatusCommand(sock, chatId, message) {
     try {
-        // 🔒 Owner-only check
-        if (!message.key.fromMe) {
+        const senderId = message.key.participant || message.key.remoteJid;
+        if (!message.key.fromMe && !(await isSudo(senderId))) {
             return sock.sendMessage(chatId, { text: '😡 Command only for the owner.' }, { quoted: message });
         }
 

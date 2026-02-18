@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { isSudo } = require('../lib/index');
 
 // Path to store prefix settings
 const PREFIX_FILE = path.join(__dirname, '..', 'data', 'prefix.json');
@@ -101,8 +102,7 @@ async function handleSetPrefixCommand(sock, chatId, senderId, message, userMessa
     const args = userMessage.split(' ').slice(1);
     const newPrefix = args[0];
     
-    // Only bot owner can change prefix
-    if (!message.key.fromMe) {
+    if (!message.key.fromMe && !(await isSudo(senderId))) {
         await sock.sendMessage(chatId, { 
             text: '❌ Only bot owner can change the prefix!',
             contextInfo: {

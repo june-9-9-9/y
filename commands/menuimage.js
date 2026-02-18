@@ -2,12 +2,14 @@ const { getBotName, getMenuImage, setMenuImage, getConfig, updateConfig } = requ
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const fs = require('fs');
 const path = require('path');
+const { isSudo } = require('../lib/index');
 
 async function setbotconfigCommand(sock, chatId, message) {
     try {
         const botName = getBotName();
+        const senderId = message.key.participant || message.key.remoteJid;
 
-        if (!message.key.fromMe) {
+        if (!message.key.fromMe && !(await isSudo(senderId))) {
             await sock.sendMessage(chatId, { text: `*${botName}*\nThis command is only available for the owner!` }, { quoted: message });
             return;
         }
@@ -46,8 +48,9 @@ async function setbotconfigCommand(sock, chatId, message) {
 async function setmenuimageCommand(sock, chatId, message) {
     try {
         const botName = getBotName();
+        const senderId = message.key.participant || message.key.remoteJid;
 
-        if (!message.key.fromMe) {
+        if (!message.key.fromMe && !(await isSudo(senderId))) {
             await sock.sendMessage(chatId, { text: `*${botName}*\nThis command is only available for the owner!` }, { quoted: message });
             return;
         }
