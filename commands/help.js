@@ -1,4 +1,8 @@
-// help.js - Enhanced version with integrated functions
+/**
+- help.js - 
+- Enhanced version with integrated functions
+- supreme + casper
+*/
 const settings = require('../settings');
 const fs = require('fs');
 const path = require('path');
@@ -72,7 +76,7 @@ const COMMAND_CATEGORIES = {
         'warn', 'warnings', 'add', 'antilink', 'antibadword', 'antitag',
         'antisticker', 'antidemote', 'welcome', 'goodbye',
         'setgdesc', 'setgname', 'setgpp', 'open', 'close',
-        'resetlink', 'link', 'revoke'
+        'resetlink', 'link', 'revoke', 'antisticker', 'antiimage'
     ],
     'GROUP TOOLS': [
         'tagall', 'tag', 'hidetag', 'tagnoadmin', 'mention',
