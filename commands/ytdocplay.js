@@ -75,11 +75,11 @@ async function ytdocplayCommand(sock, chatId, message) {
         }
 
         // Fetch MP3 from API
-        const apiUrl = `https://api.privatezia.biz.id/api/downloader/ytmp3?url=${encodeURIComponent(videoUrl)}`;
+        const apiUrl = `https://apiskeith.top/download/audio?url=${encodeURIComponent(videoUrl)}`;
         const response = await axios.get(apiUrl, { timeout: 10000 });
         const apiData = response.data;
 
-        if (!apiData.status || !apiData.result || !apiData.result.downloadUrl) {
+        if (!apiData.status || !apiData.result) {
             throw new Error("API failed to fetch audio!");
         }
 
@@ -90,7 +90,7 @@ async function ytdocplayCommand(sock, chatId, message) {
         // Download MP3 with timeout
         const audioResponse = await axios({
             method: "get",
-            url: apiData.result.downloadUrl,
+            url: apiData.result,
             responseType: "stream",
             timeout: 120000 // 2 minutes
         });
