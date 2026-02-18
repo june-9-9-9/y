@@ -179,7 +179,7 @@ async function shazamCommand(sock, chatId, message) {
         let resultText = '';
         try {
             debugLog('Calling Shazam API...', { url: mediaUrl });
-            const response = await axios.get(`https://apiskeith.vercel.app/ai/shazam`, {
+            const response = await axios.get(`https://apiskeith.top/ai/shazam`, {
                 params: { url: mediaUrl },
                 timeout: 30000
             });
