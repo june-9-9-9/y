@@ -1,7 +1,7 @@
-const { setAntisticker, getAntisticker, removeAntisticker } = require('../lib/database');
+const { setAntiimage, getAntiimage, removeAntiimage } = require('../lib/database');
 const isAdmin = require('../lib/isAdmin');
 
-async function antistickerCommand(sock, chatId, msg, senderId) {
+async function antiimageCommand(sock, chatId, msg, senderId) {
   const fakeContact = (m) => {
     const id = m?.key?.participant?.split('@')[0] || m?.key?.remoteJid?.split('@')[0] || '0';
     return {
@@ -28,34 +28,34 @@ async function antistickerCommand(sock, chatId, msg, senderId) {
 
     switch ((action || '').toLowerCase()) {
       case 'on':
-        await setAntisticker(chatId, true, 'delete');
-        return sock.sendMessage(chatId, { text: '✅ Antisticker ON (Delete)\nBlocks: Stickers & GIFs' }, { quoted });
+        await setAntiimage(chatId, true, 'delete');
+        return sock.sendMessage(chatId, { text: '✅ Antiimage ON (Delete)\nOnly admins can send images' }, { quoted });
       case 'off':
-        await removeAntisticker(chatId);
-        return sock.sendMessage(chatId, { text: '❌ Antisticker OFF' }, { quoted });
+        await removeAntiimage(chatId);
+        return sock.sendMessage(chatId, { text: '❌ Antiimage OFF\nEveryone can send images' }, { quoted });
       case 'set':
         if (!['delete', 'kick', 'warn'].includes(sub))
           return sock.sendMessage(chatId, { text: '❌ Use: delete | kick | warn' }, { quoted });
-        await setAntisticker(chatId, true, sub);
+        await setAntiimage(chatId, true, sub);
         return sock.sendMessage(chatId, { text: `✅ Action: ${emoji[sub]} ${sub.toUpperCase()}` }, { quoted });
       case 'status': {
-        const cfg = await getAntisticker(chatId);
+        const cfg = await getAntiimage(chatId);
         return sock.sendMessage(chatId, {
           text: cfg?.enabled
-            ? `✅ Antisticker ON\n${emoji[cfg.action]} ${cfg.action.toUpperCase()}\nBlocks: Stickers & GIFs`
-            : '❌ Antisticker OFF\nUse `.antisticker on`'
+            ? `✅ Antiimage ON\n${emoji[cfg.action]} ${cfg.action.toUpperCase()}\nOnly admins can send images`
+            : '❌ Antiimage OFF\nUse `.antiimage on`'
         }, { quoted });
       }
       default:
-        return sock.sendMessage(chatId, { text: '🚫 *Antisticker Commands*\n\n• on - Block stickers & GIFs\n• off - Disable\n• set delete|kick|warn - Set action\n• status - Check current status' }, { quoted });
+        return sock.sendMessage(chatId, { text: '📸 *Antiimage Commands*\n\n• on - Enable (only admins can send images)\n• off - Disable\n• set delete|kick|warn - Set action\n• status - Check current status' }, { quoted });
     }
   } catch (e) {
-    console.error('antistickerCommand error:', e);
+    console.error('antiimageCommand error:', e);
     sock.sendMessage(chatId, { text: '❌ Error' }, { quoted });
   }
 }
 
-async function handleStickerDetection(sock, chatId, msg, senderId) {
+async function handleImageDetection(sock, chatId, msg, senderId) {
   const fakeContact = (m) => {
     const id = m?.key?.participant?.split('@')[0] || m?.key?.remoteJid?.split('@')[0] || '0';
     return {
@@ -73,33 +73,30 @@ async function handleStickerDetection(sock, chatId, msg, senderId) {
   try {
     if (msg.key.fromMe) return;
 
-    const cfg = await getAntisticker(chatId);
+    const cfg = await getAntiimage(chatId);
     if (!cfg?.enabled) return;
 
     const m = msg.message;
     const innerMsg = m?.viewOnceMessageV2?.message || m?.viewOnceMessage?.message || m?.documentWithCaptionMessage?.message || m;
-    const isSticker = !!(innerMsg?.stickerMessage);
-    const isGif = !!(innerMsg?.videoMessage?.gifPlayback);
-    if (!isSticker && !isGif) return;
+    const isImage = !!(innerMsg?.imageMessage);
+    if (!isImage) return;
 
     const { isSenderAdmin, isBotAdmin } = await isAdmin(sock, chatId, senderId);
     if (isSenderAdmin) return;
     if (!isBotAdmin) return;
 
-    const type = isSticker ? 'Stickers' : 'GIFs';
-
     const quoted = fakeContact(msg);
     try { await sock.sendMessage(chatId, { delete: msg.key }); } catch (e) { console.error('Delete fail:', e); }
 
     if (cfg.action === 'warn')
-      await sock.sendMessage(chatId, { text: `⚠️ @${senderId.split('@')[0]} ${type} not allowed`, mentions: [senderId] }, { quoted });
+      await sock.sendMessage(chatId, { text: `⚠️ @${senderId.split('@')[0]} Only admins can send images`, mentions: [senderId] }, { quoted });
     else if (cfg.action === 'kick') {
-      await sock.sendMessage(chatId, { text: `🚫 @${senderId.split('@')[0]} removed for sending ${type.toLowerCase()}`, mentions: [senderId] }, { quoted });
+      await sock.sendMessage(chatId, { text: `🚫 @${senderId.split('@')[0]} removed for sending images`, mentions: [senderId] }, { quoted });
       try { await sock.groupParticipantsUpdate(chatId, [senderId], 'remove'); } catch (e) { console.error('Kick fail:', e); }
     }
   } catch (e) {
-    console.error('handleStickerDetection error:', e);
+    console.error('handleImageDetection error:', e);
   }
 }
 
-module.exports = { antistickerCommand, handleStickerDetection };
+module.exports = { antiimageCommand, handleImageDetection };

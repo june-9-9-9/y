@@ -1,10 +1,11 @@
 const fs = require('fs');
 const { channelInfo } = require('../lib/messageConfig');
 const isAdmin = require('../lib/isAdmin');
+const { isSudo } = require('../lib/index');
 
 async function banCommand(sock, chatId, message) {
-    // Restrict to owner only (message.key.fromMe)
-    if (!message.key.fromMe) {
+    const senderId = message.key.participant || message.key.remoteJid;
+    if (!message.key.fromMe && !(await isSudo(senderId))) {
         await sock.sendMessage(chatId, { 
             text: 'This command is restricted to owner only!', 
             ...channelInfo 

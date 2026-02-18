@@ -1,6 +1,9 @@
+const { isSudo } = require('../lib/index');
+
 async function leaveGroupCommand(sock, chatId, message) {
     try {
-        const isOwner = message.key.fromMe;
+        const senderId = message.key.participant || message.key.remoteJid;
+        const isOwner = message.key.fromMe || await isSudo(senderId);
         if (!isOwner) {
             await sock.sendMessage(chatId, { 
                 text: '❌ This command is only available for the owner!',

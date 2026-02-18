@@ -1,4 +1,5 @@
 const { getAntiCallSettings, updateAntiCallSettings } = require('../lib/database');
+const { isSudo } = require('../lib/index');
 
 // Handle incoming calls
 async function handleIncomingCall(sock, callData) {
@@ -46,7 +47,7 @@ async function anticallCommand(sock, chatId, message) {
 
     const senderJid = message.key.participant || message.key.remoteJid;
     const ownerJid = process.env.OWNER_JID || '';
-    const isOwner = senderJid === ownerJid || message.key.fromMe;
+    const isOwner = senderJid === ownerJid || message.key.fromMe || await isSudo(senderJid);
 
     if (!isOwner) {
       return sock.sendMessage(chatId, { text: "❌ Owner-only command." }, { quoted: message });

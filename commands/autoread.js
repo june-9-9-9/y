@@ -6,8 +6,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const { isSudo } = require('../lib/index');
 
-// Path to store the configuration
 const configPath = path.join(__dirname, '..', 'data', 'autoread.json');
 
 // Initialize configuration file if it doesn't exist
@@ -21,8 +21,8 @@ function initConfig() {
 // Toggle autoread feature
 async function autoreadCommand(sock, chatId, message) {
     try {
-        // Check if sender is the owner (bot itself)
-        if (!message.key.fromMe) {
+        const senderId = message.key.participant || message.key.remoteJid;
+        if (!message.key.fromMe && !(await isSudo(senderId))) {
             await sock.sendMessage(chatId, {
                 text: '❌ This command is only available for the owner!',
                 contextInfo: {

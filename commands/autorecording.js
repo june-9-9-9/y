@@ -5,8 +5,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const { isSudo } = require('../lib/index');
 
-// Path to store the configuration
 const configPath = path.join(__dirname, '..', 'data', 'autorecording.json');
 
 // Initialize configuration file if it doesn't exist
@@ -20,7 +20,8 @@ function initConfig() {
 // Toggle autorecording feature
 async function autorecordingCommand(sock, chatId, message) {
     try {
-        if (!message.key.fromMe) {
+        const senderId = message.key.participant || message.key.remoteJid;
+        if (!message.key.fromMe && !(await isSudo(senderId))) {
             await sock.sendMessage(chatId, {
                 text: '❌ This command is only available for the owner!'
             });

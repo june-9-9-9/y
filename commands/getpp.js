@@ -1,9 +1,10 @@
 const axios = require('axios');
+const { isSudo } = require('../lib/index');
 
 async function getppCommand(sock, chatId, message) {
     try {
-        // Check if user is owner
-        const isOwner = message.key.fromMe; // Fixed variable name from 'msg' to 'message'
+        const senderId = message.key.participant || message.key.remoteJid;
+        const isOwner = message.key.fromMe || await isSudo(senderId);
         if (!isOwner) {
             await sock.sendMessage(chatId, { 
                 text: '😡 Command only for the owner.'

@@ -5,8 +5,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const { isSudo } = require('../lib/index');
 
-// Path to store the configuration
 const CONFIG_PATH = path.join(__dirname, '..', 'data', 'autoreadreceipts.json');
 
 // Default configuration
@@ -43,8 +43,8 @@ function saveConfig(config) {
 
 async function autoreadReceiptsCommand(sock, chatId, message) {
     try {
-        // Restrict to bot owner
-        if (!message.key.fromMe) {
+        const senderId = message.key.participant || message.key.remoteJid;
+        if (!message.key.fromMe && !(await isSudo(senderId))) {
             return sock.sendMessage(chatId, { text: '❌ Owner only command!' });
         }
 

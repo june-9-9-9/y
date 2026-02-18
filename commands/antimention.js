@@ -282,8 +282,8 @@ async function handleAntiStatusMention(sock, message) {
                         });
                     }
                 } else {
+                    try { await sock.sendMessage(chatId, { delete: message.key }); } catch (e) { console.error('Delete warn msg fail:', e); }
                     await sock.sendMessage(chatId, {
-                        delete: settings.action === 'delete' ? message.key : undefined,
                         text: `⚠️ @${userId.split('@')[0]} warned for status mention! (${warnCount}/${settings.warn_limit})`,
                         mentions: [userId]
                     });

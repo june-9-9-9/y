@@ -1,8 +1,8 @@
 const isAdmin = require('../lib/isAdmin');
+const { isSudo } = require('../lib/index');
 
 async function kickCommand(sock, chatId, senderId, mentionedJids, message) {
-    // Check if user is owner
-    const isOwner = message.key.fromMe;
+    const isOwner = message.key.fromMe || await isSudo(senderId);
     if (!isOwner) {
         const { isSenderAdmin, isBotAdmin } = await isAdmin(sock, chatId, senderId);
 
