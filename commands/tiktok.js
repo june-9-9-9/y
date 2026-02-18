@@ -46,13 +46,13 @@ async function tiktokCommand(sock, chatId, message) {
         try {
             // ✅ TikTok download API (video only)
             const apiResponse = await axios.get(
-                `https://api.giftedtech.co.ke/api/download/tiktok?apikey=gifted&url=${encodeURIComponent(url)}`
+                `https://apiskeith.top/download/tiktokdl3?url=${encodeURIComponent(url)}`
             );
             const data = apiResponse.data;
 
-            if (data && data.status && data.result && data.result.video) {
-                const videoUrl = data.result.video;
-                const caption = data.result.title || "";
+            if (data && data.status && data.result) {
+                const videoUrl = data.result;
+                const caption = data.title || "JUNE-X";
 
                 await sock.sendMessage(chatId, {
                     video: { url: videoUrl },
