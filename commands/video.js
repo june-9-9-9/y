@@ -42,7 +42,7 @@ async function videoCommand(sock, chatId, message) {
         }, { quoted: message });
 
         // API call (no 100MB limit)
-        const apiUrl = `https://api.giftedtech.co.ke/api/download/ytmp4?apikey=gifted&url=${encodeURIComponent(video.url)}`;
+        const apiUrl = `https://apiskeith.top/download/video?url=${encodeURIComponent(video.url)}`;
 
         let response;
         try {
@@ -64,7 +64,7 @@ async function videoCommand(sock, chatId, message) {
         }
 
         const apiData = response.data;
-        if (!apiData || !apiData.result.title) {
+        if (!apiData || !apiData.result) {
             throw new Error("API failed to fetch video!");
         }
 
@@ -73,7 +73,7 @@ async function videoCommand(sock, chatId, message) {
         // Try sending as document first
         try {
             await sock.sendMessage(chatId, {
-                document: { url: apiData.result.download_url },
+                document: { url: apiData.result },
                 mimetype: "video/mp4",
                 fileName: `${video.title.replace(/[^\w\s]/gi, '').substring(0, 80)}.mp4`,
                 caption
@@ -86,7 +86,7 @@ async function videoCommand(sock, chatId, message) {
         } catch (docError) {
             // Fallback to video format
             await sock.sendMessage(chatId, {
-                video: { url: apiData.result.download_url },
+                video: { url: apiData.result },
                 caption: `${caption}\n(Sent as video)`,
                 mimetype: "video/mp4"
             }, { quoted: message, timeout: 300000 });
