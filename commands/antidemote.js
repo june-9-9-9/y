@@ -8,12 +8,14 @@ const {
     incrementProtectedCount,
     addBannedUser,
     removeBannedUser,
-    isUserBanned
+    isUserBanned,
+    ensureDataDir
 } = require('../lib/antidemote-file');
 const isAdmin = require('../lib/isAdmin');
 
 async function antidemoteCommand(sock, chatId, message, senderId) {
     try {
+        await ensureDataDir();
         const isSenderAdmin = await isAdmin(sock, chatId, senderId);
 
         if (!isSenderAdmin) {
@@ -86,7 +88,7 @@ async function antidemoteCommand(sock, chatId, message, senderId) {
                     return;
                 }
 
-                const mentionedKick = message.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+                const mentionedKick = message.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || (args[1].includes('@') ? args[1].replace(/[^0-9]/g, '') + '@s.whatsapp.net' : null);
                 if (!mentionedKick) {
                     await sock.sendMessage(chatId, { 
                         text: '❌ Please mention a valid user with @.' 
@@ -95,7 +97,9 @@ async function antidemoteCommand(sock, chatId, message, senderId) {
                 }
 
                 // Check if target is admin
-                const targetIsAdmin = await isAdmin(sock, chatId, mentionedKick);
+                const groupMetadataKick = await sock.groupMetadata(chatId);
+                const targetIsAdmin = groupMetadataKick.participants.find(p => p.id === mentionedKick)?.admin;
+                
                 if (targetIsAdmin && config.enabled) {
                     await sock.sendMessage(chatId, { 
                         text: '🛡️ *ANTIDEMOTE PROTECTION*\n\n❌ Cannot kick admins while antidemote is enabled!\n⚠️ Disable antidemote first with `.antidemote off`' 
@@ -133,10 +137,21 @@ async function antidemoteCommand(sock, chatId, message, senderId) {
                     return;
                 }
 
-                const mentionedBan = message.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+                const mentionedBan = message.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || (args[1].includes('@') ? args[1].replace(/[^0-9]/g, '') + '@s.whatsapp.net' : null);
                 if (!mentionedBan) {
                     await sock.sendMessage(chatId, { 
                         text: '❌ Please mention a valid user with @.' 
+                    }, { quoted: message });
+                    return;
+                }
+
+                // Check if target is admin
+                const groupMetadataBan = await sock.groupMetadata(chatId);
+                const targetIsAdminBan = groupMetadataBan.participants.find(p => p.id === mentionedBan)?.admin;
+                
+                if (targetIsAdminBan && config.enabled) {
+                    await sock.sendMessage(chatId, { 
+                        text: '🛡️ *ANTIDEMOTE PROTECTION*\n\n❌ Cannot ban admins while antidemote is enabled!\n⚠️ Disable antidemote first with `.antidemote off`' 
                     }, { quoted: message });
                     return;
                 }
@@ -182,7 +197,7 @@ async function antidemoteCommand(sock, chatId, message, senderId) {
                     return;
                 }
 
-                const mentionedUnban = message.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+                const mentionedUnban = message.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || (args[1].includes('@') ? args[1].replace(/[^0-9]/g, '') + '@s.whatsapp.net' : null);
                 if (!mentionedUnban) {
                     await sock.sendMessage(chatId, { 
                         text: '❌ Please mention a valid user with @.' 
