@@ -1,146 +1,132 @@
 const fs = require("fs");
-const axios = require('axios');
-const yts = require('yt-search');
-const path = require('path');
+const axios = require("axios");
+const yts = require("yt-search");
+const path = require("path");
+const os = require("os");
 
 async function ytdocplayCommand(sock, chatId, message) {
-    try {
+    try { 
         await sock.sendMessage(chatId, {
-            react: { text: '🎶', key: message.key }
+            react: { text: "🎼", key: message.key }
         });
-
+        
+        // Use a safe temp directory
         const tempDir = path.join(__dirname, "temp");
-        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
-
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        } else {
+            const stat = fs.statSync(tempDir);
+            if (!stat.isDirectory()) {
+                fs.unlinkSync(tempDir); // remove file named "temp"
+                fs.mkdirSync(tempDir, { recursive: true });
+            }
+        }
+        
         const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
-        const parts = text.split(' ');
-        const query = parts.slice(1).join(' ').trim();
+        const parts = text.split(" ");
+        const query = parts.slice(1).join(" ").trim();
 
         if (!query) {
-            return await sock.sendMessage(chatId, {
-                text: '📁 Provide a YouTube link or search query!\nExample: .ytdoc https://youtube.com/watch?v=...\nExample: .ytdoc lofi beats'
+            return await sock.sendMessage(chatId, { 
+                text: "🎵 Provide a song name!\nExample: .play Not Like Us" 
             }, { quoted: message });
         }
 
-        if (query.length > 500) {
-            return await sock.sendMessage(chatId, {
-                text: '📝 Input too long! Max 500 characters.'
+        if (query.length > 100) {
+            return await sock.sendMessage(chatId, { 
+                text: "📝 Song name too long! Max 100 chars." 
             }, { quoted: message });
         }
 
-        // YouTube URL validation patterns
-        const youtubePatterns = [
-            /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/(watch\?v=|embed\/|v\/|shorts\/)?([a-zA-Z0-9_-]{11})/,
-            /^https?:\/\/youtu\.be\/([a-zA-Z0-9_-]{11})/,
-            /^https?:\/\/www\.youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
-            /^https?:\/\/www\.youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/
-        ];
-
-        let videoUrl;
-        let isDirectLink = false;
-
-        // Check if input is a YouTube URL
-        for (const pattern of youtubePatterns) {
-            const match = query.match(pattern);
-            if (match) {
-                const videoId = match[5] || match[1];
-                videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-                isDirectLink = true;
-                break;
-            }
+        const searchResult = await (await yts(`${query} official`)).videos[0];
+        if (!searchResult) {
+            return sock.sendMessage(chatId, { 
+                text: "😕 Couldn't find that song. Try another one!" 
+            }, { quoted: message });
         }
 
-        let videoInfo;
+        const video = searchResult;
         
-        if (isDirectLink) {
-            // Direct YouTube URL provided
+        let downloadUrl;
+        let videoTitle;
+        
+        const apis = [
+            `https://apiskeith.top/download/audio?url=${encodeURIComponent(video.url)}`,
+            `https://api.ryzendesu.vip/api/downloader/ytmp3?url=${encodeURIComponent(video.url)}`,
+            `https://api.giftedtech.co.ke/api/download/ytmp3?apikey=gifted&url=${encodeURIComponent(video.url)}`
+        ];
+        
+        for (const api of apis) {
             try {
-                const searchResults = await yts({ videoId: videoUrl.split('v=')[1] });
-                videoInfo = searchResults;
-            } catch (error) {
-                return await sock.sendMessage(chatId, {
-                    text: '❌ Invalid YouTube URL or video not found!'
-                }, { quoted: message });
+                const response = await axios.get(api, { timeout: 30000 });
+                
+                if (api.includes("apiskeith")) {
+                    if (response.data?.status && response.data?.result) {
+                        downloadUrl = response.data.result;
+                        videoTitle = response.data.title || video.title;
+                        break;
+                    }
+                } else if (api.includes("ryzendesu")) {
+                    if (response.data?.status && response.data?.url) {
+                        downloadUrl = response.data.url;
+                        videoTitle = response.data.title || video.title;
+                        break;
+                    }
+                } else if (api.includes("gifted")) {
+                    if (response.data?.status && response.data?.result?.download_url) {
+                        downloadUrl = response.data.result.download_url;
+                        videoTitle = response.data.result.title || video.title;
+                        break;
+                    }
+                }
+            } catch {
+                continue; // try next API
             }
-        } else {
-            // Search for the query
-            const searchResults = await yts(query);
-            if (!searchResults.videos || searchResults.videos.length === 0) {
-                return await sock.sendMessage(chatId, {
-                    text: '🔍 No results found! Try a different search.'
-                }, { quoted: message });
-            }
-            videoInfo = searchResults.videos[0];
-            videoUrl = videoInfo.url;
         }
-
-        // Fetch MP3 from API
-        const apiUrl = `https://apiskeith.top/download/audio?url=${encodeURIComponent(videoUrl)}`;
-        const response = await axios.get(apiUrl, { timeout: 10000 });
-        const apiData = response.data;
-
-        if (!apiData.status || !apiData.result) {
-            throw new Error("API failed to fetch audio!");
-        }
+        
+        if (!downloadUrl) throw new Error("All download APIs failed. Try again later.");
 
         const timestamp = Date.now();
         const fileName = `audio_${timestamp}.mp3`;
         const filePath = path.join(tempDir, fileName);
 
-        // Download MP3 with timeout
-        const audioResponse = await axios({
-            method: "get",
-            url: apiData.result,
-            responseType: "stream",
-            timeout: 120000 // 2 minutes
+        const audioResponse = await axios({ 
+            method: "get", 
+            url: downloadUrl, 
+            responseType: "stream", 
+            timeout: 900000,
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            }
         });
-
+        
         const writer = fs.createWriteStream(filePath);
         audioResponse.data.pipe(writer);
-
-        await new Promise((resolve, reject) => {
-            writer.on("finish", resolve);
-            writer.on("error", reject);
-            setTimeout(() => reject(new Error("Download timeout!")), 120000);
+        await new Promise((resolve, reject) => { 
+            writer.on("finish", resolve); 
+            writer.on("error", reject); 
         });
 
-        // Verify download
         if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
-            throw new Error("Download failed - empty file!");
+            throw new Error("Download failed or empty file!");
         }
-
-        // Send as document
-        const title = apiData.result.title || videoInfo.title || 'YouTube Audio';
-        const safeTitle = title.replace(/[^\w\s-]/g, '').substring(0, 100);
         
-        await sock.sendMessage(chatId, {
-            text: `📥 *Downloading Audio*\n📄 Title: ${title}\n⏳ Duration: ${videoInfo.timestamp || 'N/A'}`
-        });
-
-        await sock.sendMessage(chatId, {
-            document: { 
-                url: filePath 
-            },
-            mimetype: "audio/mpeg",
-            fileName: `${safeTitle}.mp3`
+        // Send audio as document
+        await sock.sendMessage(chatId, { 
+            document: { url: filePath }, 
+            mimetype: "audio/mpeg", 
+            fileName: `${(videoTitle || video.title).substring(0, 100)}.mp3`
         }, { quoted: message });
 
         // Cleanup
-        if (fs.existsSync(filePath)) {
-            setTimeout(() => fs.unlinkSync(filePath), 5000);
-        }
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
     } catch (error) {
         console.error("ytdocplayCommand error:", error);
-        
-        const errorMessage = error.response?.status === 404 
-            ? 'Video not found or unavailable!'
-            : error.message.includes('timeout')
-            ? 'Request timed out! Try again.'
-            : `Error: ${error.message}`;
-            
-        await sock.sendMessage(chatId, {
-            text: `❌ ${errorMessage}`
+        return await sock.sendMessage(chatId, { 
+            text: `🚫 Error: ${error.message || "Failed to download audio"}` 
         }, { quoted: message });
     }
 }
