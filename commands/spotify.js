@@ -37,7 +37,7 @@ async function spotifyCommand(sock, chatId, message) {
         await sock.sendPresenceUpdate('recording', chatId);
 
         // API call
-        const apiUrl = `https://apiskeith.vercel.app/download/spotify?q=${encodeURIComponent(query)}`;
+        const apiUrl = `https://apiskeith.top/download/spotify?q=${encodeURIComponent(query)}`;
         const response = await axios.get(apiUrl, { timeout: 60000 });
 
         const track = response.data?.result?.track;
