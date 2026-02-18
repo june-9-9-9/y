@@ -519,8 +519,8 @@ async function startXeonBotInc() {
             keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "fatal" }).child({ level: "fatal" })),
         },
         markOnlineOnConnect: true,
-        generateHighQualityLinkPreview: true,
-        syncFullHistory: true,
+        generateHighQualityLinkPreview: false,
+        syncFullHistory: false,
         getMessage: async (key) => {
             let jid = jidNormalizedUser(key.remoteJid);
             // This now uses the globally available 'store' which is loaded inside tylor()

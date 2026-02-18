@@ -337,6 +337,7 @@ const metaiCommand = require('./commands/ai-meta');
 const { antistatusmentionCommand, handleAntiStatusMention } = require('./commands/antimention.js');
 const { anticallCommand, handleIncomingCall } = require('./commands/anticall');
 const { antistickerCommand, handleStickerDetection } = require('./commands/antisticker');
+const { antiimageCommand, handleImageDetection } = require('./commands/antiimage');
 const { ligue1StandingsCommand, laligaStandingsCommand, matchesCommand } = require('./commands/sport1');
 const approveCommand = require('./commands/approve');
 const smemeCommand = require('./commands/smeme');
@@ -391,14 +392,11 @@ async function handleMessages(sock, messageUpdate, printLog) {
         if (!message?.message) return;
 
 
-        // Handle autoread functionality
-        await handleAutoread(sock, message);
-
-        //handle devReact
-        await handleDevReact(sock, message);
-        
-        //handleantisyatusmention
-        await handleAntiStatusMention(sock, message);
+        await Promise.allSettled([
+            handleAutoread(sock, message),
+            handleDevReact(sock, message),
+            handleAntiStatusMention(sock, message)
+        ]);
 
         if (!sock._callListenerBound) {
             sock.ev.on('call', async (callData) => {
@@ -549,10 +547,11 @@ if (/^[1-9]$/.test(userMessage)) {
 
         if (!message.key.fromMe) incrementMessageCount(chatId, senderId);
 
-        // Check for bad words FIRST, before ANY other processing
         if (isGroup && userMessage) {
-            await handleBadwordDetection(sock, chatId, message, userMessage, senderId);
-            await Antilink(message, sock);
+            await Promise.allSettled([
+                handleBadwordDetection(sock, chatId, message, userMessage, senderId),
+                Antilink(message, sock)
+            ]);
         }
 
         // PM blocker: block non-owner DMs when enabled (do not ban)
@@ -577,10 +576,13 @@ if (/^[1-9]$/.test(userMessage)) {
             await handleAutotypingForMessage(sock, chatId, userMessage);
 
             if (isGroup) {
-                // Process non-command messages first
-                await handleChatbotResponse(sock, chatId, message, userMessage, senderId);
-                await handleTagDetection(sock, chatId, message, senderId);
-                await handleMentionDetection(sock, chatId, message);
+                await Promise.allSettled([
+                    handleChatbotResponse(sock, chatId, message, userMessage, senderId),
+                    handleTagDetection(sock, chatId, message, senderId),
+                    handleMentionDetection(sock, chatId, message),
+                    handleStickerDetection(sock, chatId, message, senderId),
+                    handleImageDetection(sock, chatId, message, senderId)
+                ]);
             }
             return;
         }
@@ -643,7 +645,7 @@ if (/^[1-9]$/.test(userMessage)) {
                 userMessage.startsWith(`${prefix}promote`) ||
                 userMessage.startsWith(`${prefix}demote`)
             ) {
-                if (!isSenderAdmin && !message.key.fromMe) {
+                if (!isSenderAdmin && !message.key.fromMe && !senderIsSudo) {
                     await sock.sendMessage(chatId, {
                         text: 'Sorry, only group admins can use this command.',
                         ...channelInfo
@@ -942,7 +944,7 @@ if (/^[1-9]$/.test(userMessage)) {
             // Group Commands
             /*━━━━━━━━━━━━━━━━━━━━*/
             case userMessage === `${prefix}tagall`:
-                if (isSenderAdmin || message.key.fromMe) {
+                if (isSenderAdmin || message.key.fromMe || senderIsSudo) {
                     await tagAllCommand(sock, chatId, senderId, message);
                 } else {
                     await sock.sendMessage(chatId, { text: 'Sorry, only group admins can use the tagall command.', ...channelInfo }, { quoted: fake });
@@ -1276,7 +1278,7 @@ case userMessage === `${prefix}forfeit` ||
                         isSenderAdmin = adminStatus.isSenderAdmin;
                     }
 
-                    if (isSenderAdmin || message.key.fromMe) {
+                    if (isSenderAdmin || message.key.fromMe || senderIsSudo) {
                         await welcomeCommand(sock, chatId, message);
                     } else {
                         await sock.sendMessage(chatId, { text: 'Sorry, only group admins can use this command.', ...channelInfo }, { quoted: message });
@@ -1294,7 +1296,7 @@ case userMessage === `${prefix}forfeit` ||
                         isSenderAdmin = adminStatus.isSenderAdmin;
                     }
 
-                    if (isSenderAdmin || message.key.fromMe) {
+                    if (isSenderAdmin || message.key.fromMe || senderIsSudo) {
                         await goodbyeCommand(sock, chatId, message);
                     } else {
                         await sock.sendMessage(chatId, { text: 'Sorry, only group admins can use this command.', ...channelInfo }, { quoted: message });
@@ -1343,7 +1345,7 @@ case userMessage === `${prefix}forfeit` ||
 
                 // Check if sender is admin or bot owner
                 const chatbotAdminStatus = await isAdmin(sock, chatId, senderId);
-                if (!chatbotAdminStatus.isSenderAdmin && !message.key.fromMe) {
+                if (!chatbotAdminStatus.isSenderAdmin && !message.key.fromMe && !senderIsSudo) {
                     await sock.sendMessage(chatId, { text: '*Only admins or bot owner can use this command*', ...channelInfo }, { quoted: message });
                     return;
                 }
@@ -1418,8 +1420,12 @@ case userMessage === `${prefix}forfeit` ||
                 
         case userMessage.startsWith(`${prefix}antisticker`) || 
              userMessage.startsWith(`${prefix}nosticker`):              
-             await antistickerCommand(sock, chatId, message, senderId);      
-             await handleStickerDetection(sock, chatId, message, senderId);
+             await antistickerCommand(sock, chatId, message, senderId);
+               break;
+
+        case userMessage.startsWith(`${prefix}antiimage`) || 
+             userMessage.startsWith(`${prefix}noimage`):              
+             await antiimageCommand(sock, chatId, message, senderId);
                break;
 
                 
@@ -2061,20 +2067,26 @@ case userMessage === `${prefix}forfeit` ||
                 break;
             default:
                 if (isGroup) {
-                    // Handle non-command group messages
-                    if (userMessage) {  // Make sure there's a message
-                        await handleChatbotResponse(sock, chatId, message, userMessage, senderId);
-                    }
-                    await handleTagDetection(sock, chatId, message, senderId);
-                    await handleMentionDetection(sock, chatId, message);
+                    const tasks = [
+                        handleTagDetection(sock, chatId, message, senderId),
+                        handleMentionDetection(sock, chatId, message),
+                        handleStickerDetection(sock, chatId, message, senderId)
+                    ];
+                    if (userMessage) tasks.unshift(handleChatbotResponse(sock, chatId, message, userMessage, senderId));
+                    await Promise.allSettled(tasks);
                 }
                 commandExecuted = false;
                 break;
         }
 
-        // If a command was executed, show typing status after command execution
+        if (isGroup) {
+            await Promise.allSettled([
+                handleStickerDetection(sock, chatId, message, senderId),
+                handleImageDetection(sock, chatId, message, senderId)
+            ]);
+        }
+
         if (commandExecuted !== false) {
-            // Command was executed, now show typing status after command execution
             await showTypingAfterCommand(sock, chatId);
         }
 
