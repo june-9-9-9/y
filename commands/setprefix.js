@@ -2,73 +2,70 @@ const fs = require('fs');
 const path = require('path');
 const { isSudo } = require('../lib/index');
 
-// Path to store prefix settings
-const PREFIX_FILE = path.join(__dirname, '..', 'data', 'prefix.json');
+// Paths
+const DATA_DIR = path.join(__dirname, '..', 'data');
+const PREFIX_FILE = path.join(DATA_DIR, 'prefix.json');
 
-// Default prefix
+// Constants
 const DEFAULT_PREFIX = '.';
-
-// Special value for no prefix
 const NO_PREFIX = 'none';
 
 // Ensure data directory exists
-const dataDir = path.join(__dirname, '..', 'data');
-if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-// Initialize prefix file if it doesn't exist
+// Initialize prefix file if missing
 if (!fs.existsSync(PREFIX_FILE)) {
     fs.writeFileSync(PREFIX_FILE, JSON.stringify({ prefix: DEFAULT_PREFIX }, null, 2));
 }
 
 /**
- * Get the current prefix
- * @returns {string} The current prefix (empty string for no prefix)
+ * Safely read prefix file
+ * @returns {object} Parsed prefix data
  */
-function getPrefix() {
+function readPrefixFile() {
     try {
-        const data = JSON.parse(fs.readFileSync(PREFIX_FILE, 'utf8'));
-        return data.prefix === NO_PREFIX ? '' : (data.prefix || DEFAULT_PREFIX);
+        return JSON.parse(fs.readFileSync(PREFIX_FILE, 'utf8'));
     } catch (error) {
         console.error('Error reading prefix file:', error);
-        return DEFAULT_PREFIX;
+        return { prefix: DEFAULT_PREFIX };
     }
 }
 
 /**
- * Get the raw prefix value from storage
- * @returns {string} The raw prefix value
+ * Get the current prefix (empty string if prefixless)
+ */
+function getPrefix() {
+    const data = readPrefixFile();
+    return data.prefix === NO_PREFIX ? '' : (data.prefix || DEFAULT_PREFIX);
+}
+
+/**
+ * Get raw prefix value from storage
  */
 function getRawPrefix() {
-    try {
-        const data = JSON.parse(fs.readFileSync(PREFIX_FILE, 'utf8'));
-        return data.prefix || DEFAULT_PREFIX;
-    } catch (error) {
-        console.error('Error reading prefix file:', error);
-        return DEFAULT_PREFIX;
-    }
+    const data = readPrefixFile();
+    return data.prefix || DEFAULT_PREFIX;
 }
 
 /**
  * Set new prefix
- * @param {string} newPrefix - The new prefix to set
+ * @param {string} newPrefix
  * @returns {boolean} Success status
  */
 function setPrefix(newPrefix) {
     try {
-        // Validate prefix (allow empty string for no prefix, or 1-3 characters)
+        let data;
         if (newPrefix === '') {
-            // Set to no prefix
-            const data = { prefix: NO_PREFIX };
-            fs.writeFileSync(PREFIX_FILE, JSON.stringify(data, null, 2));
-            return true;
+            data = { prefix: NO_PREFIX };
         } else if (newPrefix && newPrefix.length <= 3) {
-            const data = { prefix: newPrefix };
-            fs.writeFileSync(PREFIX_FILE, JSON.stringify(data, null, 2));
-            return true;
+            data = { prefix: newPrefix };
+        } else {
+            return false;
         }
-        return false;
+        fs.writeFileSync(PREFIX_FILE, JSON.stringify(data, null, 2));
+        return true;
     } catch (error) {
         console.error('Error setting prefix:', error);
         return false;
@@ -77,12 +74,10 @@ function setPrefix(newPrefix) {
 
 /**
  * Reset prefix to default
- * @returns {boolean} Success status
  */
 function resetPrefix() {
     try {
-        const data = { prefix: DEFAULT_PREFIX };
-        fs.writeFileSync(PREFIX_FILE, JSON.stringify(data, null, 2));
+        fs.writeFileSync(PREFIX_FILE, JSON.stringify({ prefix: DEFAULT_PREFIX }, null, 2));
         return true;
     } catch (error) {
         console.error('Error resetting prefix:', error);
@@ -92,162 +87,91 @@ function resetPrefix() {
 
 /**
  * Check if bot is running in prefixless mode
- * @returns {boolean} True if no prefix is set
  */
 function isPrefixless() {
     return getRawPrefix() === NO_PREFIX;
 }
 
-async function handleSetPrefixCommand(sock, chatId, senderId, message, userMessage, currentPrefix) {
-    const args = userMessage.split(' ').slice(1);
-    const newPrefix = args[0];
-    
-    if (!message.key.fromMe && !(await isSudo(senderId))) {
-        await sock.sendMessage(chatId, { 
-            text: '❌ Only bot owner can change the prefix!',
-            contextInfo: {
-                forwardingScore: 1,
-                isForwarded: false,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: '',
-                    newsletterName: '',
-                    serverMessageId: -1
-                }
-            }
-        },{quoted: message});
-        return;
-    }
+/**
+ * Handle setprefix command
+ */
+async function handleSetPrefixCommand(sock, chatId, senderId, message, userMessage) {
+    try {
+        const args = userMessage.trim().split(/\s+/).slice(1);
+        const newPrefix = args[0];
 
-    if (!newPrefix) {
-        // Show current prefix
-        const current = getRawPrefix();
-        const displayPrefix = current === NO_PREFIX ? 'None (prefixless)' : current;
-        await sock.sendMessage(chatId, { 
-            text: `👑 Current prefix: *${displayPrefix}*\n\nUsage: ${current === NO_PREFIX ? 'command' : current + 'setprefix'} <new_prefix|none>\nExamples:\n• ${current === NO_PREFIX ? 'setprefix' : current + 'setprefix'} !\n• ${current === NO_PREFIX ? 'setprefix' : current + 'setprefix'} none (for prefixless mode)\n• ${current === NO_PREFIX ? 'setprefix' : current + 'setprefix'} reset`,
-            contextInfo: {
-                forwardingScore: 1,
-                isForwarded: false,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: '',
-                    newsletterName: '',
-                    serverMessageId: -1
-                }
-            }
-        },{quoted: message});
-        return;
-    }
-
-    if (newPrefix === 'reset') {
-        // Reset to default prefix
-        const success = resetPrefix();
-        if (success) {
-            const defaultPrefix = getPrefix();
+        // Authorization check
+        if (!message.key?.fromMe && !(await isSudo(senderId))) {
             await sock.sendMessage(chatId, { 
-                text: `✅ Prefix reset to default: *${defaultPrefix}*`,
-                contextInfo: {
-                    forwardingScore: 1,
-                    isForwarded: false,
-                    forwardedNewsletterMessageInfo: {
-                        newsletterJid: '@',
-                        newsletterName: '',
-                        serverMessageId: -1
-                    }
-                }
-            },{quoted: message});
-        } else {
-            await sock.sendMessage(chatId, { 
-                text: '❌ Failed to reset prefix!',
-                contextInfo: {
-                    forwardingScore: 1,
-                    isForwarded: false,
-                    forwardedNewsletterMessageInfo: {
-                        newsletterJid: '@',
-                        newsletterName: '',
-                        serverMessageId: -1
-                    }
-                }
-            });
+                text: '❌ Only bot owner can change the prefix!'
+            }, { quoted: message });
+            return;
         }
-        return;
-    }
 
-    if (newPrefix.toLowerCase() === NO_PREFIX) {
-        // Set to prefixless mode
-        const success = setPrefix('');
-        if (success) {
+        // Show current prefix if no argument
+        if (!newPrefix) {
+            const current = getRawPrefix();
+            const displayPrefix = current === NO_PREFIX ? 'None (prefixless)' : `"${current}"`;
+            const commandExample = current === NO_PREFIX ? 'setprefix' : `${current}setprefix`;
+
             await sock.sendMessage(chatId, { 
-                text: 'Bot set to  *prefixless mode* successfully!',
-                contextInfo: {
-                    forwardingScore: 1,
-                    isForwarded: false,
-                    forwardedNewsletterMessageInfo: {
-                        newsletterJid: '@',
-                        newsletterName: '',
-                        serverMessageId: -1
-                    }
-                }
-            },{quoted: message});
-        } else {
-            await sock.sendMessage(chatId, { 
-                text: '❌ Failed to set prefixless mode!',
-                contextInfo: {
-                    forwardingScore: 1,
-                    isForwarded: false,
-                    forwardedNewsletterMessageInfo: {
-                        newsletterJid: '@',
-                        newsletterName: '',
-                        serverMessageId: -1
-                    }
-                }
-            },{quoted: message});
+                text: `👑 *Current Prefix Settings*\n\n` +
+                      `📌 Current prefix: *${displayPrefix}*\n\n` +
+                      `*Usage:*\n` +
+                      `• ${commandExample} <new_prefix|none|reset>\n\n` +
+                      `*Examples:*\n` +
+                      `• ${commandExample} !\n` +
+                      `• ${commandExample} none (for prefixless mode)\n` +
+                      `• ${commandExample} reset`
+            }, { quoted: message });
+            return;
         }
-        return;
-    }
 
-    // Set new prefix
-    if (newPrefix.length > 3) {
-        await sock.sendMessage(chatId, { 
-            text: '❌ Prefix must be 1-3 characters long! Use "none" for prefixless mode.',
-            contextInfo: {
-                forwardingScore: 1,
-                isForwarded: false,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: '',
-                    newsletterName: '',
-                    serverMessageId: -1
-                }
+        // Handle reset
+        if (newPrefix.toLowerCase() === 'reset') {
+            if (resetPrefix()) {
+                await sock.sendMessage(chatId, { 
+                    text: `✅ Prefix reset to default: *"${DEFAULT_PREFIX}"*`
+                }, { quoted: message });
+            } else {
+                await sock.sendMessage(chatId, { text: '❌ Failed to reset prefix!' }, { quoted: message });
             }
-        },{quoted: message});
-        return;
-    }
+            return;
+        }
 
-    const success = setPrefix(newPrefix);
-    if (success) {
-        await sock.sendMessage(chatId, { 
-            text: `✅ Prefix successfully set to: *${newPrefix}*`,
-            contextInfo: {
-                forwardingScore: 1,
-                isForwarded: false,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: '@',
-                    newsletterName: '',
-                    serverMessageId: -1
-                }
+        // Handle prefixless
+        if (newPrefix.toLowerCase() === NO_PREFIX) {
+            if (setPrefix('')) {
+                await sock.sendMessage(chatId, { 
+                    text: '✅ Bot set to *prefixless mode* successfully!\n\n' +
+                          'Now you can use commands without any prefix.'
+                }, { quoted: message });
+            } else {
+                await sock.sendMessage(chatId, { text: '❌ Failed to set prefixless mode!' }, { quoted: message });
             }
-        },{quoted: message});
-    } else {
-        await sock.sendMessage(chatId, { 
-            text: '❌ Failed to set prefix!',
-            contextInfo: {
-                forwardingScore: 1,
-                isForwarded: false,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: '@',
-                    newsletterName: '',
-                    serverMessageId: -1
-                }
-            }
-        },{quoted: message});
+            return;
+        }
+
+        // Validate length
+        if (newPrefix.length > 3) {
+            await sock.sendMessage(chatId, { 
+                text: '❌ Prefix must be 1-3 characters long!\nUse "none" for prefixless mode.'
+            }, { quoted: message });
+            return;
+        }
+
+        // Set new prefix
+        if (setPrefix(newPrefix)) {
+            await sock.sendMessage(chatId, { 
+                text: `✅ Prefix successfully set to: *"${newPrefix}"*\n\n` +
+                      `Now use ${newPrefix}help to see available commands.`
+            }, { quoted: message });
+        } else {
+            await sock.sendMessage(chatId, { text: '❌ Failed to set prefix!' }, { quoted: message });
+        }
+    } catch (error) {
+        console.error('Error in handleSetPrefixCommand:', error);
+        await sock.sendMessage(chatId, { text: '❌ An error occurred while processing the command.' }, { quoted: message });
     }
 }
 
@@ -258,5 +182,6 @@ module.exports = {
     resetPrefix,
     isPrefixless,
     handleSetPrefixCommand,
+    DEFAULT_PREFIX,
     NO_PREFIX
 };
