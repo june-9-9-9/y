@@ -55,7 +55,7 @@ async function transcribeCommand(sock, chatId, message) {
         if (!mediaUrl) throw new Error('Failed to upload media');
 
         // Call transcription API
-        const apiUrl = `https://apiskeith.vercel.app/ai/transcribe?q=${encodeURIComponent(mediaUrl)}`;
+        const apiUrl = `https://apiskeith.top/ai/transcribe?q=${encodeURIComponent(mediaUrl)}`;
         const response = await axios.get(apiUrl, { timeout: 60000 });
 
         if (!response.data?.status || !response.data?.result?.text) {
