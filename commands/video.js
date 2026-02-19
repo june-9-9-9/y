@@ -42,7 +42,7 @@ async function videoCommand(sock, chatId, message) {
         }, { quoted: message });
 
         // API call (no 100MB limit)
-        const apiUrl = `https://apiskeith.top/download/video?url=${encodeURIComponent(video.url)}`;
+        const apiUrl = `https://media.cypherxbot.space/download/youtube/video?url=${encodeURIComponent(video.url)}`;
 
         let response;
         try {
@@ -64,7 +64,7 @@ async function videoCommand(sock, chatId, message) {
         }
 
         const apiData = response.data;
-        if (!apiData || !apiData.result) {
+        if (!apiData || !apiData.status) {
             throw new Error("API failed to fetch video!");
         }
 
@@ -73,7 +73,7 @@ async function videoCommand(sock, chatId, message) {
         // Try sending as document first
         try {
             await sock.sendMessage(chatId, {
-                document: { url: apiData.result },
+                document: { url: apiData.result.download_url },
                 mimetype: "video/mp4",
                 fileName: `${video.title.replace(/[^\w\s]/gi, '').substring(0, 80)}.mp4`,
                 caption
@@ -86,7 +86,7 @@ async function videoCommand(sock, chatId, message) {
         } catch (docError) {
             // Fallback to video format
             await sock.sendMessage(chatId, {
-                video: { url: apiData.result },
+                video: { url: apiData.result.download_url },
                 caption: `${caption}\n(Sent as video)`,
                 mimetype: "video/mp4"
             }, { quoted: message, timeout: 300000 });
