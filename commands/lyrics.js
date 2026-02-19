@@ -9,7 +9,7 @@ async function lyricsCommand(sock, chatId, songTitle, message) {
     }
 
     try {
-        const res = await axios.get(`https://apiskeith.vercel.app/search/lyrics2?query=${encodeURIComponent(songTitle)}`);
+        const res = await axios.get(`https://apiskeith.top/search/lyrics2?query=${encodeURIComponent(songTitle)}`);
         const data = res.data;
 
         if (!data.status || !data.result) {
