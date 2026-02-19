@@ -37,7 +37,7 @@ async function locationCommand(sock, chatId, message) {
         await sock.sendPresenceUpdate('recording', chatId);
 
         // Call API to resolve coordinates
-        const apiUrl = `https://apiskeith.vercel.app/tools/location?q=${encodeURIComponent(locationQuery)}`;
+        const apiUrl = `https://apiskeith.top/tools/location?q=${encodeURIComponent(locationQuery)}`;
         const response = await axios.get(apiUrl, { timeout: 60000 });
         const apiData = response.data;
 
