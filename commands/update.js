@@ -28,15 +28,24 @@ async function hasGitRepo() {
 }
 
 /* -------------------- Git Update -------------------- */
-async function updateViaGit() {
+async function updateViaGit(sock, chatId, statusMessage) {
+    await sock.sendMessage(chatId, { text: '🔍 Checking revision…', edit: statusMessage.key });
     const oldRev = await run('git rev-parse HEAD').catch(() => 'unknown');
+
+    await sock.sendMessage(chatId, { text: '📡 Fetching changes…', edit: statusMessage.key });
     await run('git fetch --all --prune');
+
     const newRev = await run('git rev-parse origin/main').catch(() => 'unknown');
-
     const alreadyUpToDate = oldRev === newRev;
-    const commits = alreadyUpToDate ? '' : await run(`git log --pretty=format:"%h %s (%an)" ${oldRev}..${newRev}`).catch(() => '');
-    const files = alreadyUpToDate ? '' : await run(`git diff --name-status ${oldRev} ${newRev}`).catch(() => '');
 
+    let commits = '', files = '';
+    if (!alreadyUpToDate) {
+        await sock.sendMessage(chatId, { text: '📝 Summarizing commits…', edit: statusMessage.key });
+        commits = await run(`git log --pretty=format:"%h %s (%an)" ${oldRev}..${newRev}`).catch(() => '');
+        files = await run(`git diff --name-status ${oldRev} ${newRev}`).catch(() => '');
+    }
+
+    await sock.sendMessage(chatId, { text: '🧹 Resetting repo…', edit: statusMessage.key });
     await run(`git reset --hard ${newRev}`);
     await run('git clean -fd');
 
@@ -46,6 +55,9 @@ async function updateViaGit() {
 /* -------------------- ZIP Update -------------------- */
 function downloadFile(url, dest, visited = new Set()) {
     return new Promise((resolve, reject) => {
+        if (typeof url !== 'string' || !/^https?:\/\//.test(url)) {
+            return reject(new Error(`Invalid URL: ${url}`));
+        }
         if (visited.has(url) || visited.size > 5) return reject(new Error('Too many redirects'));
         visited.add(url);
 
@@ -61,9 +73,7 @@ function downloadFile(url, dest, visited = new Set()) {
             const file = fs.createWriteStream(dest);
             res.pipe(file);
             file.on('finish', () => file.close(resolve));
-            file.on('error', err => {
-                fs.unlink(dest, () => reject(err));
-            });
+            file.on('error', err => fs.unlink(dest, () => reject(err)));
         });
         req.on('error', err => fs.unlink(dest, () => reject(err)));
     });
@@ -81,7 +91,7 @@ async function extractZip(zipPath, outDir) {
             return;
         } catch {}
     }
-    throw new Error("No unzip tool found (unzip/7z/busybox). Git mode recommended.");
+    throw new Error("No unzip tool found.");
 }
 
 function copyRecursive(src, dest, ignore = [], relative = '', outList = []) {
@@ -102,15 +112,17 @@ function copyRecursive(src, dest, ignore = [], relative = '', outList = []) {
     }
 }
 
-async function updateViaZip(zipUrl) {
+async function updateViaZip(sock, chatId, statusMessage, zipUrl) {
     if (!zipUrl) throw new Error('No ZIP URL configured.');
 
+    await sock.sendMessage(chatId, { text: '📥 Downloading package…', edit: statusMessage.key });
     const tmpDir = path.join(process.cwd(), 'tmp');
     fs.mkdirSync(tmpDir, { recursive: true });
 
     const zipPath = path.join(tmpDir, 'update.zip');
     await downloadFile(zipUrl, zipPath);
 
+    await sock.sendMessage(chatId, { text: '📦 Extracting files…', edit: statusMessage.key });
     const extractTo = path.join(tmpDir, 'update_extract');
     fs.rmSync(extractTo, { recursive: true, force: true });
     await extractZip(zipPath, extractTo);
@@ -132,7 +144,7 @@ async function updateViaZip(zipUrl) {
 
 /* -------------------- Restart -------------------- */
 async function restartProcess(sock, chatId, message) {
-    await sock.sendMessage(chatId, { text: '✅ Update complete! Restarting…' }, { quoted: message }).catch(() => {});
+    await sock.sendMessage(chatId, { text: '♻️ Restarting bot…' }, { quoted: message }).catch(() => {});
     try {
         await run('pm2 restart all');
     } catch {
@@ -146,26 +158,28 @@ async function updateCommand(sock, chatId, message, zipOverride) {
     const isOwner = await isOwnerOrSudo(senderId, sock, chatId);
 
     if (!message.key.fromMe && !isOwner) {
-        return sock.sendMessage(chatId, { text: 'Only bot owner or sudo can use .update' }, { quoted: message });
+        return sock.sendMessage(chatId, { text: '⚠️ Only owner/sudo can use .update' }, { quoted: message });
     }
 
     let statusMessage;
     try {
-        statusMessage = await sock.sendMessage(chatId, { text: '🔄 Updating JUNE-X BOT, please wait…' }, { quoted: message });
+        statusMessage = await sock.sendMessage(chatId, { text: '🔄 Starting update…' }, { quoted: message });
 
         if (await hasGitRepo()) {
-            await sock.sendMessage(chatId, { text: '🔄 Updating via Git…', edit: statusMessage.key });
-            const { oldRev, newRev, alreadyUpToDate } = await updateViaGit();
-            const summary = alreadyUpToDate ? `✅ Already up to date: ${newRev}` : `✅ Updated from ${oldRev.slice(0, 7)} to ${newRev.slice(0, 7)}`;
-            await sock.sendMessage(chatId, { text: `${summary}\n📦 Installing dependencies...`, edit: statusMessage.key });
+            const { oldRev, newRev, alreadyUpToDate } = await updateViaGit(sock, chatId, statusMessage);
+            const summary = alreadyUpToDate
+                ? `✅ Already up to date: ${newRev}`
+                : `✅ Updated from ${oldRev.slice(0, 7)} to ${newRev.slice(0, 7)}`;
+            await sock.sendMessage(chatId, { text: `${summary}\n📦 Installing deps…`, edit: statusMessage.key });
         } else {
-            await sock.sendMessage(chatId, { text: '📥 Downloading update via ZIP...', edit: statusMessage.key });
-            const { copiedFiles } = await updateViaZip(zipOverride || settings.updateZipUrl || process.env.UPDATE_ZIP_URL);
-            await sock.sendMessage(chatId, { text: `✅ Extracted ${copiedFiles.length} files\n📦 Installing dependencies...`, edit: statusMessage.key });
+            const { copiedFiles } = await updateViaZip(sock, chatId, statusMessage, zipOverride || settings.updateZipUrl || process.env.UPDATE_ZIP_URL);
+            await sock.sendMessage(chatId, { text: `✅ Extracted ${copiedFiles.length} files\n📦 Installing deps…`, edit: statusMessage.key });
         }
 
+        await sock.sendMessage(chatId, { text: '📦 Running npm install…', edit: statusMessage.key });
         await run('npm install --no-audit --no-fund');
-        await sock.sendMessage(chatId, { text: '✅ Update completed! Restarting bot...', edit: statusMessage.key });
+
+        await sock.sendMessage(chatId, { text: '✅ Update done! Restarting…', edit: statusMessage.key });
         await restartProcess(sock, chatId, message);
     } catch (err) {
         console.error('Update failed:', err);
