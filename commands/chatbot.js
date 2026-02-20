@@ -5,7 +5,7 @@ const fs = require('fs');
 // ==================== DATA MANAGEMENT ====================
 
 // Path to user group data file
-const DATA_FILE = path.join(__dirname, '../Database/userGroupData.json');
+const DATA_FILE = path.join(__dirname, '../data/userGroupData.json');
 
 // Initialize default data structure
 const defaultData = {
