@@ -5,7 +5,7 @@ const fs = require('fs');
 // ==================== DATA MANAGEMENT ====================
 
 // Path to user group data file
-const DATA_FILE = path.join(__dirname, '../data/userGroupData.json');
+const DATA_FILE = path.join(__dirname, '../Database/userGroupData.json');
 
 // Initialize default data structure
 const defaultData = {
@@ -186,6 +186,62 @@ function setGroupConfig(chatId, key, value) {
     return saveSettings(settings);
 }
 
+// ==================== HELPER FUNCTIONS ====================
+
+// Extract sender ID properly from message
+function getSenderId(message) {
+    try {
+        // Try to get from key.participant (for groups)
+        if (message.key?.participant) {
+            return message.key.participant.split(':')[0] + '@s.whatsapp.net';
+        }
+        
+        // Try to get from participant field
+        if (message.participant) {
+            return message.participant.split(':')[0] + '@s.whatsapp.net';
+        }
+        
+        // Try to get from pushName (for DMs)
+        if (message.pushName) {
+            // This is a fallback, not reliable for ID
+            return null;
+        }
+        
+        // Last resort: use remoteJid if it's a DM (not a group)
+        if (message.key?.remoteJid && !message.key.remoteJid.endsWith('@g.us')) {
+            return message.key.remoteJid.split(':')[0] + '@s.whatsapp.net';
+        }
+        
+        return null;
+    } catch (error) {
+        console.error('Error extracting sender ID:', error.message);
+        return null;
+    }
+}
+
+// Check if user is admin in group
+async function isUserAdmin(sock, chatId, userId) {
+    if (!chatId.endsWith('@g.us')) return false;
+    
+    try {
+        const groupMetadata = await sock.groupMetadata(chatId);
+        
+        // Clean the user ID for comparison
+        const cleanUserId = userId.split(':')[0].split('@')[0];
+        
+        // Check if user is in group and has admin privileges
+        const participant = groupMetadata.participants.find(p => {
+            const cleanParticipantId = p.id.split(':')[0].split('@')[0];
+            return cleanParticipantId === cleanUserId;
+        });
+        
+        return participant && (participant.admin === 'admin' || participant.admin === 'superadmin');
+    } catch (error) {
+        console.error('Error checking admin status:', error.message);
+        return false;
+    }
+}
+
 // ==================== CHATBOT COMMAND HANDLER ====================
 
 async function handleChatbotCommand(sock, chatId, message, match) {
@@ -202,60 +258,29 @@ async function handleChatbotCommand(sock, chatId, message, match) {
     // Get bot's number
     const botNumber = sock.user.id.split(':')[0] + '@s.whatsapp.net';
     
-    // Check if sender is bot owner
-    const senderId = message.key.participant || message.participant || message.pushName || message.key.remoteJid;
-    const isOwner = senderId === botNumber;
-
-    // If it's the bot owner, allow access immediately
-    if (isOwner) {
-        if (match === 'on') {
-            await showTyping(sock, chatId);
-            if (data.chatbot[chatId]) {
-                return sock.sendMessage(chatId, { 
-                    text: '*Chatbot is already enabled for this group*',
-                    quoted: message
-                });
-            }
-            data.chatbot[chatId] = true;
-            saveUserGroupData(data);
-            console.log(`Chatbot enabled for group ${chatId}`);
-            return sock.sendMessage(chatId, { 
-                text: '*Chatbot has been enabled for this group*',
-                quoted: message
-            });
-        }
-
-        if (match === 'off') {
-            await showTyping(sock, chatId);
-            if (!data.chatbot[chatId]) {
-                return sock.sendMessage(chatId, { 
-                    text: '*Chatbot is already disabled for this group*',
-                    quoted: message
-                });
-            }
-            data.chatbot[chatId] = false;
-            saveUserGroupData(data);
-            setGroupConfig(chatId, 'chatbot', false);
-            console.log(`Chatbot disabled for group ${chatId}`);
-            return sock.sendMessage(chatId, { 
-                text: '*Chatbot has been disabled for this group*',
-                quoted: message
-            });
-        }
+    // Get sender ID properly
+    const senderId = getSenderId(message);
+    
+    if (!senderId) {
+        console.log('Could not determine sender ID');
+        return;
     }
+    
+    // Check if sender is bot owner (compare just the numbers)
+    const cleanBotNumber = botNumber.split('@')[0];
+    const cleanSenderId = senderId.split('@')[0];
+    const isOwner = cleanSenderId === cleanBotNumber;
 
-    // For non-owners, check admin status
+    console.log(`Sender: ${cleanSenderId}, Bot: ${cleanBotNumber}, isOwner: ${isOwner}`);
+
+    // For groups, check if user is admin
     let isAdmin = false;
     if (chatId.endsWith('@g.us')) {
-        try {
-            const groupMetadata = await sock.groupMetadata(chatId);
-            isAdmin = groupMetadata.participants.some(p => p.id === senderId && (p.admin === 'admin' || p.admin === 'superadmin'));
-        } catch (e) {
-            console.warn('⚠️ Could not fetch group metadata. Bot might not be admin.');
-        }
+        isAdmin = await isUserAdmin(sock, chatId, senderId);
     }
 
-    if (!isAdmin && !isOwner) {
+    // Allow access if user is owner OR admin
+    if (!isOwner && !isAdmin) {
         await showTyping(sock, chatId);
         return sock.sendMessage(chatId, {
             text: '❌ Only group admins or the bot owner can use this command.',
@@ -263,6 +288,7 @@ async function handleChatbotCommand(sock, chatId, message, match) {
         });
     }
 
+    // Handle commands
     if (match === 'on') {
         await showTyping(sock, chatId);
         if (data.chatbot[chatId]) {
