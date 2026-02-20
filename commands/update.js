@@ -1,486 +1,316 @@
+const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const isAdmin = require('../lib/isAdmin');
+const https = require('https');
+const settings = require('../settings');
+const isOwnerOrSudo = require('../lib/isOwner');
 
-// In-memory storage
-const antiStatusMentionData = { settings: {}, warns: {} };
-
-// Database file path
-const DATA_DIR = path.join(__dirname, '..', 'data');
-const DB_PATH = path.join(DATA_DIR, 'antistatusmention.json');
-
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+function run(cmd) {
+    return new Promise((resolve, reject) => {
+        exec(cmd, { windowsHide: true }, (err, stdout, stderr) => {
+            if (err) return reject(new Error((stderr || stdout || err.message || '').toString()));
+            resolve((stdout || '').toString());
+        });
+    });
 }
 
-// Load data
-function loadData() {
+let progressMsg = null;
+
+async function updateProgress(sock, chatId, message, text) {
     try {
-        if (fs.existsSync(DB_PATH)) {
-            const data = fs.readFileSync(DB_PATH, 'utf8');
-            Object.assign(antiStatusMentionData, JSON.parse(data));
-        }
-    } catch (error) {
-        console.error('\x1b[35m[AntiStatusMention] Load error:\x1b[0m', error);
-    }
-}
-
-// Save data
-function saveData() {
-    try {
-        fs.writeFileSync(DB_PATH, JSON.stringify(antiStatusMentionData, null, 2));
-    } catch (error) {
-        console.error('\x1b[35m[AntiStatusMention] Save error:\x1b[0m', error);
-    }
-}
-
-// Initialize
-loadData();
-
-// Database functions
-async function getAntiStatusMentionSettings(chatId) {
-    return antiStatusMentionData.settings[chatId] || {
-        status: 'off',
-        warn_limit: 3,
-        action: 'warn'
-    };
-}
-
-async function updateAntiStatusMentionSettings(chatId, updates) {
-    if (!antiStatusMentionData.settings[chatId]) {
-        antiStatusMentionData.settings[chatId] = {
-            status: 'off',
-            warn_limit: 3,
-            action: 'warn'
-        };
-    }
-    Object.assign(antiStatusMentionData.settings[chatId], updates);
-    saveData();
-    return antiStatusMentionData.settings[chatId];
-}
-
-async function clearAllStatusWarns(chatId) {
-    if (antiStatusMentionData.warns[chatId]) {
-        delete antiStatusMentionData.warns[chatId];
-        saveData();
-    }
-    return true;
-}
-
-async function getUserStatusWarns(chatId, userId) {
-    if (!antiStatusMentionData.warns[chatId]) {
-        antiStatusMentionData.warns[chatId] = {};
-    }
-    return antiStatusMentionData.warns[chatId][userId] || 0;
-}
-
-async function addUserStatusWarn(chatId, userId) {
-    if (!antiStatusMentionData.warns[chatId]) {
-        antiStatusMentionData.warns[chatId] = {};
-    }
-    if (!antiStatusMentionData.warns[chatId][userId]) {
-        antiStatusMentionData.warns[chatId][userId] = 0;
-    }
-    antiStatusMentionData.warns[chatId][userId]++;
-    saveData();
-    return antiStatusMentionData.warns[chatId][userId];
-}
-
-async function resetUserStatusWarns(chatId, userId) {
-    if (antiStatusMentionData.warns[chatId] && antiStatusMentionData.warns[chatId][userId]) {
-        delete antiStatusMentionData.warns[chatId][userId];
-        saveData();
-    }
-    return true;
-}
-
-// Command handler
-async function antistatusmentionCommand(sock, chatId, message) {
-    try {
-        // Check if command is used in a group
-        if (!chatId.endsWith('@g.us')) {
+        if (progressMsg) {
+            // Edit existing message
             await sock.sendMessage(chatId, { 
-                text: "❌ *Group Command Only*\n\nThis command can only be used in groups!", 
-                mentions: [message.key.participant || message.key.remoteJid]
-            }, { quoted: message });
-            return;
+                text: text,
+                edit: progressMsg.key 
+            });
+        } else {
+            // Send new message and store reference
+            const sent = await sock.sendMessage(chatId, { text: text }, { quoted: message });
+            progressMsg = sent;
         }
-
-        await sock.sendMessage(chatId, { react: { text: '🛡️', key: message.key } });
-
-        const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
-        const parts = text.split(' ');
-        const query = parts.slice(1).join(' ').trim();
-
-        const groupMetadata = await sock.groupMetadata(chatId).catch(() => null);
-        if (!groupMetadata) {
-            return await sock.sendMessage(chatId, { 
-                text: "❌ *Error*\n\nFailed to fetch group metadata!", 
-                mentions: [message.key.participant || message.key.remoteJid]
-            }, { quoted: message });
-        }
-
-        const userId = message.key.participant || message.key.remoteJid;
-        const userIsAdmin = await isAdmin(sock, chatId, userId);
-        if (!userIsAdmin) {
-            await sock.sendMessage(chatId, { 
-                text: "❌ *Admin Only*\n\nThis command is only for group admins!", 
-                mentions: [userId]
-            }, { quoted: message });
-            return;
-        }
-
-        const botId = sock.user.id.split(':')[0] + '@s.whatsapp.net';
-        const botIsAdmin = await isAdmin(sock, chatId, botId);
-        if (!botIsAdmin) {
-            await sock.sendMessage(chatId, { 
-                text: "❌ *Bot Admin Required*\n\nPlease make the bot an admin first!", 
-                mentions: [userId]
-            }, { quoted: message });
-            return;
-        }
-
-        const settings = await getAntiStatusMentionSettings(chatId);
-
-        if (!query) {
-            const statusMap = {
-                'off': '❌ OFF',
-                'warn': '⚠️ WARN',
-                'delete': '🗑️ DELETE',
-                'remove': '🚫 REMOVE'
-            };
-            const totalWarned = antiStatusMentionData.warns[chatId] ? Object.keys(antiStatusMentionData.warns[chatId]).length : 0;
-            return await sock.sendMessage(chatId, {
-                text: `*🛡️ Anti-Status-Mention Settings*\n\n` +
-                      `┌ *Current Settings*\n` +
-                      `│ Status: ${statusMap[settings.action]}\n` +
-                      `│ Limit: ${settings.warn_limit}\n` +
-                      `│ Warned: ${totalWarned}\n` +
-                      `└──────────────\n\n` +
-                      `*📝 Commands:*\n` +
-                      `▸ *off* - Disable feature\n` +
-                      `▸ *warn* - Warn users\n` +
-                      `▸ *delete* - Delete only\n` +
-                      `▸ *remove* - Remove users\n` +
-                      `▸ *limit 1-10* - Set warn limit\n` +
-                      `▸ *resetwarns* - Clear all warns\n` +
-                      `▸ *status* - Show settings\n\n` +
-                      `*ℹ️ Group Command Only*`,
-                mentions: [userId]
-            }, { quoted: message });
-        }
-
-        const args = query.split(/\s+/);
-        const subcommand = args[0]?.toLowerCase();
-        const value = args[1];
-
-        switch (subcommand) {
-            case 'off':
-            case 'warn':
-            case 'delete':
-            case 'remove':
-                await updateAntiStatusMentionSettings(chatId, { status: subcommand, action: subcommand });
-                await sock.sendMessage(chatId, { 
-                    text: `✅ *Settings Updated*\n\nAnti-status-mention has been set to: *${subcommand.toUpperCase()}*\n\n*Group:* ${groupMetadata.subject}`,
-                    mentions: [userId]
-                }, { quoted: message });
-                break;
-
-            case 'limit':
-                const limit = parseInt(value);
-                if (isNaN(limit) || limit < 1 || limit > 10) {
-                    await sock.sendMessage(chatId, { 
-                        text: "❌ *Invalid Limit*\n\nPlease use a number between 1 and 10 only!", 
-                        mentions: [userId]
-                    }, { quoted: message });
-                    return;
-                }
-                await updateAntiStatusMentionSettings(chatId, { warn_limit: limit });
-                await sock.sendMessage(chatId, { 
-                    text: `✅ *Limit Updated*\n\nWarn limit has been set to: *${limit}*\n\n*Group:* ${groupMetadata.subject}`,
-                    mentions: [userId]
-                }, { quoted: message });
-                break;
-
-            case 'resetwarns':
-                await clearAllStatusWarns(chatId);
-                await sock.sendMessage(chatId, { 
-                    text: `✅ *Warns Reset*\n\nAll status mention warns have been cleared for this group.\n\n*Group:* ${groupMetadata.subject}`,
-                    mentions: [userId]
-                }, { quoted: message });
-                break;
-
-            case 'status':
-            case 'info':
-                const currentSettings = await getAntiStatusMentionSettings(chatId);
-                const statusMap = {
-                    'off': '❌ OFF',
-                    'warn': '⚠️ WARN',
-                    'delete': '🗑️ DELETE',
-                    'remove': '🚫 REMOVE'
-                };
-                const totalWarned = antiStatusMentionData.warns[chatId] ? Object.keys(antiStatusMentionData.warns[chatId]).length : 0;
-                await sock.sendMessage(chatId, {
-                    text: `*📊 Anti-Status-Mention Status*\n\n` +
-                          `┌ *Group Information*\n` +
-                          `│ Name: ${groupMetadata.subject}\n` +
-                          `│ ID: ${chatId}\n` +
-                          `├ *Current Settings*\n` +
-                          `│ Status: ${statusMap[currentSettings.action]}\n` +
-                          `│ Limit: ${currentSettings.warn_limit}\n` +
-                          `│ Warned: ${totalWarned}\n` +
-                          `└──────────────`,
-                    mentions: [userId]
-                }, { quoted: message });
-                break;
-
-            default:
-                await sock.sendMessage(chatId, { 
-                    text: "❌ *Invalid Command*\n\nAvailable commands:\n▸ off/warn/delete/remove\n▸ limit 1-10\n▸ resetwarns\n▸ status", 
-                    mentions: [userId]
-                }, { quoted: message });
-                break;
-        }
-    } catch (error) {
-        console.error("\x1b[35m[AntiStatusMention] Error:\x1b[0m", error);
-        await sock.sendMessage(chatId, { 
-            text: `🚫 *Error*\n\n${error.message}`,
-            mentions: [message.key.participant || message.key.remoteJid]
-        }, { quoted: message });
+    } catch (e) {
+        console.log('Progress update failed:', e);
     }
 }
 
-// Enhanced event handler with isGroupStatusMention detection
-async function handleAntiStatusMention(sock, message) {
+async function hasGitRepo() {
+    const gitDir = path.join(process.cwd(), '.git');
+    if (!fs.existsSync(gitDir)) return false;
     try {
-        const chatId = message.key.remoteJid;
-        
-        // Check if in group
-        if (!chatId?.endsWith('@g.us')) return;
+        await run('git --version');
+        return true;
+    } catch {
+        return false;
+    }
+}
 
-        const settings = await getAntiStatusMentionSettings(chatId);
-        if (settings.action === 'off') return;
+async function updateViaGit(sock, chatId, message) {
+    await updateProgress(sock, chatId, message, '📦 Git: Fetching repository...');
+    
+    const oldRev = (await run('git rev-parse HEAD').catch(() => 'unknown')).trim();
+    await updateProgress(sock, chatId, message, `📦 Current: ${oldRev.substring(0, 7)}`);
+    
+    await run('git fetch --all --prune');
+    await updateProgress(sock, chatId, message, '📦 Checking for updates...');
+    
+    const newRev = (await run('git rev-parse origin/main')).trim();
+    const alreadyUpToDate = oldRev === newRev;
+    
+    if (alreadyUpToDate) {
+        await updateProgress(sock, chatId, message, `✅ Already up to date: ${newRev.substring(0, 7)}`);
+        return { oldRev, newRev, alreadyUpToDate, commits: '', files: '' };
+    }
+    
+    await updateProgress(sock, chatId, message, `📦 New version: ${newRev.substring(0, 7)}`);
+    
+    const commits = await run(`git log --pretty=format:"%h %s" ${oldRev}..${newRev}`).catch(() => '');
+    const files = await run(`git diff --name-status ${oldRev} ${newRev}`).catch(() => '');
+    const fileCount = files.split('\n').filter(f => f.trim()).length;
+    
+    await updateProgress(sock, chatId, message, `📦 Updating ${fileCount} files...`);
+    
+    await run(`git reset --hard ${newRev}`);
+    await run('git clean -fd');
+    
+    return { oldRev, newRev, alreadyUpToDate, commits, files };
+}
 
-        // ENHANCED: Comprehensive isGroupStatusMention detection
-        const isGroupStatusMention = (() => {
-            // Check direct group status mention message type
-            if (message.message?.groupStatusMentionMessage) {
-                return true;
+function downloadFile(url, dest, sock, chatId, message, visited = new Set()) {
+    return new Promise((resolve, reject) => {
+        try {
+            if (visited.has(url) || visited.size > 5) {
+                return reject(new Error('Too many redirects'));
             }
-            
-            // Check in extended text message context for mentioned JIDs
-            if (message.message?.extendedTextMessage?.contextInfo?.mentionedJid) {
-                const mentionedJids = message.message.extendedTextMessage.contextInfo.mentionedJid;
-                if (mentionedJids && Array.isArray(mentionedJids)) {
-                    for (const jid of mentionedJids) {
-                        if (jid.includes('status') || jid.includes('broadcast')) {
-                            return true;
+            visited.add(url);
+
+            updateProgress(sock, chatId, message, '⬇️ Downloading update...');
+
+            const useHttps = url.startsWith('https://');
+            const client = useHttps ? require('https') : require('http');
+            const req = client.get(url, {
+                headers: {
+                    'User-Agent': 'KnightBot-Updater/1.0',
+                    'Accept': '*/*'
+                }
+            }, res => {
+                if ([301, 302, 303, 307, 308].includes(res.statusCode)) {
+                    const location = res.headers.location;
+                    if (!location) return reject(new Error(`HTTP ${res.statusCode} without Location`));
+                    const nextUrl = new URL(location, url).toString();
+                    res.resume();
+                    return downloadFile(nextUrl, dest, sock, chatId, message, visited).then(resolve).catch(reject);
+                }
+
+                if (res.statusCode !== 200) {
+                    return reject(new Error(`HTTP ${res.statusCode}`));
+                }
+
+                const totalSize = parseInt(res.headers['content-length'], 10);
+                let downloadedSize = 0;
+                let lastPercent = 0;
+
+                const file = fs.createWriteStream(dest);
+                
+                res.on('data', chunk => {
+                    downloadedSize += chunk.length;
+                    if (totalSize) {
+                        const percent = Math.round((downloadedSize / totalSize) * 100);
+                        if (percent >= lastPercent + 20) {
+                            lastPercent = percent;
+                            updateProgress(sock, chatId, message, `⬇️ Download: ${percent}%`);
                         }
                     }
-                }
-            }
-            
-            // Check for status mention in quoted message
-            if (message.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
-                const quoted = message.message.extendedTextMessage.contextInfo.quotedMessage;
-                if (quoted?.groupStatusMentionMessage) {
-                    return true;
-                }
-            }
-            
-            // Check message content for status-related patterns
-            let text = message.message?.extendedTextMessage?.text || 
-                      message.message?.conversation || 
-                      message.message?.imageMessage?.caption || '';
-            
-            if (text) {
-                // Check for @status mention in text
-                if (text.includes('@status') || text.includes('@Status')) {
-                    return true;
-                }
+                });
                 
-                // Check for status broadcast patterns
-                const statusPatterns = [
-                    /@status\.whatsapp\.net/,
-                    /status\s*@/i,
-                    /@\s*status/i,
-                    /broadcast/i,
-                    /status update/i,
-                    /status message/i
-                ];
-                
-                for (const pattern of statusPatterns) {
-                    if (pattern.test(text)) {
-                        return true;
-                    }
-                }
-            }
-            
-            return false;
-        })();
-
-        // ENHANCED: Check for forwarded messages that might contain status mentions
-        const isForwarded = message.message?.extendedTextMessage?.contextInfo?.isForwarded;
-        const forwardingScore = message.message?.extendedTextMessage?.contextInfo?.forwardingScore || 0;
-        
-        let hasStatusContent = false;
-        
-        if (isForwarded || forwardingScore > 0) {
-            let text = message.message?.extendedTextMessage?.text || 
-                      message.message?.conversation || 
-                      message.message?.imageMessage?.caption || '';
-            
-            // Check forwarded message content for status mentions
-            if (text.includes('@status') || text.includes('status update') || 
-                text.includes('Status') || text.includes('STATUS')) {
-                hasStatusContent = true;
-            }
-            
-            // Check for group ID in forwarded content
-            const groupIdPart = chatId.split('@')[0];
-            if (text.includes(groupIdPart)) {
-                hasStatusContent = true;
-            }
-            
-            // Check if forwarded message contains status broadcast
-            if (message.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
-                const quoted = message.message.extendedTextMessage.contextInfo.quotedMessage;
-                if (quoted?.groupStatusMentionMessage || 
-                    quoted?.protocolMessage?.type === 'REVOKE' ||
-                    quoted?.statusMentionMessage) {
-                    hasStatusContent = true;
-                }
-            }
+                res.pipe(file);
+                file.on('finish', () => {
+                    file.close();
+                    updateProgress(sock, chatId, message, '⬇️ Download complete');
+                    resolve();
+                });
+                file.on('error', err => {
+                    try { file.close(() => {}); } catch {}
+                    fs.unlink(dest, () => reject(err));
+                });
+            });
+            req.on('error', err => {
+                fs.unlink(dest, () => reject(err));
+            });
+        } catch (e) {
+            reject(e);
         }
+    });
+}
 
-        // If neither direct status mention nor forwarded status content, return
-        if (!isGroupStatusMention && !hasStatusContent) {
-            return;
-        }
+async function extractZip(zipPath, outDir, sock, chatId, message) {
+    await updateProgress(sock, chatId, message, '📂 Extracting files...');
+    
+    if (process.platform === 'win32') {
+        const cmd = `powershell -NoProfile -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${outDir.replace(/\\/g, '/')}' -Force"`;
+        await run(cmd);
+        return;
+    }
+    
+    try {
+        await run('command -v unzip');
+        await run(`unzip -o '${zipPath}' -d '${outDir}'`);
+        return;
+    } catch {}
+    try {
+        await run('command -v 7z');
+        await run(`7z x -y '${zipPath}' -o'${outDir}'`);
+        return;
+    } catch {}
+    try {
+        await run('busybox unzip -h');
+        await run(`busybox unzip -o '${zipPath}' -d '${outDir}'`);
+        return;
+    } catch {}
+    throw new Error("No unzip tool found");
+}
 
-        const userId = message.key.participant || message.key.remoteJid;
-        const userIsAdmin = await isAdmin(sock, chatId, userId);
+function copyRecursive(src, dest, ignore = [], relative = '', outList = []) {
+    if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+    
+    for (const entry of fs.readdirSync(src)) {
+        if (ignore.includes(entry)) continue;
+        const s = path.join(src, entry);
+        const d = path.join(dest, entry);
+        const stat = fs.lstatSync(s);
         
-        // Skip for admins
-        if (userIsAdmin) {
-            console.log(`\x1b[35m[AntiStatusMention] Admin skipped: ${userId}\x1b[0m`);
-            return;
+        if (stat.isDirectory()) {
+            copyRecursive(s, d, ignore, path.join(relative, entry), outList);
+        } else {
+            fs.copyFileSync(s, d);
+            outList.push(path.join(relative, entry).replace(/\\/g, '/'));
         }
-
-        const groupMetadata = await sock.groupMetadata(chatId).catch(() => null);
-        const groupName = groupMetadata ? groupMetadata.subject : 'the group';
-        
-        // Determine mention type for logging/display
-        const mentionType = isGroupStatusMention ? 'Direct Status Mention' : 'Forwarded Status Content';
-
-        // Handle different action modes
-        switch (settings.action) {
-            case 'warn':
-                const warnCount = await addUserStatusWarn(chatId, userId);
-                
-                // Delete the offending message
-                try { 
-                    await sock.sendMessage(chatId, { delete: message.key }); 
-                } catch (e) { 
-                    console.error('Delete failed:', e); 
-                }
-                
-                if (warnCount >= settings.warn_limit) {
-                    // Reset warnings and give final warning
-                    await resetUserStatusWarns(chatId, userId);
-                    
-                    await sock.sendMessage(chatId, {
-                        text: `⚠️ *Status Mention Final Warning*\n\n` +
-                              `@${userId.split('@')[0]} you have been warned for mentioning *@status*.\n\n` +
-                              `┌ *Details*\n` +
-                              `│ Warns: ${warnCount}/${settings.warn_limit}\n` +
-                              `│ Type: ${mentionType}\n` +
-                              `│ Action: Final Warning\n` +
-                              `│ Group: ${groupName}\n` +
-                              `└──────────────\n\n` +
-                              `*📌 Note:* Next violation may result in removal!`,
-                        mentions: [userId]
-                    });
-                } else {
-                    await sock.sendMessage(chatId, {
-                        text: `⚠️ *Status Mention Warning*\n\n` +
-                              `@${userId.split('@')[0]} please don't mention *@status* in this group!\n\n` +
-                              `┌ *Details*\n` +
-                              `│ Warns: ${warnCount}/${settings.warn_limit}\n` +
-                              `│ Type: ${mentionType}\n` +
-                              `│ Group: ${groupName}\n` +
-                              `└──────────────`,
-                        mentions: [userId]
-                    });
-                }
-                break;
-
-            case 'delete':
-                try { 
-                    await sock.sendMessage(chatId, { delete: message.key });
-                    await sock.sendMessage(chatId, {
-                        text: `🗑️ *Message Deleted*\n\n` +
-                              `@${userId.split('@')[0]} your message was deleted because it contained a status mention.\n\n` +
-                              `┌ *Details*\n` +
-                              `│ Type: ${mentionType}\n` +
-                              `│ Group: ${groupName}\n` +
-                              `└──────────────`,
-                        mentions: [userId]
-                    });
-                } catch (e) { 
-                    console.error('Delete failed:', e);
-                }
-                break;
-
-            case 'remove':
-                try { 
-                    // Delete the message first
-                    await sock.sendMessage(chatId, { delete: message.key }); 
-                    
-                    // Remove user from group
-                    await sock.groupParticipantsUpdate(chatId, [userId], 'remove');
-                    
-                    // Notify group
-                    await sock.sendMessage(chatId, {
-                        text: `🚫 *Member Removed*\n\n` +
-                              `@${userId.split('@')[0]} has been removed from the group for mentioning *@status*.\n\n` +
-                              `┌ *Details*\n` +
-                              `│ Type: ${mentionType}\n` +
-                              `│ Group: ${groupName}\n` +
-                              `└──────────────`,
-                        mentions: [userId]
-                    });
-                } catch (e) { 
-                    console.error('Remove failed:', e);
-                }
-                break;
-                
-            default:
-                // Just delete without notification for unknown actions
-                try {
-                    await sock.sendMessage(chatId, { delete: message.key });
-                } catch (e) {
-                    console.error('Delete failed:', e);
-                }
-                break;
-        }
-
-        // Log the action
-        console.log(`\x1b[35m[AntiStatusMention] Action taken:\x1b[0m`, {
-            group: chatId,
-            user: userId,
-            action: settings.action,
-            type: mentionType,
-            timestamp: new Date().toISOString()
-        });
-
-    } catch (error) {
-        console.error("\x1b[35m[AntiStatusMention] Handler error:\x1b[0m", error);
     }
 }
 
-module.exports = {
-    antistatusmentionCommand,
-    handleAntiStatusMention
-};
+async function updateViaZip(sock, chatId, message, zipOverride) {
+    await updateProgress(sock, chatId, message, '🗜️ Starting ZIP update...');
+    
+    const zipUrl = (zipOverride || settings.updateZipUrl || process.env.UPDATE_ZIP_URL || '').trim();
+    if (!zipUrl) {
+        throw new Error('No ZIP URL configured');
+    }
+    
+    const tmpDir = path.join(process.cwd(), 'tmp');
+    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+    
+    const zipPath = path.join(tmpDir, 'update.zip');
+    await downloadFile(zipUrl, zipPath, sock, chatId, message);
+    
+    const extractTo = path.join(tmpDir, 'update_extract');
+    if (fs.existsSync(extractTo)) fs.rmSync(extractTo, { recursive: true, force: true });
+    
+    await extractZip(zipPath, extractTo, sock, chatId, message);
+    await updateProgress(sock, chatId, message, '📋 Copying files...');
+
+    const [root] = fs.readdirSync(extractTo).map(n => path.join(extractTo, n));
+    const srcRoot = fs.existsSync(root) && fs.lstatSync(root).isDirectory() ? root : extractTo;
+    
+    const ignore = ['node_modules', '.git', 'session', 'tmp', 'tmp/', 'temp', 'data', 'baileys_store.json'];
+    const copied = [];
+    
+    // Preserve owner settings
+    let preservedOwner = null;
+    let preservedBotOwner = null;
+    try {
+        const currentSettings = require('../settings');
+        preservedOwner = currentSettings && currentSettings.ownerNumber ? String(currentSettings.ownerNumber) : null;
+        preservedBotOwner = currentSettings && currentSettings.botOwner ? String(currentSettings.botOwner) : null;
+    } catch {}
+    
+    copyRecursive(srcRoot, process.cwd(), ignore, '', copied);
+    
+    if (preservedOwner) {
+        try {
+            const settingsPath = path.join(process.cwd(), 'settings.js');
+            if (fs.existsSync(settingsPath)) {
+                let text = fs.readFileSync(settingsPath, 'utf8');
+                text = text.replace(/ownerNumber:\s*'[^']*'/, `ownerNumber: '${preservedOwner}'`);
+                if (preservedBotOwner) {
+                    text = text.replace(/botOwner:\s*'[^']*'/, `botOwner: '${preservedBotOwner}'`);
+                }
+                fs.writeFileSync(settingsPath, text);
+            }
+        } catch {}
+    }
+    
+    // Cleanup
+    try { fs.rmSync(extractTo, { recursive: true, force: true }); } catch {}
+    try { fs.rmSync(zipPath, { force: true }); } catch {}
+    
+    return { copiedFiles: copied };
+}
+
+async function restartProcess(sock, chatId, message) {
+    await updateProgress(sock, chatId, message, '♻️ Restarting bot...');
+    
+    try {
+        await run('pm2 restart all');
+        return;
+    } catch {}
+    
+    setTimeout(() => {
+        process.exit(0);
+    }, 500);
+}
+
+async function updateCommand(sock, chatId, message, zipOverride) {
+    const senderId = message.key.participant || message.key.remoteJid;
+    const isOwner = await isOwnerOrSudo(senderId, sock, chatId);
+    
+    if (!message.key.fromMe && !isOwner) {
+        await sock.sendMessage(chatId, { 
+            text: '❌ Only bot owner can use .update' 
+        }, { quoted: message });
+        return;
+    }
+    
+    const startTime = Date.now();
+    progressMsg = null;
+    
+    try {
+        await updateProgress(sock, chatId, message, '🔄 Starting update...');
+        
+        if (await hasGitRepo()) {
+            const { oldRev, newRev, alreadyUpToDate } = await updateViaGit(sock, chatId, message);
+            
+            if (alreadyUpToDate) {
+                await updateProgress(sock, chatId, message, `✅ Already up to date (${newRev.substring(0, 7)})`);
+                progressMsg = null;
+                return;
+            }
+            
+            await updateProgress(sock, chatId, message, '📦 Installing dependencies...');
+            await run('npm install --no-audit --no-fund');
+            
+        } else {
+            await updateProgress(sock, chatId, message, '⚠️ Using ZIP mode');
+            await updateViaZip(sock, chatId, message, zipOverride);
+        }
+        
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        
+        try {
+            const v = require('../settings').version || 'unknown';
+            await updateProgress(sock, chatId, message, 
+                `✅ Update complete! (${elapsed}s)\n📦 v${v}\n♻️ Restarting...`);
+        } catch {
+            await updateProgress(sock, chatId, message, 
+                `✅ Update complete! (${elapsed}s)\n♻️ Restarting...`);
+        }
+        
+        await restartProcess(sock, chatId, message);
+        
+    } catch (err) {
+        console.error('Update failed:', err);
+        await updateProgress(sock, chatId, message, `❌ Failed: ${err.message.substring(0, 50)}`);
+        progressMsg = null;
+    }
+}
+
+module.exports = updateCommand;
