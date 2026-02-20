@@ -1,11 +1,11 @@
 const fs = require('fs');
 const path = require('path');
-const isAdmin = require('../lib/isAdmin'); // Add this import
+const isAdmin = require('../lib/isAdmin');
 
 // In-memory storage
 const antiStatusMentionData = { settings: {}, warns: {} };
 
-// Database file path - goes to ../data/antistatusmention.json
+// Database file path
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const DB_PATH = path.join(DATA_DIR, 'antistatusmention.json');
 
@@ -22,7 +22,7 @@ function loadData() {
             Object.assign(antiStatusMentionData, JSON.parse(data));
         }
     } catch (error) {
-        console.error('Error loading anti-status-mention data:', error);
+        console.error('\x1b[35m[AntiStatusMention] Load error:\x1b[0m', error);
     }
 }
 
@@ -31,7 +31,7 @@ function saveData() {
     try {
         fs.writeFileSync(DB_PATH, JSON.stringify(antiStatusMentionData, null, 2));
     } catch (error) {
-        console.error('Error saving anti-status-mention data:', error);
+        console.error('\x1b[35m[AntiStatusMention] Save error:\x1b[0m', error);
     }
 }
 
@@ -55,7 +55,6 @@ async function updateAntiStatusMentionSettings(chatId, updates) {
             action: 'warn'
         };
     }
-    
     Object.assign(antiStatusMentionData.settings[chatId], updates);
     saveData();
     return antiStatusMentionData.settings[chatId];
@@ -80,11 +79,9 @@ async function addUserStatusWarn(chatId, userId) {
     if (!antiStatusMentionData.warns[chatId]) {
         antiStatusMentionData.warns[chatId] = {};
     }
-    
     if (!antiStatusMentionData.warns[chatId][userId]) {
         antiStatusMentionData.warns[chatId][userId] = 0;
     }
-    
     antiStatusMentionData.warns[chatId][userId]++;
     saveData();
     return antiStatusMentionData.warns[chatId][userId];
@@ -98,75 +95,82 @@ async function resetUserStatusWarns(chatId, userId) {
     return true;
 }
 
-// Main command handler
+// Command handler
 async function antistatusmentionCommand(sock, chatId, message) {
     try {
-        // Send reaction
-        await sock.sendMessage(chatId, {
-            react: { text: '🛡️', key: message.key }
-        });
+        // Check if command is used in a group
+        if (!chatId.endsWith('@g.us')) {
+            await sock.sendMessage(chatId, { 
+                text: "❌ *Group Command Only*\n\nThis command can only be used in groups!", 
+                mentions: [message.key.participant || message.key.remoteJid]
+            }, { quoted: message });
+            return;
+        }
+
+        await sock.sendMessage(chatId, { react: { text: '🛡️', key: message.key } });
 
         const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
         const parts = text.split(' ');
         const query = parts.slice(1).join(' ').trim();
 
-        // Get group info and check admin status using external module
         const groupMetadata = await sock.groupMetadata(chatId).catch(() => null);
         if (!groupMetadata) {
             return await sock.sendMessage(chatId, { 
-                text: "❌ Group command only!"
+                text: "❌ *Error*\n\nFailed to fetch group metadata!", 
+                mentions: [message.key.participant || message.key.remoteJid]
             }, { quoted: message });
         }
 
-        // Check if user is admin using external module
         const userId = message.key.participant || message.key.remoteJid;
         const userIsAdmin = await isAdmin(sock, chatId, userId);
-        
         if (!userIsAdmin) {
-            return await sock.sendMessage(chatId, { 
-                text: "❌ Admin only!"
+            await sock.sendMessage(chatId, { 
+                text: "❌ *Admin Only*\n\nThis command is only for group admins!", 
+                mentions: [userId]
             }, { quoted: message });
+            return;
         }
 
-        // Check if bot is admin using external module
         const botId = sock.user.id.split(':')[0] + '@s.whatsapp.net';
         const botIsAdmin = await isAdmin(sock, chatId, botId);
-        
         if (!botIsAdmin) {
-            return await sock.sendMessage(chatId, { 
-                text: "❌ Need bot admin!"
+            await sock.sendMessage(chatId, { 
+                text: "❌ *Bot Admin Required*\n\nPlease make the bot an admin first!", 
+                mentions: [userId]
             }, { quoted: message });
+            return;
         }
 
-        // Get settings
         const settings = await getAntiStatusMentionSettings(chatId);
 
-        // No arguments = show help
         if (!query) {
             const statusMap = {
                 'off': '❌ OFF',
-                'warn': '⚠️ WARN', 
+                'warn': '⚠️ WARN',
                 'delete': '🗑️ DELETE',
                 'remove': '🚫 REMOVE'
             };
-
-            const totalWarned = antiStatusMentionData.warns[chatId] ? 
-                Object.keys(antiStatusMentionData.warns[chatId]).length : 0;
-
-            return await sock.sendMessage(chatId, { 
-                text: `*Anti-Status-Mention*\n\n` +
-                `Status: ${statusMap[settings.status]}\n` +
-                `Limit: ${settings.warn_limit}\n` +
-                `Warned: ${totalWarned}\n\n` +
-                `*Commands:*\n` +
-                `▸ off/warn/delete/remove\n` +
-                `▸ limit 1-10\n` +
-                `▸ resetwarns\n` +
-                `▸ status`
+            const totalWarned = antiStatusMentionData.warns[chatId] ? Object.keys(antiStatusMentionData.warns[chatId]).length : 0;
+            return await sock.sendMessage(chatId, {
+                text: `*🛡️ Anti-Status-Mention Settings*\n\n` +
+                      `┌ *Current Settings*\n` +
+                      `│ Status: ${statusMap[settings.action]}\n` +
+                      `│ Limit: ${settings.warn_limit}\n` +
+                      `│ Warned: ${totalWarned}\n` +
+                      `└──────────────\n\n` +
+                      `*📝 Commands:*\n` +
+                      `▸ *off* - Disable feature\n` +
+                      `▸ *warn* - Warn users\n` +
+                      `▸ *delete* - Delete only\n` +
+                      `▸ *remove* - Remove users\n` +
+                      `▸ *limit 1-10* - Set warn limit\n` +
+                      `▸ *resetwarns* - Clear all warns\n` +
+                      `▸ *status* - Show settings\n\n` +
+                      `*ℹ️ Group Command Only*`,
+                mentions: [userId]
             }, { quoted: message });
         }
 
-        // Parse arguments
         const args = query.split(/\s+/);
         const subcommand = args[0]?.toLowerCase();
         const value = args[1];
@@ -176,151 +180,167 @@ async function antistatusmentionCommand(sock, chatId, message) {
             case 'warn':
             case 'delete':
             case 'remove':
-                await updateAntiStatusMentionSettings(chatId, { 
-                    status: subcommand, 
-                    action: subcommand 
-                });
-                return await sock.sendMessage(chatId, { 
-                    text: `✅ Set to: ${subcommand.toUpperCase()}`
+                await updateAntiStatusMentionSettings(chatId, { status: subcommand, action: subcommand });
+                await sock.sendMessage(chatId, { 
+                    text: `✅ *Settings Updated*\n\nAnti-status-mention has been set to: *${subcommand.toUpperCase()}*\n\n*Group:* ${groupMetadata.subject}`,
+                    mentions: [userId]
                 }, { quoted: message });
+                break;
 
             case 'limit':
                 const limit = parseInt(value);
                 if (isNaN(limit) || limit < 1 || limit > 10) {
-                    return await sock.sendMessage(chatId, { 
-                        text: "❌ Limit 1-10 only"
+                    await sock.sendMessage(chatId, { 
+                        text: "❌ *Invalid Limit*\n\nPlease use a number between 1 and 10 only!", 
+                        mentions: [userId]
                     }, { quoted: message });
+                    return;
                 }
                 await updateAntiStatusMentionSettings(chatId, { warn_limit: limit });
-                return await sock.sendMessage(chatId, { 
-                    text: `✅ Limit: ${limit}`
+                await sock.sendMessage(chatId, { 
+                    text: `✅ *Limit Updated*\n\nWarn limit has been set to: *${limit}*\n\n*Group:* ${groupMetadata.subject}`,
+                    mentions: [userId]
                 }, { quoted: message });
+                break;
 
             case 'resetwarns':
                 await clearAllStatusWarns(chatId);
-                return await sock.sendMessage(chatId, { 
-                    text: "✅ Warns reset"
+                await sock.sendMessage(chatId, { 
+                    text: `✅ *Warns Reset*\n\nAll status mention warns have been cleared for this group.\n\n*Group:* ${groupMetadata.subject}`,
+                    mentions: [userId]
                 }, { quoted: message });
+                break;
 
             case 'status':
             case 'info':
                 const currentSettings = await getAntiStatusMentionSettings(chatId);
                 const statusMap = {
                     'off': '❌ OFF',
-                    'warn': '⚠️ WARN', 
+                    'warn': '⚠️ WARN',
                     'delete': '🗑️ DELETE',
                     'remove': '🚫 REMOVE'
                 };
-                const totalWarned = antiStatusMentionData.warns[chatId] ? 
-                    Object.keys(antiStatusMentionData.warns[chatId]).length : 0;
-                
-                return await sock.sendMessage(chatId, { 
-                    text: `*Current Settings*\n\n` +
-                    `Status: ${statusMap[currentSettings.status]}\n` +
-                    `Limit: ${currentSettings.warn_limit}\n` +
-                    `Warned: ${totalWarned}`
+                const totalWarned = antiStatusMentionData.warns[chatId] ? Object.keys(antiStatusMentionData.warns[chatId]).length : 0;
+                await sock.sendMessage(chatId, {
+                    text: `*📊 Anti-Status-Mention Status*\n\n` +
+                          `┌ *Group Information*\n` +
+                          `│ Name: ${groupMetadata.subject}\n` +
+                          `│ ID: ${chatId}\n` +
+                          `├ *Current Settings*\n` +
+                          `│ Status: ${statusMap[currentSettings.action]}\n` +
+                          `│ Limit: ${currentSettings.warn_limit}\n` +
+                          `│ Warned: ${totalWarned}\n` +
+                          `└──────────────`,
+                    mentions: [userId]
                 }, { quoted: message });
+                break;
 
             default:
-                return await sock.sendMessage(chatId, { 
-                    text: "❌ Invalid!\nUse: off/warn/delete/remove\nlimit 1-10\nresetwarns\nstatus"
+                await sock.sendMessage(chatId, { 
+                    text: "❌ *Invalid Command*\n\nAvailable commands:\n▸ off/warn/delete/remove\n▸ limit 1-10\n▸ resetwarns\n▸ status", 
+                    mentions: [userId]
                 }, { quoted: message });
+                break;
         }
-
     } catch (error) {
-        console.error("AntiStatusMention error:", error);
-        return await sock.sendMessage(chatId, { 
-            text: `🚫 Error: ${error.message}`
+        console.error("\x1b[35m[AntiStatusMention] Error:\x1b[0m", error);
+        await sock.sendMessage(chatId, { 
+            text: `🚫 *Error*\n\n${error.message}`,
+            mentions: [message.key.participant || message.key.remoteJid]
         }, { quoted: message });
     }
 }
 
-// Event handler for status mentions
+// Event handler
 async function handleAntiStatusMention(sock, message) {
     try {
         const chatId = message.key.remoteJid;
-        if (!chatId.endsWith('@g.us')) return; // Only groups
+        
+        // Check if in group
+        if (!chatId.endsWith('@g.us')) return;
 
         const settings = await getAntiStatusMentionSettings(chatId);
-        if (settings.status === 'off') return;
+        if (settings.action === 'off') return;
 
-        // Check if message contains status mention
-        const text = message.message?.conversation || 
-                     message.message?.extendedTextMessage?.text || 
-                     message.message?.imageMessage?.caption ||
-                     '';
-        
+        const text = message.message?.conversation ||
+                     message.message?.extendedTextMessage?.text ||
+                     message.message?.imageMessage?.caption || '';
+
         if (!text.includes('@status')) return;
 
         const userId = message.key.participant || message.key.remoteJid;
-        
-        // Check if user is admin (exempt admins)
         const userIsAdmin = await isAdmin(sock, chatId, userId);
         if (userIsAdmin) return;
 
-        switch (settings.status) {
+        const groupMetadata = await sock.groupMetadata(chatId).catch(() => null);
+        const groupName = groupMetadata ? groupMetadata.subject : 'the group';
+
+        switch (settings.action) {
             case 'warn':
                 const warnCount = await addUserStatusWarn(chatId, userId);
+                try { await sock.sendMessage(chatId, { delete: message.key }); } catch (e) { console.error('Delete failed:', e); }
                 
                 if (warnCount >= settings.warn_limit) {
-                    // Take action after reaching limit
                     await resetUserStatusWarns(chatId, userId);
-                    
-                    if (settings.action === 'remove') {
-                        await sock.groupParticipantsUpdate(chatId, [userId], 'remove');
-                        await sock.sendMessage(chatId, {
-                            text: `🚫 @${userId.split('@')[0]} removed for status mentions (${settings.warn_limit} warnings)`,
-                            mentions: [userId]
-                        });
-                    } else if (settings.action === 'delete') {
-                        await sock.sendMessage(chatId, {
-                            delete: message.key
-                        });
-                        await sock.sendMessage(chatId, {
-                            text: `⚠️ @${userId.split('@')[0]} reached ${settings.warn_limit} warnings for status mentions`,
-                            mentions: [userId]
-                        });
-                    }
-                } else {
-                    try { await sock.sendMessage(chatId, { delete: message.key }); } catch (e) { console.error('Delete warn msg fail:', e); }
                     await sock.sendMessage(chatId, {
-                        text: `⚠️ @${userId.split('@')[0]} warned for status mention! (${warnCount}/${settings.warn_limit})`,
+                        text: `⚠️ *Status Mention Warning*\n\n` +
+                              `@${userId.split('@')[0]} you have been warned for mentioning *@status*.\n\n` +
+                              `┌ *Details*\n` +
+                              `│ Warns: ${warnCount}/${settings.warn_limit}\n` +
+                              `│ Action: Final Warning\n` +
+                              `│ Group: ${groupName}\n` +
+                              `└──────────────\n\n` +
+                              `*📌 Note:* Next violation may result in removal!`,
+                        mentions: [userId]
+                    });
+                } else {
+                    await sock.sendMessage(chatId, {
+                        text: `⚠️ *Status Mention Warning*\n\n` +
+                              `@${userId.split('@')[0]} please don't mention *@status* in this group!\n\n` +
+                              `┌ *Details*\n` +
+                              `│ Warns: ${warnCount}/${settings.warn_limit}\n` +
+                              `│ Group: ${groupName}\n` +
+                              `└──────────────`,
                         mentions: [userId]
                     });
                 }
                 break;
 
             case 'delete':
-                await sock.sendMessage(chatId, {
-                    delete: message.key
-                });
-                await sock.sendMessage(chatId, {
-                    text: `🗑️ Status mention deleted from @${userId.split('@')[0]}`,
-                    mentions: [userId]
-                });
+                try { 
+                    await sock.sendMessage(chatId, { delete: message.key });
+                    await sock.sendMessage(chatId, {
+                        text: `🗑️ *Message Deleted*\n\n` +
+                              `@${userId.split('@')[0]} your message was deleted because it contained *@status* mention.\n\n` +
+                              `*Group:* ${groupName}`,
+                        mentions: [userId]
+                    });
+                } catch (e) { 
+                    console.error('Delete failed:', e);
+                }
                 break;
 
             case 'remove':
-                await sock.groupParticipantsUpdate(chatId, [userId], 'remove');
-                await sock.sendMessage(chatId, {
-                    text: `🚫 @${userId.split('@')[0]} removed for status mention`,
-                    mentions: [userId]
-                });
+                try { 
+                    await sock.sendMessage(chatId, { delete: message.key }); 
+                    await sock.groupParticipantsUpdate(chatId, [userId], 'remove');
+                    await sock.sendMessage(chatId, {
+                        text: `🚫 *Member Removed*\n\n` +
+                              `@${userId.split('@')[0]} has been removed from the group for mentioning *@status*.\n\n` +
+                              `*Group:* ${groupName}`,
+                        mentions: [userId]
+                    });
+                } catch (e) { 
+                    console.error('Remove failed:', e);
+                }
                 break;
         }
     } catch (error) {
-        console.error("Error in handleAntiStatusMention:", error);
+        console.error("\x1b[35m[AntiStatusMention] Handler error:\x1b[0m", error);
     }
 }
 
-// Export
 module.exports = {
     antistatusmentionCommand,
-    handleAntiStatusMention, // Export the handler
-    getAntiStatusMentionSettings,
-    updateAntiStatusMentionSettings,
-    clearAllStatusWarns,
-    getUserStatusWarns,
-    addUserStatusWarn,
-    resetUserStatusWarns
+    handleAntiStatusMention
 };
