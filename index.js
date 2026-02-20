@@ -321,9 +321,9 @@ async function getLoginMethod() {
     }
 
 
-    log("[ LOG-IN ] Choose login method:", 'blue');
-    log("1)[ ENTER ] WhatsApp Number (Pairing Code)", 'blue');
-    log("2)[ ENTER ] Paste Session ID", 'blue');
+    log("[ LOG-IN  ] Choose login method:", 'blue');
+    log("[ 1)ENTER ] WhatsApp Number [Pairing Code]", 'blue');
+    log("[ 2)ENTER ] Paste Session ID[Paste session id]", 'blue');
 
     let choice = await question("Enter option number (1 or 2): ");
     choice = choice.trim();
