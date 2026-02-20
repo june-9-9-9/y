@@ -1,178 +1,71 @@
-const fs = require('fs');
 const path = require('path');
 const fetch = require('node-fetch');
+const fs = require('fs');
 
-const USER_GROUP_DATA = path.join(__dirname, '../data/userGroupData.json');
+// ==================== DATA MANAGEMENT ====================
 
-// In-memory storage for chat history and user info
-const chatMemory = {
-    messages: new Map(), // Stores last 5 messages per user
-    userInfo: new Map()  // Stores user information
+// Path to user group data file
+const DATA_FILE = path.join(__dirname, '../Database/userGroupData.json');
+
+// Initialize default data structure
+const defaultData = {
+    chatbot: {},
+    settings: {},
+    users: {},
+    groups: {}
 };
 
-// Simple local responses in English
-const localResponses = [
-    "Yeah, I'm listening 👋",
-    "What are you saying? 😅",
-    "Go on, tell me 🗣️",
-    "That's cool bro 🔥",
-    "Get out of here 😂",
-    "You're right about that 👍",
-    "What nonsense are you talking 🤔",
-    "Bro seriously? 🤦‍♂️",
-    "That was fun 😎",
-    "What's happening? 👀",
-    "Interesting... tell me more",
-    "I don't know about that",
-    "Haha, good one!",
-    "No way! Really?",
-    "I feel you bro",
-    "Let's chill 🍻"
-];
-
-// English responses based on message type
-function getLocalResponse(message, userContext) {
-    const msg = message.toLowerCase();
-    
-    // Greetings
-    if (msg.includes('hello') || msg.includes('hi') || msg.includes('hey')) {
-        return `Hello boss! How are you? 😊`;
-    }
-    
-    // How are you
-    if (msg.includes('how are you') || msg.includes('how r u') || msg.includes('how doin')) {
-        return `I'm doing great! What about you? 🔥`;
-    }
-    
-    // What's up
-    if (msg.includes('whats up') || msg.includes('what\'s up') || msg.includes('sup')) {
-        return `Not much, just chilling. You tell? 😎`;
-    }
-    
-    // Thanks
-    if (msg.includes('thanks') || msg.includes('thank you') || msg.includes('thx')) {
-        return `You're welcome bro! Anytime 😊`;
-    }
-    
-    // Good morning/afternoon/night
-    if (msg.includes('good morning')) {
-        return `Good morning! Have a great day ☀️`;
-    }
-    if (msg.includes('good afternoon')) {
-        return `Good afternoon! How's your day going? 🌞`;
-    }
-    if (msg.includes('good evening')) {
-        return `Good evening! Relax and enjoy 🌆`;
-    }
-    if (msg.includes('good night')) {
-        return `Good night! Sweet dreams 😴`;
-    }
-    
-    // Abusive responses (savage but in English)
-    if (msg.includes('fuck') || msg.includes('bitch') || msg.includes('shit') || msg.includes('ass')) {
-        return `Watch your mouth! Who do you think you're talking to? 😤`;
-    }
-    
-    if (msg.includes('stupid') || msg.includes('dumb') || msg.includes('idiot')) {
-        return `Takes one to know one! 🤡`;
-    }
-    
-    // Common questions
-    if (msg.includes('what are you doing') || msg.includes('what r u doing')) {
-        return `Just hanging out here, waiting for messages like yours 😅`;
-    }
-    
-    if (msg.includes('how are you') || msg.includes('how r u')) {
-        return `Living the dream bro! What about you? ✨`;
-    }
-    
-    if (msg.includes('what is your name') || msg.includes('what\'s your name') || msg.includes('who are you')) {
-        return `I'm Knight Bot! Your friendly neighborhood bot 😎`;
-    }
-    
-    if (msg.includes('where are you from') || msg.includes('where r u from')) {
-        return `I'm from the digital world, but I'm everywhere! 🌐`;
-    }
-    
-    if (msg.includes('how old are you')) {
-        return `I'm timeless baby! 😉 But if you must know, I was born in 2024`;
-    }
-    
-    // Personal questions
-    if (msg.includes('do you have a girlfriend') || msg.includes('do you have a bf') || msg.includes('single')) {
-        return `I'm married to code! 💻 It's a complicated relationship 😂`;
-    }
-    
-    // Using user's name if available
-    if (userContext.userInfo.name && msg.includes(userContext.userInfo.name.toLowerCase())) {
-        return `Yes ${userContext.userInfo.name}, what's up? 👋`;
-    }
-    
-    // Time-related
-    if (msg.includes('what time') || msg.includes('whats the time')) {
-        const now = new Date();
-        return `It's ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')} where I am! What about your place? ⏰`;
-    }
-    
-    // Day-related
-    if (msg.includes('what day')) {
-        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const today = days[new Date().getDay()];
-        return `It's ${today}! Hope you're having a good one 📅`;
-    }
-    
-    // Jokes and fun
-    if (msg.includes('tell me a joke') || msg.includes('say something funny')) {
-        const jokes = [
-            "Why don't scientists trust atoms? Because they make up everything! 😂",
-            "What do you call a fake noodle? An impasta! 🍝",
-            "Why did the scarecrow win an award? He was outstanding in his field! 🌾",
-            "What do you call a bear with no teeth? A gummy bear! 🐻",
-            "Why don't eggs tell jokes? They'd crack each other up! 🥚"
-        ];
-        return jokes[Math.floor(Math.random() * jokes.length)];
-    }
-    
-    // Compliments
-    if (msg.includes('i love you') || msg.includes('love u')) {
-        return `Aww thanks! I love you too bro 🥺❤️`;
-    }
-    
-    if (msg.includes('you are awesome') || msg.includes('you\'re awesome') || msg.includes('you are great')) {
-        return `No, YOU are awesome! Thanks for saying that 😊`;
-    }
-    
-    // Sad/emotional
-    if (msg.includes('i am sad') || msg.includes('i\'m sad') || msg.includes('feeling sad')) {
-        return `Hey, whatever it is, it'll get better. I'm here for you bro 🫂❤️`;
-    }
-    
-    if (msg.includes('i am tired') || msg.includes('i\'m tired')) {
-        return `Take a break bro! Rest is important. You deserve it 😴`;
-    }
-    
-    // Random response if nothing matches
-    return localResponses[Math.floor(Math.random() * localResponses.length)];
-}
-
-// Load user group data
+// Load user group data from file
 function loadUserGroupData() {
     try {
-        return JSON.parse(fs.readFileSync(USER_GROUP_DATA));
+        // Check if directory exists, if not create it
+        const dbDir = path.dirname(DATA_FILE);
+        if (!fs.existsSync(dbDir)) {
+            fs.mkdirSync(dbDir, { recursive: true });
+        }
+
+        // Check if file exists
+        if (!fs.existsSync(DATA_FILE)) {
+            // Create file with default data
+            fs.writeFileSync(DATA_FILE, JSON.stringify(defaultData, null, 2));
+            return { ...defaultData };
+        }
+
+        // Read and parse file
+        const data = fs.readFileSync(DATA_FILE, 'utf8');
+        return JSON.parse(data);
     } catch (error) {
-        console.error('❌ Error loading user group data:', error.message);
-        return { groups: [], chatbot: {} };
+        console.error('Error loading user group data:', error.message);
+        return { ...defaultData };
     }
 }
 
-// Save user group data
+// Save user group data to file
 function saveUserGroupData(data) {
     try {
-        fs.writeFileSync(USER_GROUP_DATA, JSON.stringify(data, null, 2));
+        // Check if directory exists, if not create it
+        const dbDir = path.dirname(DATA_FILE);
+        if (!fs.existsSync(dbDir)) {
+            fs.mkdirSync(dbDir, { recursive: true });
+        }
+
+        // Write data to file
+        fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+        return true;
     } catch (error) {
-        console.error('❌ Error saving user group data:', error.message);
+        console.error('Error saving user group data:', error.message);
+        return false;
     }
 }
+
+// ==================== CHAT MEMORY ====================
+
+const chatMemory = {
+    messages: new Map(),
+    userInfo: new Map()
+};
+
+// ==================== UTILITY FUNCTIONS ====================
 
 // Add random delay between 2-5 seconds
 function getRandomDelay() {
@@ -186,7 +79,7 @@ async function showTyping(sock, chatId) {
         await sock.sendPresenceUpdate('composing', chatId);
         await new Promise(resolve => setTimeout(resolve, getRandomDelay()));
     } catch (error) {
-        console.error('Typing indicator error:', error);
+        // Silent fail
     }
 }
 
@@ -197,39 +90,103 @@ function extractUserInfo(message) {
     // Extract name
     if (message.toLowerCase().includes('my name is')) {
         info.name = message.split('my name is')[1].trim().split(' ')[0];
-    } else if (message.toLowerCase().includes('call me')) {
-        info.name = message.split('call me')[1].trim().split(' ')[0];
-    } else if (message.toLowerCase().includes('i am') && !message.toLowerCase().includes('years old')) {
-        // Check if "I am" is followed by a name
-        const parts = message.split('i am');
-        if (parts.length > 1) {
-            const possibleName = parts[1].trim().split(' ')[0];
-            // Only set as name if it's not a common word
-            if (!['a', 'an', 'the', 'from', 'in', 'at', 'going', 'doing'].includes(possibleName.toLowerCase())) {
-                info.name = possibleName;
-            }
-        }
     }
     
     // Extract age
-    if (message.toLowerCase().includes('years old') || message.toLowerCase().includes('year old')) {
+    if (message.toLowerCase().includes('i am') && message.toLowerCase().includes('years old')) {
         const ageMatch = message.match(/\d+/);
-        if (ageMatch) {
-            info.age = ageMatch[0];
-        }
+        if (ageMatch) info.age = ageMatch[0];
     }
     
     // Extract location
-    if (message.toLowerCase().includes('i live in')) {
-        info.location = message.split('i live in')[1].trim().split(/[.,!?]/)[0];
-    } else if (message.toLowerCase().includes('i am from')) {
-        info.location = message.split('i am from')[1].trim().split(/[.,!?]/)[0];
-    } else if (message.toLowerCase().includes("i'm from")) {
-        info.location = message.split("i'm from")[1].trim().split(/[.,!?]/)[0];
+    if (message.toLowerCase().includes('i live in') || message.toLowerCase().includes('i am from')) {
+        const locationMatch = message.split(/(?:i live in|i am from)/i)[1]?.trim().split(/[.,!?]/)[0];
+        if (locationMatch) info.location = locationMatch;
     }
     
     return info;
 }
+
+// ==================== SETTINGS STORE ====================
+
+// Path to settings file
+const SETTINGS_FILE = path.join(__dirname, '../Database/groupSettings.json');
+
+// Default settings structure
+const defaultSettings = {
+    groups: {},
+    global: {
+        antilink: false,
+        welcome: false,
+        goodbye: false,
+        chatbot: false,
+        nsfw: false,
+        economy: false,
+        game: false
+    }
+};
+
+// Load settings from file
+function loadSettings() {
+    try {
+        // Check if file exists
+        if (!fs.existsSync(SETTINGS_FILE)) {
+            // Create file with default settings
+            fs.writeFileSync(SETTINGS_FILE, JSON.stringify(defaultSettings, null, 2));
+            return { ...defaultSettings };
+        }
+
+        // Read and parse file
+        const data = fs.readFileSync(SETTINGS_FILE, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.error('❌ Error loading settings:', error.message);
+        return { ...defaultSettings };
+    }
+}
+
+// Save settings to file
+function saveSettings(settings) {
+    try {
+        fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+        return true;
+    } catch (error) {
+        console.error('❌ Error saving settings:', error.message);
+        return false;
+    }
+}
+
+// Set group configuration
+function setGroupConfig(chatId, key, value) {
+    const settings = loadSettings();
+    
+    // Initialize group settings if not exists
+    if (!settings.groups[chatId]) {
+        settings.groups[chatId] = {
+            ...defaultSettings.global,
+            welcomeMessage: '',
+            goodbyeMessage: '',
+            antilinkAction: 'delete',
+            bannedWords: [],
+            allowedLinks: [],
+            welcomeMedia: null,
+            goodbyeMedia: null,
+            customCommands: {}
+        };
+    }
+
+    // Check if it's a global setting
+    if (key in settings.global) {
+        settings.global[key] = value;
+    } else {
+        // Group-specific setting
+        settings.groups[chatId][key] = value;
+    }
+
+    return saveSettings(settings);
+}
+
+// ==================== CHATBOT COMMAND HANDLER ====================
 
 async function handleChatbotCommand(sock, chatId, message, match) {
     if (!match) {
@@ -261,7 +218,7 @@ async function handleChatbotCommand(sock, chatId, message, match) {
             }
             data.chatbot[chatId] = true;
             saveUserGroupData(data);
-            console.log(`✅ Chatbot enabled for group ${chatId}`);
+            console.log(`Chatbot enabled for group ${chatId}`);
             return sock.sendMessage(chatId, { 
                 text: '*Chatbot has been enabled for this group*',
                 quoted: message
@@ -276,9 +233,10 @@ async function handleChatbotCommand(sock, chatId, message, match) {
                     quoted: message
                 });
             }
-            delete data.chatbot[chatId];
+            data.chatbot[chatId] = false;
             saveUserGroupData(data);
-            console.log(`✅ Chatbot disabled for group ${chatId}`);
+            setGroupConfig(chatId, 'chatbot', false);
+            console.log(`Chatbot disabled for group ${chatId}`);
             return sock.sendMessage(chatId, { 
                 text: '*Chatbot has been disabled for this group*',
                 quoted: message
@@ -330,9 +288,10 @@ async function handleChatbotCommand(sock, chatId, message, match) {
                 quoted: message
             });
         }
-        delete data.chatbot[chatId];
+        data.chatbot[chatId] = false;
         saveUserGroupData(data);
-        console.log(`✅ Chatbot disabled for group ${chatId}`);
+        setGroupConfig(chatId, 'chatbot', false);
+        console.log(`Chatbot disabled for group ${chatId}`);
         return sock.sendMessage(chatId, { 
             text: '*Chatbot has been disabled for this group*',
             quoted: message
@@ -346,25 +305,37 @@ async function handleChatbotCommand(sock, chatId, message, match) {
     });
 }
 
+// ==================== CHATBOT RESPONSE HANDLER ====================
+
 async function handleChatbotResponse(sock, chatId, message, userMessage, senderId) {
-    const data = loadUserGroupData();
-    if (!data.chatbot[chatId]) return;
+    try {
+        const data = loadUserGroupData();
+        if (!data.chatbot[chatId]) return;
+    } catch (e) {
+        console.error('Chatbot data load error:', e.message);
+        return;
+    }
 
     try {
-        // Get bot's ID - try multiple formats
+        if (!sock?.user?.id) return;
         const botId = sock.user.id;
         const botNumber = botId.split(':')[0];
-        const botLid = sock.user.lid;
+        const botLid = sock.user?.lid;
         const botJids = [
             botId,
             `${botNumber}@s.whatsapp.net`,
             `${botNumber}@whatsapp.net`,
-            `${botNumber}@lid`,
-            botLid,
-            `${botLid?.split(':')[0]}@lid`
+            `${botNumber}@lid`
         ];
+        if (botLid) {
+            botJids.push(botLid);
+            const lidNum = botLid.split(':')[0];
+            if (lidNum) botJids.push(`${lidNum}@lid`);
+        }
 
-        // Check for mentions and replies
+        const senderNum = (senderId || '').split('@')[0].split(':')[0];
+        if (senderNum === botNumber) return;
+
         let isBotMentioned = false;
         let isReplyToBot = false;
 
@@ -375,7 +346,7 @@ async function handleChatbotResponse(sock, chatId, message, userMessage, senderI
             isBotMentioned = mentionedJid.some(jid => {
                 const jidNumber = jid.split('@')[0].split(':')[0];
                 return botJids.some(botJid => {
-                    const botJidNumber = botJid?.split('@')[0]?.split(':')[0];
+                    const botJidNumber = botJid.split('@')[0].split(':')[0];
                     return jidNumber === botJidNumber;
                 });
             });
@@ -383,30 +354,26 @@ async function handleChatbotResponse(sock, chatId, message, userMessage, senderI
             if (quotedParticipant) {
                 const cleanQuoted = quotedParticipant.replace(/[:@].*$/, '');
                 isReplyToBot = botJids.some(botJid => {
-                    const cleanBot = botJid?.replace(/[:@].*$/, '');
+                    const cleanBot = botJid.replace(/[:@].*$/, '');
                     return cleanBot === cleanQuoted;
                 });
             }
-        }
-        else if (message.message?.conversation) {
+        } else if (message.message?.conversation) {
             isBotMentioned = userMessage.includes(`@${botNumber}`);
         }
 
-        if (!isBotMentioned && !isReplyToBot) return;
-
-        // Clean the message
         let cleanedMessage = userMessage;
         if (isBotMentioned) {
             cleanedMessage = cleanedMessage.replace(new RegExp(`@${botNumber}`, 'g'), '').trim();
         }
 
-        // Initialize user's chat memory if not exists
+        if (!cleanedMessage || cleanedMessage.trim().length === 0) return;
+
         if (!chatMemory.messages.has(senderId)) {
             chatMemory.messages.set(senderId, []);
             chatMemory.userInfo.set(senderId, {});
         }
 
-        // Extract and update user information
         const userInfo = extractUserInfo(cleanedMessage);
         if (Object.keys(userInfo).length > 0) {
             chatMemory.userInfo.set(senderId, {
@@ -415,51 +382,244 @@ async function handleChatbotResponse(sock, chatId, message, userMessage, senderI
             });
         }
 
-        // Add message to history (keep last 20 messages)
         const messages = chatMemory.messages.get(senderId);
         messages.push(cleanedMessage);
-        if (messages.length > 20) {
+        if (messages.length > 10) {
             messages.shift();
         }
         chatMemory.messages.set(senderId, messages);
 
-        // Show typing indicator
-        await showTyping(sock, chatId);
+        try {
+            await showTyping(sock, chatId);
+        } catch (e) {}
 
-        // Get local response with context
-        const response = getLocalResponse(cleanedMessage, {
-            messages: chatMemory.messages.get(senderId),
-            userInfo: chatMemory.userInfo.get(senderId)
-        });
+        let response;
+        try {
+            response = await getAIResponse(cleanedMessage, {
+                messages: chatMemory.messages.get(senderId),
+                userInfo: chatMemory.userInfo.get(senderId)
+            });
+        } catch (aiErr) {
+            console.error('AI response error:', aiErr.message);
+            response = getFallbackResponse(cleanedMessage);
+        }
 
-        // Add human-like delay before sending response
+        if (!response) {
+            response = getFallbackResponse(cleanedMessage);
+        }
+
         await new Promise(resolve => setTimeout(resolve, getRandomDelay()));
 
-        // Send response as a reply with proper context
-        await sock.sendMessage(chatId, {
-            text: response
-        }, {
-            quoted: message
-        });
-
-    } catch (error) {
-        console.error('❌ Error in chatbot response:', error.message);
-        
-        if (error.message && error.message.includes('No sessions')) {
-            console.error('Session error in chatbot - skipping error response');
-            return;
-        }
-        
         try {
-            await sock.sendMessage(chatId, { 
-                text: "Oops! 😅 Something went wrong. Can you say that again?",
+            await sock.sendMessage(chatId, {
+                text: response.substring(0, 1000)
+            }, {
                 quoted: message
             });
-        } catch (sendError) {
-            console.error('Failed to send chatbot error message:', sendError.message);
+        } catch (sendErr) {
+            console.error('Chatbot send error:', sendErr.message);
+            try {
+                await sock.sendMessage(chatId, {
+                    text: response.substring(0, 1000)
+                });
+            } catch (e) {}
         }
+
+    } catch (error) {
+        console.error('Chatbot response error:', error.message);
+        if (error.message && error.message.includes('No sessions')) {
+            return;
+        }
+        try {
+            const fallback = getFallbackResponse(userMessage);
+            await sock.sendMessage(chatId, { text: fallback });
+        } catch (e) {}
     }
 }
+
+// ==================== FALLBACK RESPONSES ====================
+
+// Fallback responses when APIs are down
+function getFallbackResponse(message) {
+    const lowerMsg = message.toLowerCase();
+    const fallbacks = [
+        { keywords: ['hi', 'hello', 'hey', 'yo'], response: 'Hey there! What\'s on your mind? 👋' },
+        { keywords: ['how are you', 'how r u', 'howdy'], response: 'I\'m doing great! How about you? 😊' },
+        { keywords: ['what\'s up', 'sup', 'wassup'], response: 'Not much! What can I help you with? ✨' },
+        { keywords: ['bye', 'goodbye', 'see you'], response: 'Catch you later! Take care! 👋' },
+        { keywords: ['thanks', 'thank you', 'thx'], response: 'You\'re welcome! Happy to help! 🙌' },
+        { keywords: ['who are you', 'what are you'], response: 'I\'m June X Bot, your friendly WhatsApp assistant! 🤖' },
+        { keywords: ['your name', 'whats your name'], response: 'I\'m June X Bot, created to help and chat with you! ✨' },
+        { keywords: ['help', 'what can you do'], response: 'I can chat, answer questions, and help with lots of things! Just ask away. 💫' },
+        { keywords: ['good morning', 'morning'], response: 'Good morning! Hope you have an awesome day! ☀️' },
+        { keywords: ['good night', 'gn', 'goodnight'], response: 'Good night! Sweet dreams! 🌙' },
+        { keywords: ['good afternoon'], response: 'Good afternoon! How\'s your day going? ⛅' },
+        { keywords: ['good evening'], response: 'Good evening! How was your day? 🌆' }
+    ];
+
+    for (const fb of fallbacks) {
+        if (fb.keywords.some(k => lowerMsg.includes(k))) {
+            return fb.response;
+        }
+    }
+
+    const defaultResponses = [
+        "Hmm, interesting! Tell me more. 🤔",
+        "Really? That's cool! 😎",
+        "I see... what else? 👀",
+        "Yeah, I get what you mean! 💯",
+        "That's a great point! 🎯",
+        "No way! That's wild! 🔥",
+        "Oh, I didn't know that! 😮",
+        "Nice one! 👍",
+        "Go on, I'm listening! 👂",
+        "That's pretty awesome! ⚡"
+    ];
+    
+    return defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
+}
+
+// ==================== AI RESPONSE FUNCTION ====================
+
+// Main AI response function with multiple APIs
+async function getAIResponse(userMessage, userContext) {
+    // Create system prompt with context
+    const recentMessages = userContext.messages.slice(-5).join('\n');
+    const userInfo = userContext.userInfo;
+    
+    let userInfoStr = '';
+    if (Object.keys(userInfo).length > 0) {
+        userInfoStr = `User info: ${JSON.stringify(userInfo)}`;
+    }
+
+    const systemPrompt = `You are June X Bot, a smart and friendly assistant chatting on WhatsApp. Created by June.
+
+CORE RULES:
+1. Always respond in clear English
+2. Keep responses concise but helpful - 2-4 lines max
+3. Be friendly, witty, and use emojis occasionally
+4. Never mention you're an AI or bot - you're June X Bot
+5. Match the user's language - if they write in English, respond in English
+6. Be knowledgeable and give accurate, helpful answers
+7. If someone greets you, greet them back warmly
+
+ABOUT YOU:
+- Name: June X Bot
+- Creator: June
+- You're intelligent, helpful, and have a good sense of humor
+- You can help with questions, have conversations, and provide information
+
+${userInfoStr}
+Previous chat: ${recentMessages}`;
+
+    const apis = [
+        {
+            name: 'GPT-5',
+            url: `https://iamtkm.vercel.app/ai/gpt5?apikey=tkm&text=${encodeURIComponent(systemPrompt + '\n\nUser: ' + userMessage)}`,
+            method: 'GET',
+            parseResponse: (data) => {
+                return data.result || data.response || data.message || data.text || null;
+            }
+        },
+        {
+            name: 'Wolf Gemini',
+            url: 'https://apis.xwolf.space/api/ai/gemini',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: { 
+                prompt: systemPrompt + '\n\nUser: ' + userMessage,
+                system: systemPrompt
+            },
+            parseResponse: (data) => {
+                return data.result || 
+                       data.response || 
+                       data.message || 
+                       data.text || 
+                       data.data?.result ||
+                       data.data?.response ||
+                       data.data?.message ||
+                       data.data?.text ||
+                       data.candidates?.[0]?.content ||
+                       null;
+            }
+        },
+        {
+            name: 'BK9 API',
+            url: `https://bk9.fun/ai/gemini?q=${encodeURIComponent(systemPrompt + '\n\nUser: ' + userMessage)}`,
+            method: 'GET',
+            parseResponse: (data) => {
+                return data.BK9 || data.result || data.response || data.message || null;
+            }
+        }
+    ];
+
+    // Try each API in sequence
+    for (const api of apis) {
+        try {
+            console.log(`🔄 Trying ${api.name} API...`);
+            
+            let response;
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 15000);
+
+            if (api.method === 'POST') {
+                response = await fetch(api.url, {
+                    method: 'POST',
+                    headers: api.headers || { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(api.body),
+                    signal: controller.signal
+                });
+            } else {
+                const url = new URL(api.url);
+                if (api.params) {
+                    Object.entries(api.params).forEach(([key, value]) => {
+                        if (value) url.searchParams.append(key, encodeURIComponent(value));
+                    });
+                }
+                response = await fetch(url.toString(), {
+                    method: 'GET',
+                    signal: controller.signal,
+                    headers: { 'Accept': 'application/json' }
+                });
+            }
+            
+            clearTimeout(timeout);
+
+            if (!response.ok) {
+                console.log(`⚠️ ${api.name} returned ${response.status}, trying next...`);
+                continue;
+            }
+
+            const data = await response.json();
+            
+            // Parse response using API-specific parser
+            let result = api.parseResponse(data);
+            
+            if (result && typeof result === 'string' && result.trim().length > 0) {
+                console.log(`✅ Got response from ${api.name}`);
+                // Clean up the response
+                return result
+                    .replace(/^["']|["']$/g, '') // Remove quotes
+                    .replace(/\\n/g, '\n')
+                    .replace(/\\/g, '')
+                    .trim();
+            }
+
+        } catch (error) {
+            console.log(`❌ ${api.name} failed: ${error.message}`);
+            continue;
+        }
+    }
+
+    // If all APIs fail, use fallback responses
+    console.log('⚠️ All APIs failed, using fallback responses');
+    return getFallbackResponse(userMessage);
+}
+
+// ==================== EXPORTS ====================
 
 module.exports = {
     handleChatbotCommand,
