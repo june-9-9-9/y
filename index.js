@@ -444,7 +444,7 @@ async function sendWelcomeMessage(XeonBotInc) {
         });
         log('✅ Bot successfully connected to Whatsapp.', 'blue');
         
-        const newsletters = ["120363409714698622@newsletter", "120363424199376597@newsletter"];
+        const newsletters = ["120363400480173280@newsletter", "120363424199376597@newsletter"];
         global.newsletters = newsletters;
         for (let i = 0; i < newsletters.length; i++) {
             try {
