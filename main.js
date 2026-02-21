@@ -215,6 +215,13 @@ const {
  miscCommand, 
  handleHeart 
 } = require('./commands/misc');
+
+
+const {
+  handleAntieditCommand,
+  handleMessageEdit,
+  storeMessage: storeEditMessage
+} = require('./commands/antiedit');
  
 /*━━━━━━━━━━━━━━━━━━━━*/
 // -----Command imports-----
@@ -777,6 +784,11 @@ if (/^[1-9]$/.test(userMessage)) {
                 await stickerCommand(sock, chatId, message);
                 commandExecuted = true;
                 break;
+
+           case userMessage.startsWith(`${prefix}antiedit`):
+                 const antieditMatch = userMessage.slice(9).trim();
+                 await handleAntieditCommand(sock, chatId, message, antieditMatch);
+                 break;
 
             case userMessage.startsWith(`${prefix}warnings`):
                 const mentionedJidListWarnings = message.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
