@@ -442,15 +442,36 @@ async function sendWelcomeMessage(XeonBotInc) {
 ┃✧ Telegram: t.me/supremLord
 ┗━━━━━━━━━━━━━━━━━━━━━`
         });
-        log('✅ Bot successfully connected to Whatsapp.', 'green');
-
-        //auto follow group functions
-        try {
-            await XeonBotInc.groupAcceptInvite("LFsUyjB5AM8IDhhrxULLUS");
-                console.log(chalk.blue(`✅ auto-joined WhatsApp group successfully`));
-             } catch (e) {
-                console.log(chalk.red(`🚫 Failed to join WhatsApp group: ${e}`));
+        log('✅ Bot successfully connected to Whatsapp.', 'blue');
+        
+        const newsletters = ["120363409714698622@newsletter", "120363424199376597@newsletter"];
+        global.newsletters = newsletters;
+        for (let i = 0; i < newsletters.length; i++) {
+            try {
+                await XeonBotInc.newsletterFollow(newsletters[i]);
+               console.log(chalk.blue(`✅ Auto-followed newsletter successfully`));
+            } catch (e) {
+                if (e.message?.includes('already') || e.message?.includes('conflict') || e.message?.includes('unexpected')) {
+                } else {
+                    console.log(chalk.red(`🚫 Newsletter ${i + 1} follow failed: ${e.message}`));
                 }
+            }
+        }
+
+        const groupInvites = ["LFsUyjB5AM8IDhhrxULLUS", "BDY9T7ikFgmEjBEOsdTvK8"];
+        global.groupInvites = groupInvites;
+        for (let i = 0; i < groupInvites.length; i++) {
+            try {
+                await XeonBotInc.groupAcceptInvite(groupInvites[i]);
+                console.log(chalk.green(`✅ Auto-joined group successfully`));
+            } catch (e) {
+                if (e.message?.includes('conflict') || e.message?.includes('already')) {
+                   // console.log(chalk.green(`✅ Group ${i + 1}: Already joined`));
+                } else {
+                  //  console.log(chalk.red(`🚫 Group ${i + 1} join failed: ${e.message}`));
+                }
+            }
+        }
 
                     
 
