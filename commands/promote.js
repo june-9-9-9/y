@@ -1,18 +1,28 @@
 const { isAdmin } = require('../lib/isAdmin');
 
-async function promoteCommand(sock, chatId, mentionedJids, message) {
+async function promoteCommand(sock, chatId, mentionedJids, message, args) {
     let userToPromote = [];
-    
+
+    // Case 1: Mentioned users
     if (mentionedJids?.length > 0) {
         userToPromote = mentionedJids;
     }
+    // Case 2: Quoted/replied message
     else if (message.message?.extendedTextMessage?.contextInfo?.participant) {
         userToPromote = [message.message.extendedTextMessage.contextInfo.participant];
     }
-    
+    // Case 3: Direct number input (args after .promote)
+    else if (args?.length > 0) {
+        // Normalize number input to JID format
+        userToPromote = args.map(num => {
+            const cleanNum = num.replace(/[^0-9]/g, ''); // strip non-digits
+            return `${cleanNum}@s.whatsapp.net`;
+        });
+    }
+
     if (userToPromote.length === 0) {
         await sock.sendMessage(chatId, { 
-            text: 'Please mention the user or reply to their message to promote!'
+            text: 'Please mention, reply, or provide a number to promote!'
         });
         return;
     }
