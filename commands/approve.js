@@ -45,11 +45,8 @@ async function approveCommand(sock, chatId, message) {
         };
 
         if (args[0]?.toLowerCase() === 'all') {
-            const failed = await batchApprove(pending.map(p => p.jid));
-            return sock.sendMessage(chatId, {
-                text: `📋 *Results*\n✅ Approved: ${pending.length - failed.length}\n❌ Failed: ${failed.length}`,
-                mentions: failed.slice(0, 10)
-            });
+            await batchApprove(pending.map(p => p.jid));
+            return; // silent, no success message
         }
 
         const mentioned = message.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
@@ -59,11 +56,8 @@ async function approveCommand(sock, chatId, message) {
             if (!valid.length)
                 return sock.sendMessage(chatId, { text: `⚠️ Not pending: ${invalid.map(j => '@' + j.split('@')[0]).join(', ')}`, mentions: invalid, quoted: message });
 
-            const failed = await batchApprove(valid);
-            return sock.sendMessage(chatId, {
-                text: `📋 *Results*\n✅ Approved: ${valid.length - failed.length}\n❌ Failed: ${failed.length}\n⚠️ Not Pending: ${invalid.length}`,
-                mentions: mentioned
-            });
+            await batchApprove(valid);
+            return; // silent, no success message
         }
 
         const list = pending.map(p => `• @${p.jid.split('@')[0]}`).join('\n');
