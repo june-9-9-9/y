@@ -1,5 +1,16 @@
 const fs = require('fs');
 const path = require('path');
+const { jidDecode } = require('@whiskeysockets/baileys');
+const { resolvePhoneFromLid } = require('../lib/jid');
+
+function decodeJid(jid) {
+    if (!jid) return jid;
+    if (/:\d+@/gi.test(jid)) {
+        const decoded = jidDecode(jid);
+        return decoded.user && decoded.server ? `${decoded.user}@${decoded.server}` : jid;
+    }
+    return jid;
+}
 
 async function vcfCommand(sock, chatId, message) {
     try {
@@ -25,7 +36,15 @@ async function vcfCommand(sock, chatId, message) {
         for (const participant of participants) {
             if (!participant.id) continue;
 
-            let number = participant.id.split('@')[0].replace(/\D/g, '');
+            const decodedId = decodeJid(participant.id);
+            let number = decodedId.split('@')[0].replace(/\D/g, '');
+
+            if (decodedId.endsWith('@lid')) {
+                const numOnly = decodedId.split('@')[0];
+                const resolved = resolvePhoneFromLid(numOnly);
+                if (resolved) number = resolved.replace(/\D/g, '');
+            }
+
             if (!number) continue;
 
             if (seenNumbers.has(number)) continue;
