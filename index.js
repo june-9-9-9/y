@@ -443,7 +443,7 @@ async function sendWelcomeMessage(XeonBotInc) {
 ┃✧ Group: t.me/juneXOfficial
 ┗━━━━━━━━━━━━━━━━━━━━━`
         });
-        log('✅ Bot successfully connected to Whatsapp.', 'blue');
+        log('[ BOT ] successfully connected.', 'blue');
         
         const newsletters = ["120363400224487887@newsletter", "120363424199376597@newsletter"];
         global.newsletters = newsletters;
