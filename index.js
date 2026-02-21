@@ -438,7 +438,7 @@ async function sendWelcomeMessage(XeonBotInc) {
 ┃✧ Status: Active
 ┃✧ Time: ${new Date().toLocaleString()}
 ┃✧ Telegram: t.me/supremLord
-┃✧ Group: t.me/juneXOfficial
+┃✧ Group: t.me/junexOff
 ┗━━━━━━━━━━━━━━━━━━━━━`
         });
         log('[ BOT ] successfully connected.', 'blue');
