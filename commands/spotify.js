@@ -65,7 +65,7 @@ async function spotifyCommand(sock, chatId, message) {
         if (track.genres?.length > 0) trackInfo += `🎭 *Genres:* ${track.genres.join(', ')}\n`;
         if (track.url) trackInfo += `🔗 *Spotify URL:* ${track.url}\n`;
         trackInfo += `\n✅ *Download successful!*\n`;
-        trackInfo += `> Powered by Keith's Spotify API`;
+        trackInfo += `> ©supreme`;
 
         await sock.sendMessage(chatId, { text: trackInfo }, { quoted: message });
 
