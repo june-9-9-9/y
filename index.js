@@ -10,11 +10,7 @@
 // --- Environment Setup ---
 const config = require('./config');
 /*━━━━━━━━━━━━━━━━━━━━*/
-require('dotenv').config(); // CRITICAL: Load .env variables first!
-// *******************************************************************
-// *** CRITICAL CHANGE: REQUIRED FILES (settings.js, main, etc.) ***
-// *** HAVE BEEN REMOVED FROM HERE AND MOVED BELOW THE CLONER RUN. ***
-// *******************************************************************
+require('dotenv').config(); // CRITICAL: Load .env variables first
 
 const fs = require('fs')
 const chalk = require('chalk')
@@ -22,8 +18,7 @@ const path = require('path')
 const axios = require('axios')
 const os = require('os')
 const PhoneNumber = require('awesome-phonenumber')
-// The smsg utility also depends on other files, so we'll move its require statement.
-// const { smsg } = require('./lib/myfunc') 
+
 const {
     default: makeWASocket,
     useMultiFileAuthState,
@@ -39,13 +34,15 @@ const pino = require("pino")
 const readline = require("readline")
 const { rmSync } = require('fs')
 
-// --- 🌟 NEW: Centralized Logging Function ---
+// --- 🌟 NEW: Centralized Logging Function
+
 /**
  * Custom logging function to enforce the [ JUNE - MD ] prefix and styling.
  * @param {string} message - The message to log.
  * @param {string} [color='white'] - The chalk color (e.g., 'green', 'red', 'yellow').
  * @param {boolean} [isError=false] - Whether to use console.error.
  */
+
 function log(message, color = 'white', isError = false) {
     const prefix = chalk.magenta.bold('[ JUNE - X ]');
     const logFunc = isError ? console.error : console.log;
@@ -141,9 +138,10 @@ function deleteErrorCountFile() {
 /**
  * NEW: Helper function to centralize the cleanup of all session-related files.
  */
+
 function clearSessionFiles() {
     try {
-        log('🗑️ Clearing session folder...', 'blue');
+        log('[ CLEARING ] session folder...', 'blue');
         // Delete the entire session directory
         rmSync(sessionDir, { recursive: true, force: true });
         // Delete login file if it exists
@@ -151,7 +149,7 @@ function clearSessionFiles() {
         // Delete error count file
         deleteErrorCountFile();
         global.errorRetryCount = 0; // Reset in-memory counter
-        log('✅ Session files cleaned successfully.', 'green');
+        log('[ SESSION ] files cleaned successfully.', 'green');
     } catch (e) {
         log(`Failed to clear session files: ${e.message}`, 'red', true);
     }
@@ -176,7 +174,7 @@ function cleanupOldMessages() {
         }
     }
     saveStoredMessages(cleanedMessages);
-    log("🧹 [Msg Cleanup] Old messages removed from message_backup.json", 'yellow');
+    log("[ MSG CLEANUP ] Old messages removed  🧹", 'green');
 }
 
 function cleanupJunkFiles(botSocket) {
@@ -323,7 +321,7 @@ async function getLoginMethod() {
 
     log("[ LOG-IN  ] Choose login method:", 'blue');
     log("[ 1)ENTER ] WhatsApp Number [Pairing Code]", 'blue');
-    log("[ 2)ENTER ] Paste Session ID[Use session]", 'blue');
+    log("[ 2)ENTER ] Paste Session ID [Use session]", 'blue');
 
     let choice = await question("Enter option number (1 or 2): ");
     choice = choice.trim();
@@ -619,8 +617,8 @@ async function startXeonBotInc() {
             }
         } else if (connection === 'open') {           
             console.log(chalk.yellow(`💅Connected to => ` + JSON.stringify(XeonBotInc.user, null, 2)))
-            log('JUNE X Connected', 'yellow');      
-            log(`Github: Vinpink2`, 'yellow');
+            log('JUNE-X CONNECTED', 'yellow');      
+            log(`GITHUB: VINPINK2`, 'yellow');
             
             // Send the welcome message (which includes the 10s stability delay and error reset)
      await sendWelcomeMessage(XeonBotInc);
