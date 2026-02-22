@@ -500,14 +500,33 @@ const fake = createFakeContact(message);
             const chatName = chatType === 'Group' ? (groupMetadata?.subject || 'Unknown Group') : pushname;
             const time = new Date().toLocaleTimeString();
             
-            console.log(chalk.bgHex('#121212').blue.bold(`
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  📥 INCOMING MESSAGE: ${time}
-  👤 From: ${pushname}: ${participant}
-  💬 Chat Type: ${chatType}: ${chatName}
-  💭 Message: ${body || "—"}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-`));   
+       const colors = [
+    chalk.red.bold,
+    chalk.yellow.bold,
+    chalk.green.bold,
+    chalk.cyan.bold,
+    chalk.blue.bold,
+    chalk.magenta.bold,
+  ];
+  return text
+    .split("")
+    .map((char, i) => colors[i % colors.length](char))
+    .join("");
+}
+
+function rainbowLine(length) {
+  return rainbowText("━".repeat(length));
+}
+            
+const width = 55; // adjust rectangle width
+           
+console.log(chalk.bgHex("#121212")(`
+${rainbowLine(width)}
+${chalk.red.bold("┏")}  ${rainbowText("NEW MESSAGE")}: ${time}
+${chalk.blue.bold("┃")}  FROM: ${rainbowText(pushname)}: ${participant}
+${chalk.white.bold("┃")}  CHAT: ${rainbowText(chatType)}: ${chatName}
+${chalk.green.bold("┗")}  MESSAGE: ${rainbowText(body || "—")}
+${rainbowLine(width)}`)); 
         }
 
         // Enforce private mode BEFORE any replies (except owner/sudo)
