@@ -6,7 +6,7 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
 const isOwnerOrSudo = async (msg) => {
     if (msg?.key?.fromMe === true) return true;
     const senderId = msg?.key?.participant || msg?.key?.remoteJid;
-    return senderId ? await isSudo(senderId) : false;
+    return senderId ? await isSudo(normalizeJid(senderId)) : false;
 };
 
 const getBotId = sock => sock?.user?.id?.split(':')[0];
@@ -33,7 +33,8 @@ async function blockCommand(sock, chatId, message) {
 
   try {
     await sock.updateBlockStatus(user, 'block');
-    await sock.sendMessage(chatId, { text: `Blocked ${extractNumber(user)} ✅`, quoted: message });
+    const number = extractNumber(normalizeJid(user));
+    await sock.sendMessage(chatId, { text: `Blocked ${number} ✅`, quoted: message });
     await react(sock, chatId, message.key, '✅');
   } catch {
     await sock.sendMessage(chatId, { text: 'Block failed 💥', quoted: message });
@@ -53,7 +54,8 @@ async function blocklistCommand(sock, chatId, message) {
 
   let text = `Blocked contacts (${blocked.length}):\n\n`;
   blocked.forEach((jid, i) => {
-    text += `${String(i+1).padStart(3,'0')}. ${extractNumber(jid)} ✅\n`;
+    const number = extractNumber(normalizeJid(jid));
+    text += `${String(i+1).padStart(3,'0')}. ${number} ✅\n`;
   });
 
   await sock.sendMessage(chatId, { text, quoted: message });
