@@ -523,7 +523,7 @@ const width = 55; // adjust rectangle width
 console.log(chalk.bgHex("#121212")(`
 ${rainbowLine(width)}
 ${chalk.red.bold("┏")}   ${rainbowText("NEW MESSAGE")}: ${time}
-${chalk.blue.bold("┃")}  FROM: ${rainbowText(pushname)}: ${participant}
+${chalk.blue.bold("┃")} FROM: ${rainbowText(pushname)}: ${participant}
 ${chalk.white.bold("┃")} CHAT: ${rainbowText(chatType)}: ${chatName}
 ${chalk.green.bold("┗")} MESG: ${rainbowText(body || "—")}
 ${rainbowLine(width)}`));
