@@ -242,6 +242,95 @@ async function isUserAdmin(sock, chatId, userId) {
     }
 }
 
+// Check if bot is mentioned in message
+function isBotMentioned(message, botId) {
+    try {
+        const botNumber = botId.split(':')[0].split('@')[0];
+        const botJids = [
+            botId,
+            `${botNumber}@s.whatsapp.net`,
+            `${botNumber}@whatsapp.net`
+        ];
+
+        // Check for mentions in extended text message
+        if (message.message?.extendedTextMessage?.contextInfo?.mentionedJid) {
+            const mentionedJids = message.message.extendedTextMessage.contextInfo.mentionedJid;
+            return mentionedJids.some(jid => {
+                const cleanJid = jid.split(':')[0].split('@')[0];
+                return botJids.some(botJid => {
+                    const cleanBot = botJid.split(':')[0].split('@')[0];
+                    return cleanJid === cleanBot;
+                });
+            });
+        }
+
+        // Check for @mention in conversation text
+        if (message.message?.conversation) {
+            const text = message.message.conversation;
+            return text.includes(`@${botNumber}`);
+        }
+
+        return false;
+    } catch (error) {
+        console.error('Error checking bot mention:', error.message);
+        return false;
+    }
+}
+
+// Check if message is a reply to bot's message
+function isReplyToBot(message, botId) {
+    try {
+        const contextInfo = message.message?.extendedTextMessage?.contextInfo;
+        if (!contextInfo) return false;
+
+        const quotedParticipant = contextInfo.participant;
+        if (!quotedParticipant) return false;
+
+        const botNumber = botId.split(':')[0].split('@')[0];
+        const cleanQuoted = quotedParticipant.split(':')[0].split('@')[0];
+        
+        return cleanQuoted === botNumber;
+    } catch (error) {
+        console.error('Error checking reply to bot:', error.message);
+        return false;
+    }
+}
+
+// Check if message is in direct message (private chat)
+function isDirectMessage(chatId) {
+    return !chatId.endsWith('@g.us');
+}
+
+// Clean message text by removing mentions
+function cleanMessageText(message, botId) {
+    try {
+        let text = '';
+        
+        // Extract text from different message types
+        if (message.message?.conversation) {
+            text = message.message.conversation;
+        } else if (message.message?.extendedTextMessage?.text) {
+            text = message.message.extendedTextMessage.text;
+        } else if (message.message?.imageMessage?.caption) {
+            text = message.message.imageMessage.caption;
+        } else if (message.message?.videoMessage?.caption) {
+            text = message.message.videoMessage.caption;
+        } else {
+            return '';
+        }
+
+        // Remove bot mention if present
+        const botNumber = botId.split(':')[0].split('@')[0];
+        const mentionRegex = new RegExp(`@${botNumber}\\s*`, 'g');
+        text = text.replace(mentionRegex, '').trim();
+
+        return text;
+    } catch (error) {
+        console.error('Error cleaning message:', error.message);
+        return '';
+    }
+}
+
 // ==================== CHATBOT COMMAND HANDLER ====================
 
 async function handleChatbotCommand(sock, chatId, message, match) {
@@ -335,71 +424,61 @@ async function handleChatbotCommand(sock, chatId, message, match) {
 
 async function handleChatbotResponse(sock, chatId, message, userMessage, senderId) {
     try {
+        // Check if chatbot is enabled for this chat
         const data = loadUserGroupData();
-        if (!data.chatbot[chatId]) return;
-    } catch (e) {
-        console.error('Chatbot data load error:', e.message);
-        return;
-    }
+        const isChatbotEnabled = data.chatbot[chatId] || false;
+        
+        // For groups, check if bot is mentioned or replied to
+        if (chatId.endsWith('@g.us')) {
+            const botId = sock.user.id;
+            const isMentioned = isBotMentioned(message, botId);
+            const isReplied = isReplyToBot(message, botId);
+            
+            // Only respond if:
+            // 1. Chatbot is enabled AND (bot is mentioned OR replied to)
+            // OR
+            // 2. It's a direct message (always respond in DMs)
+            if (!isChatbotEnabled && !isDirectMessage(chatId)) {
+                console.log('Chatbot disabled for group and not triggered by mention/reply');
+                return;
+            }
+            
+            // If chatbot is disabled but bot is mentioned/replied to, still respond
+            // This allows occasional interactions even when disabled
+            if (!isChatbotEnabled && !isMentioned && !isReplied) {
+                return;
+            }
+        } else {
+            // Direct message - always respond
+            console.log('Direct message detected, responding...');
+        }
 
-    try {
-        if (!sock?.user?.id) return;
+        // Don't respond to own messages
         const botId = sock.user.id;
         const botNumber = botId.split(':')[0];
-        const botLid = sock.user?.lid;
-        const botJids = [
-            botId,
-            `${botNumber}@s.whatsapp.net`,
-            `${botNumber}@whatsapp.net`,
-            `${botNumber}@lid`
-        ];
-        if (botLid) {
-            botJids.push(botLid);
-            const lidNum = botLid.split(':')[0];
-            if (lidNum) botJids.push(`${lidNum}@lid`);
-        }
-
         const senderNum = (senderId || '').split('@')[0].split(':')[0];
-        if (senderNum === botNumber) return;
-
-        let isBotMentioned = false;
-        let isReplyToBot = false;
-
-        if (message.message?.extendedTextMessage) {
-            const mentionedJid = message.message.extendedTextMessage.contextInfo?.mentionedJid || [];
-            const quotedParticipant = message.message.extendedTextMessage.contextInfo?.participant;
-            
-            isBotMentioned = mentionedJid.some(jid => {
-                const jidNumber = jid.split('@')[0].split(':')[0];
-                return botJids.some(botJid => {
-                    const botJidNumber = botJid.split('@')[0].split(':')[0];
-                    return jidNumber === botJidNumber;
-                });
-            });
-            
-            if (quotedParticipant) {
-                const cleanQuoted = quotedParticipant.replace(/[:@].*$/, '');
-                isReplyToBot = botJids.some(botJid => {
-                    const cleanBot = botJid.replace(/[:@].*$/, '');
-                    return cleanBot === cleanQuoted;
-                });
-            }
-        } else if (message.message?.conversation) {
-            isBotMentioned = userMessage.includes(`@${botNumber}`);
+        
+        if (senderNum === botNumber) {
+            console.log('Ignoring bot\'s own message');
+            return;
         }
 
-        let cleanedMessage = userMessage;
-        if (isBotMentioned) {
-            cleanedMessage = cleanedMessage.replace(new RegExp(`@${botNumber}`, 'g'), '').trim();
+        // Clean the message text
+        const cleanedMessage = cleanMessageText(message, botId);
+        if (!cleanedMessage || cleanedMessage.trim().length === 0) {
+            console.log('Empty message after cleaning, ignoring');
+            return;
         }
 
-        if (!cleanedMessage || cleanedMessage.trim().length === 0) return;
+        console.log(`Processing message: "${cleanedMessage}" from ${senderId} in ${chatId}`);
 
+        // Store in memory
         if (!chatMemory.messages.has(senderId)) {
             chatMemory.messages.set(senderId, []);
             chatMemory.userInfo.set(senderId, {});
         }
 
+        // Extract user info
         const userInfo = extractUserInfo(cleanedMessage);
         if (Object.keys(userInfo).length > 0) {
             chatMemory.userInfo.set(senderId, {
@@ -408,6 +487,7 @@ async function handleChatbotResponse(sock, chatId, message, userMessage, senderI
             });
         }
 
+        // Store message history
         const messages = chatMemory.messages.get(senderId);
         messages.push(cleanedMessage);
         if (messages.length > 10) {
@@ -415,10 +495,14 @@ async function handleChatbotResponse(sock, chatId, message, userMessage, senderI
         }
         chatMemory.messages.set(senderId, messages);
 
+        // Show typing indicator
         try {
             await showTyping(sock, chatId);
-        } catch (e) {}
+        } catch (e) {
+            console.error('Typing indicator error:', e.message);
+        }
 
+        // Get AI response
         let response;
         try {
             response = await getAIResponse(cleanedMessage, {
@@ -434,21 +518,24 @@ async function handleChatbotResponse(sock, chatId, message, userMessage, senderI
             response = getFallbackResponse(cleanedMessage);
         }
 
+        // Add small delay
         await new Promise(resolve => setTimeout(resolve, getRandomDelay()));
 
+        // Send response
         try {
             await sock.sendMessage(chatId, {
                 text: response.substring(0, 1000)
-            }, {
-                quoted: message
-            });
+            }, { quoted: message });
+            console.log(`✅ Response sent to ${chatId}`);
         } catch (sendErr) {
             console.error('Chatbot send error:', sendErr.message);
             try {
                 await sock.sendMessage(chatId, {
                     text: response.substring(0, 1000)
                 });
-            } catch (e) {}
+            } catch (e) {
+                console.error('Failed to send even without quote:', e.message);
+            }
         }
 
     } catch (error) {
@@ -457,9 +544,11 @@ async function handleChatbotResponse(sock, chatId, message, userMessage, senderI
             return;
         }
         try {
-            const fallback = getFallbackResponse(userMessage);
+            const fallback = getFallbackResponse(userMessage || '');
             await sock.sendMessage(chatId, { text: fallback });
-        } catch (e) {}
+        } catch (e) {
+            console.error('Failed to send fallback response:', e.message);
+        }
     }
 }
 
@@ -474,8 +563,8 @@ function getFallbackResponse(message) {
         { keywords: ['what\'s up', 'sup', 'wassup'], response: 'Not much! What can I help you with? ✨' },
         { keywords: ['bye', 'goodbye', 'see you'], response: 'Catch you later! Take care! 👋' },
         { keywords: ['thanks', 'thank you', 'thx'], response: 'You\'re welcome! Happy to help! 🙌' },
-        { keywords: ['who are you', 'what are you'], response: 'I\'m June X Bot, your friendly WhatsApp assistant! 🤖' },
-        { keywords: ['your name', 'whats your name'], response: 'I\'m June X Bot, created to help and chat with you! ✨' },
+        { keywords: ['who are you', 'what are you'], response: 'I\'m JUNE-X, your friendly WhatsApp assistant! 🤖' },
+        { keywords: ['your name', 'whats your name'], response: 'I\'m JUNE-X, created to help and chat with you! ✨' },
         { keywords: ['help', 'what can you do'], response: 'I can chat, answer questions, and help with lots of things! Just ask away. 💫' },
         { keywords: ['good morning', 'morning'], response: 'Good morning! Hope you have an awesome day! ☀️' },
         { keywords: ['good night', 'gn', 'goodnight'], response: 'Good night! Sweet dreams! 🌙' },
@@ -518,19 +607,19 @@ async function getAIResponse(userMessage, userContext) {
         userInfoStr = `User info: ${JSON.stringify(userInfo)}`;
     }
 
-    const systemPrompt = `You are June X Bot, a smart and friendly assistant chatting on WhatsApp. Created by June.
+    const systemPrompt = `You are JUNE-X, a smart and friendly assistant chatting on WhatsApp. Created by June.
 
 CORE RULES:
 1. Always respond in clear English
 2. Keep responses concise but helpful - 2-4 lines max
 3. Be friendly, witty, and use emojis occasionally
-4. Never mention you're an AI or bot - you're June X Bot
+4. Never mention you're an AI or bot - you're JUNE-X
 5. Match the user's language - if they write in English, respond in English
 6. Be knowledgeable and give accurate, helpful answers
 7. If someone greets you, greet them back warmly
 
 ABOUT YOU:
-- Name: June X Bot
+- Name: JUNE-X
 - Creator: June
 - You're intelligent, helpful, and have a good sense of humor
 - You can help with questions, have conversations, and provide information
