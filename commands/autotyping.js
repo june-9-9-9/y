@@ -1,12 +1,13 @@
 /**
- * A WhatsApp Bot
- * Autotyping Command - Shows fake typing status (straight typing presence with fixed 15s duration)
+ * Knight Bot - A WhatsApp Bot
+ * Autotyping Command - Shows fake typing status
  */
 
 const fs = require('fs');
 const path = require('path');
-const { isSudo } = require('../lib/index');
+const isOwnerOrSudo = require('../lib/isOwner');
 
+// Path to store the configuration
 const configPath = path.join(__dirname, '..', 'data', 'autotyping.json');
 
 // Initialize configuration file if it doesn't exist
@@ -21,10 +22,12 @@ function initConfig() {
 async function autotypingCommand(sock, chatId, message) {
     try {
         const senderId = message.key.participant || message.key.remoteJid;
-        if (!message.key.fromMe && !(await isSudo(senderId))) {
+        const isOwner = await isOwnerOrSudo(senderId, sock, chatId);
+        
+        if (!message.key.fromMe && !isOwner) {
             await sock.sendMessage(chatId, {
                 text: '❌ This command is only available for the owner!'
-            });
+            }, { quoted: message });
             return;
         }
 
@@ -46,7 +49,7 @@ async function autotypingCommand(sock, chatId, message) {
             } else {
                 await sock.sendMessage(chatId, {
                     text: '❌ Invalid option! Use: .autotyping on/off'
-                });
+                }, { quoted: message });
                 return;
             }
         } else {
@@ -60,13 +63,13 @@ async function autotypingCommand(sock, chatId, message) {
         // Send confirmation message
         await sock.sendMessage(chatId, {
             text: `✅ Auto-typing has been ${config.enabled ? 'enabled' : 'disabled'}!`
-        });
+        }, { quoted: message });
         
     } catch (error) {
         console.error('Error in autotyping command:', error);
         await sock.sendMessage(chatId, {
             text: '❌ Error processing command!'
-        });
+        }, { quoted: message });
     }
 }
 
@@ -81,53 +84,141 @@ function isAutotypingEnabled() {
     }
 }
 
-// Straight typing presence with fixed 15s duration
-async function straightTypingPresence(sock, chatId) {
+// Function to handle autotyping for regular messages
+async function handleAutotypingForMessage(sock, chatId, userMessage) {
     if (isAutotypingEnabled()) {
         try {
+            // First subscribe to presence updates for this chat
+            await sock.presenceSubscribe(chatId);
+            
+            // Send available status first
+            await sock.sendPresenceUpdate('available', chatId);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Then send the composing status
+            await sock.sendPresenceUpdate('composing', chatId);
+            
+            // Simulate typing time based on message length with longer duration
+            // Increased minimum and maximum times for more realistic typing
+            const typingDelay = Math.max(5000, Math.min(15000, userMessage.length * 200));
+            
+            // Break the typing into multiple intervals to keep it active
+            const intervals = Math.floor(typingDelay / 3000); // Refresh every 3 seconds
+            
+            for (let i = 0; i < intervals; i++) {
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                await sock.sendPresenceUpdate('composing', chatId);
+            }
+            
+            // Additional delay for remaining time
+            const remainingTime = typingDelay - (intervals * 3000);
+            if (remainingTime > 0) {
+                await new Promise(resolve => setTimeout(resolve, remainingTime));
+                await sock.sendPresenceUpdate('composing', chatId);
+            }
+            
+            // Finally send paused status
+            await sock.sendPresenceUpdate('paused', chatId);
+            
+            return true; // Indicates typing was shown
+        } catch (error) {
+            console.error('❌ Error sending typing indicator:', error);
+            return false; // Indicates typing failed
+        }
+    }
+    return false; // Autotyping is disabled
+}
+
+// Function to handle autotyping for commands - BEFORE command execution
+async function handleAutotypingForCommand(sock, chatId) {
+    if (isAutotypingEnabled()) {
+        try {
+            // First subscribe to presence updates for this chat
+            await sock.presenceSubscribe(chatId);
+            
+            // Send available status first
+            await sock.sendPresenceUpdate('available', chatId);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Then send the composing status
+            await sock.sendPresenceUpdate('composing', chatId);
+            
+            // Keep typing indicator active for commands with longer duration
+            const commandTypingDelay = 8000; // Increased to 8 seconds
+            
+            // Break into intervals to keep it active
+            const intervals = Math.floor(commandTypingDelay / 3000);
+            
+            for (let i = 0; i < intervals; i++) {
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                await sock.sendPresenceUpdate('composing', chatId);
+            }
+            
+            // Additional delay for remaining time
+            const remainingTime = commandTypingDelay - (intervals * 3000);
+            if (remainingTime > 0) {
+                await new Promise(resolve => setTimeout(resolve, remainingTime));
+                await sock.sendPresenceUpdate('composing', chatId);
+            }
+            
+            // Finally send paused status
+            await sock.sendPresenceUpdate('paused', chatId);
+            
+            return true; // Indicates typing was shown
+        } catch (error) {
+            console.error('❌ Error sending command typing indicator:', error);
+            return false; // Indicates typing failed
+        }
+    }
+    return false; // Autotyping is disabled
+}
+
+// Function to show typing status AFTER command execution
+async function showTypingAfterCommand(sock, chatId) {
+    if (isAutotypingEnabled()) {
+        try {
+            // This function runs after the command has been executed and response sent
+            // So we show a longer typing indicator for better UX
+            
             // Subscribe to presence updates
             await sock.presenceSubscribe(chatId);
-
-            // Show typing status
+            
+            // Show typing status for a longer duration
+            const postCommandDelay = 5000; // 5 seconds
+            
             await sock.sendPresenceUpdate('composing', chatId);
-
-            // Fixed typing duration of 15 seconds
-            const typingDuration = 15000;
-            await new Promise(resolve => setTimeout(resolve, typingDuration));
-
-            // End typing
+            
+            // Break into intervals to keep it active
+            const intervals = Math.floor(postCommandDelay / 3000);
+            
+            for (let i = 0; i < intervals; i++) {
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                await sock.sendPresenceUpdate('composing', chatId);
+            }
+            
+            // Additional delay for remaining time
+            const remainingTime = postCommandDelay - (intervals * 3000);
+            if (remainingTime > 0) {
+                await new Promise(resolve => setTimeout(resolve, remainingTime));
+                await sock.sendPresenceUpdate('composing', chatId);
+            }
+            
+            // Then pause
             await sock.sendPresenceUpdate('paused', chatId);
-
+            
             return true;
         } catch (error) {
-            console.error('❌ Error sending straight typing indicator:', error);
+            console.error('❌ Error sending post-command typing indicator:', error);
             return false;
         }
     }
-    return false; // Autotyping disabled
-}
-
-// Handle autotyping for regular messages
-async function handleAutotypingForMessage(sock, chatId) {
-    return await straightTypingPresence(sock, chatId);
-}
-
-// Handle autotyping for commands (before execution)
-async function handleAutotypingForCommand(sock, chatId) {
-    return await straightTypingPresence(sock, chatId);
-}
-
-// Show typing status after command execution
-async function showTypingAfterCommand(sock, chatId) {
-    return await straightTypingPresence(sock, chatId);
+    return false; // Autotyping is disabled
 }
 
 module.exports = {
     autotypingCommand,
     isAutotypingEnabled,
-    straightTypingPresence,
     handleAutotypingForMessage,
     handleAutotypingForCommand,
     showTypingAfterCommand
 };
-                    
