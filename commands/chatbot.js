@@ -35,7 +35,6 @@ function loadUserGroupData() {
         const data = fs.readFileSync(DATA_FILE, 'utf8');
         return JSON.parse(data);
     } catch (error) {
-        console.error('Error loading user group data:', error.message);
         return { ...defaultData };
     }
 }
@@ -53,7 +52,6 @@ function saveUserGroupData(data) {
         fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
         return true;
     } catch (error) {
-        console.error('Error saving user group data:', error.message);
         return false;
     }
 }
@@ -140,7 +138,6 @@ function loadSettings() {
         const data = fs.readFileSync(SETTINGS_FILE, 'utf8');
         return JSON.parse(data);
     } catch (error) {
-        console.error('❌ Error loading settings:', error.message);
         return { ...defaultSettings };
     }
 }
@@ -151,7 +148,6 @@ function saveSettings(settings) {
         fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
         return true;
     } catch (error) {
-        console.error('❌ Error saving settings:', error.message);
         return false;
     }
 }
@@ -214,7 +210,6 @@ function getSenderId(message) {
         
         return null;
     } catch (error) {
-        console.error('Error extracting sender ID:', error.message);
         return null;
     }
 }
@@ -237,7 +232,6 @@ async function isUserAdmin(sock, chatId, userId) {
         
         return participant && (participant.admin === 'admin' || participant.admin === 'superadmin');
     } catch (error) {
-        console.error('Error checking admin status:', error.message);
         return false;
     }
 }
@@ -272,7 +266,6 @@ function isBotMentioned(message, botId) {
 
         return false;
     } catch (error) {
-        console.error('Error checking bot mention:', error.message);
         return false;
     }
 }
@@ -291,7 +284,6 @@ function isReplyToBot(message, botId) {
         
         return cleanQuoted === botNumber;
     } catch (error) {
-        console.error('Error checking reply to bot:', error.message);
         return false;
     }
 }
@@ -326,7 +318,6 @@ function cleanMessageText(message, botId) {
 
         return text;
     } catch (error) {
-        console.error('Error cleaning message:', error.message);
         return '';
     }
 }
@@ -351,7 +342,6 @@ async function handleChatbotCommand(sock, chatId, message, match) {
     const senderId = getSenderId(message);
     
     if (!senderId) {
-        console.log('Could not determine sender ID');
         return;
     }
     
@@ -359,8 +349,6 @@ async function handleChatbotCommand(sock, chatId, message, match) {
     const cleanBotNumber = botNumber.split('@')[0];
     const cleanSenderId = senderId.split('@')[0];
     const isOwner = cleanSenderId === cleanBotNumber;
-
-    console.log(`Sender: ${cleanSenderId}, Bot: ${cleanBotNumber}, isOwner: ${isOwner}`);
 
     // For groups, check if user is admin
     let isAdmin = false;
@@ -388,7 +376,6 @@ async function handleChatbotCommand(sock, chatId, message, match) {
         }
         data.chatbot[chatId] = true;
         saveUserGroupData(data);
-        console.log(`✅ Chatbot enabled for group ${chatId}`);
         return sock.sendMessage(chatId, { 
             text: '*Chatbot has been enabled for this group*',
             quoted: message
@@ -406,7 +393,6 @@ async function handleChatbotCommand(sock, chatId, message, match) {
         data.chatbot[chatId] = false;
         saveUserGroupData(data);
         setGroupConfig(chatId, 'chatbot', false);
-        console.log(`Chatbot disabled for group ${chatId}`);
         return sock.sendMessage(chatId, { 
             text: '*Chatbot has been disabled for this group*',
             quoted: message
@@ -439,7 +425,6 @@ async function handleChatbotResponse(sock, chatId, message, userMessage, senderI
             // OR
             // 2. It's a direct message (always respond in DMs)
             if (!isChatbotEnabled && !isDirectMessage(chatId)) {
-                console.log('Chatbot disabled for group and not triggered by mention/reply');
                 return;
             }
             
@@ -450,7 +435,6 @@ async function handleChatbotResponse(sock, chatId, message, userMessage, senderI
             }
         } else {
             // Direct message - always respond
-            console.log('Direct message detected, responding...');
         }
 
         // Don't respond to own messages
@@ -459,18 +443,14 @@ async function handleChatbotResponse(sock, chatId, message, userMessage, senderI
         const senderNum = (senderId || '').split('@')[0].split(':')[0];
         
         if (senderNum === botNumber) {
-            console.log('Ignoring bot\'s own message');
             return;
         }
 
         // Clean the message text
         const cleanedMessage = cleanMessageText(message, botId);
         if (!cleanedMessage || cleanedMessage.trim().length === 0) {
-            console.log('Empty message after cleaning, ignoring');
             return;
         }
-
-        console.log(`Processing message: "${cleanedMessage}" from ${senderId} in ${chatId}`);
 
         // Store in memory
         if (!chatMemory.messages.has(senderId)) {
@@ -499,7 +479,7 @@ async function handleChatbotResponse(sock, chatId, message, userMessage, senderI
         try {
             await showTyping(sock, chatId);
         } catch (e) {
-            console.error('Typing indicator error:', e.message);
+            // Silent fail
         }
 
         // Get AI response
@@ -510,7 +490,6 @@ async function handleChatbotResponse(sock, chatId, message, userMessage, senderI
                 userInfo: chatMemory.userInfo.get(senderId)
             });
         } catch (aiErr) {
-            console.error('AI response error:', aiErr.message);
             response = getFallbackResponse(cleanedMessage);
         }
 
@@ -526,20 +505,17 @@ async function handleChatbotResponse(sock, chatId, message, userMessage, senderI
             await sock.sendMessage(chatId, {
                 text: response.substring(0, 1000)
             }, { quoted: message });
-            console.log(`✅ Response sent to ${chatId}`);
         } catch (sendErr) {
-            console.error('Chatbot send error:', sendErr.message);
             try {
                 await sock.sendMessage(chatId, {
                     text: response.substring(0, 1000)
                 });
             } catch (e) {
-                console.error('Failed to send even without quote:', e.message);
+                // Silent fail
             }
         }
 
     } catch (error) {
-        console.error('Chatbot response error:', error.message);
         if (error.message && error.message.includes('No sessions')) {
             return;
         }
@@ -547,7 +523,7 @@ async function handleChatbotResponse(sock, chatId, message, userMessage, senderI
             const fallback = getFallbackResponse(userMessage || '');
             await sock.sendMessage(chatId, { text: fallback });
         } catch (e) {
-            console.error('Failed to send fallback response:', e.message);
+            // Silent fail
         }
     }
 }
@@ -674,8 +650,6 @@ Previous chat: ${recentMessages}`;
     // Try each API in sequence
     for (const api of apis) {
         try {
-            console.log(`🔄 Trying ${api.name} API...`);
-            
             let response;
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 15000);
@@ -704,7 +678,6 @@ Previous chat: ${recentMessages}`;
             clearTimeout(timeout);
 
             if (!response.ok) {
-                console.log(`⚠️ ${api.name} returned ${response.status}, trying next...`);
                 continue;
             }
 
@@ -714,7 +687,6 @@ Previous chat: ${recentMessages}`;
             let result = api.parseResponse(data);
             
             if (result && typeof result === 'string' && result.trim().length > 0) {
-                console.log(`✅ Got response from ${api.name}`);
                 // Clean up the response
                 return result
                     .replace(/^["']|["']$/g, '') // Remove quotes
@@ -724,13 +696,11 @@ Previous chat: ${recentMessages}`;
             }
 
         } catch (error) {
-            console.log(`❌ ${api.name} failed: ${error.message}`);
             continue;
         }
     }
 
     // If all APIs fail, use fallback responses
-    console.log('⚠️ All APIs failed, using fallback responses');
     return getFallbackResponse(userMessage);
 }
 
