@@ -217,10 +217,7 @@ const {
 } = require('./commands/misc');
 
 
-const {
-  handleAntieditCommand,
-  handleMessageEdit,
-  storeMessage: storeEditMessage
+const { antieditCommand 
 } = require('./commands/antiedit');
  
 /*━━━━━━━━━━━━━━━━━━━━*/
@@ -806,8 +803,7 @@ if (/^[1-9]$/.test(userMessage)) {
                 break;
 
            case userMessage.startsWith(`${prefix}antiedit`):
-                 const antieditMatch = userMessage.slice(9).trim();
-                 await handleAntieditCommand(sock, chatId, message, antieditMatch);
+                 await antieditCommand(sock, chatId, message);
                  break;
 
             case userMessage.startsWith(`${prefix}warnings`):
