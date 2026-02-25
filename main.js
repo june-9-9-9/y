@@ -907,13 +907,13 @@ if (/^[1-9]$/.test(userMessage)) {
     if (!action) {
         const currentMode = data.mode || (data.isPublic ? 'public' : 'private');
         await sock.sendMessage(chatId, {
-            text: `🤖 *Bot Mode Configuration*\n\n` +
+            text: `*MODE CONFIGURATION*\n\n` +
                   `Current mode: *${currentMode}*\n\n` +
-                  `📋 *Available Modes:*\n` +
-                  `• ${prefix}mode private - Only owner can use bot\n` +
-                  `• ${prefix}mode public - Everyone can use bot\n` +
-                  `• ${prefix}mode group - Only groups can use bot\n` +
-                  `• ${prefix}mode pm - Only private messages (inbox)\n\n` +
+                  `*AVAILABLE MODES:*\n` +
+                  ` ${prefix}mode private - Only owner can use bot\n` +
+                  ` ${prefix}mode public - Everyone can use bot\n` +
+                  ` ${prefix}mode group - Only groups can use bot\n` +
+                  ` ${prefix}mode pm - Only private messages (inbox)\n\n` +
                   `Example:\n${prefix}mode public`
         }, { quoted: fake });
         return;
@@ -922,11 +922,11 @@ if (/^[1-9]$/.test(userMessage)) {
     // Validate mode
     if (!validModes.includes(action)) {
         await sock.sendMessage(chatId, {
-            text: `❌ Invalid mode!\n\n📋 *Available Modes:*\n` +
-                  `• ${prefix}mode private - Only owner can use bot\n` +
-                  `• ${prefix}mode public - Everyone can use bot\n` +
-                  `• ${prefix}mode group - Only groups can use bot\n` +
-                  `• ${prefix}mode pm - Only private messages (inbox)\n\n` +
+            text: `❌ Invalid mode!\n\n *AVAILABLE MODES:*\n` +
+                  ` ${prefix}mode private - Only owner can use bot\n` +
+                  ` ${prefix}mode public - Everyone can use bot\n` +
+                  ` ${prefix}mode group - Only groups can use bot\n` +
+                  ` ${prefix}mode pm - Only private messages (inbox)\n\n` +
                   `Example:\n${prefix}mode group`
         }, { quoted: fake });
         return;
