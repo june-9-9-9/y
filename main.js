@@ -195,6 +195,11 @@ const {
  addCommandReaction, 
  handleAreactCommand 
 } = require('./lib/reactions');
+
+const { 
+    registerListeners, 
+    fancyCommand 
+} = require('./commands/fancy');
   
 const {
   autoStatusCommand, 
