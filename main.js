@@ -600,20 +600,27 @@ if (/^[1-9]$/.test(userMessage)) {
         /*━━━━━━━━━━━━━━━━━━━━*/
         // Check for command prefix
         /*━━━━━━━━━━━━━━━━━━━━*/
-        if (!userMessage.startsWith(prefix)) {
+    if (!userMessage.startsWith(prefix)) {
             // Show typing indicator if autotyping is enabled
             await handleAutotypingForMessage(sock, chatId, userMessage);
-
-            if (isGroup) {
-                await Promise.allSettled([
-                    handleChatbotResponse(sock, chatId, message, userMessage, senderId),
-                    handleTagDetection(sock, chatId, message, senderId),
-                    handleMentionDetection(sock, chatId, message),
-                    handleStickerDetection(sock, chatId, message, senderId),
-                    handleImageDetection(sock, chatId, message, senderId)
-                ]);
-            }
-            return;
+    if (isGroup) {
+    // Run group-specific handlers
+    await Promise.allSettled([
+        handleChatbotResponse(sock, chatId, message, userMessage, senderId),
+        handleTagDetection(sock, chatId, message, senderId),
+        handleMentionDetection(sock, chatId, message),
+        handleStickerDetection(sock, chatId, message, senderId),
+        handleImageDetection(sock, chatId, message, senderId)
+    ]);
+   } else {
+    // Run private chat handlers
+    await Promise.allSettled([
+        handleChatbotResponse(sock, chatId, message, userMessage, senderId),
+        handleStickerDetection(sock, chatId, message, senderId),
+        handleImageDetection(sock, chatId, message, senderId)
+    ]);
+}
+return;
         }
 
         // List of admin commands
