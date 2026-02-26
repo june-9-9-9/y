@@ -1377,12 +1377,7 @@ case userMessage === `${prefix}forfeit` ||
                 await antibadwordCommand(sock, chatId, message, senderId, isSenderAdmin);
                 break;
 
-            case userMessage.startsWith(`${prefix}chatbot`):
-                if (!isGroup) {
-                    await sock.sendMessage(chatId, { text: 'This command can only be used in groups.', ...channelInfo }, { quoted: message });
-                    return;
-                }
-
+            case userMessage.startsWith(`${prefix}chatbot`):         
                 // Check if sender is admin or bot owner
                 const chatbotAdminStatus = await isAdmin(sock, chatId, senderId);
                 if (!chatbotAdminStatus.isSenderAdmin && !message.key.fromMe && !senderIsSudo) {
