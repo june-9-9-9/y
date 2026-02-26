@@ -42,8 +42,8 @@ async function playCommand(sock, chatId, message) {
         // API fallbacks
         const apis = [
             {
-                url: `https://media.cypherxbot.space/download/youtube/audio?url=${encodeURIComponent(video.url)}`,
-                parse: (data) => data?.status ? { url: data.result.download_url, title: data.result.title } : null
+                url: `https://apiskeith.top/download/audio?url=${encodeURIComponent(video.url)}`,
+                parse: (data) => data?.status ? { url: data.result, title: data.result.title } : null
             },
             {
                 url: `https://apiskeith.top/download/audio?url=${encodeURIComponent(video.url)}`,
