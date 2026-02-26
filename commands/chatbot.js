@@ -438,7 +438,7 @@ async function handleChatbotCommand(sock, chatId, message, match) {
             saveUserGroupData(data);
             setGroupConfig(chatId, 'chatbot', true);
             return sock.sendMessage(chatId, { 
-                text: '*✅ Chatbot has been enabled for this group*\n\nI will now respond when mentioned or replied to!',
+                text: '*✅ Chatbot has been enabled for this group*\n',
                 quoted: message
             });
         }
@@ -455,7 +455,7 @@ async function handleChatbotCommand(sock, chatId, message, match) {
             saveUserGroupData(data);
             setGroupConfig(chatId, 'chatbot', false);
             return sock.sendMessage(chatId, { 
-                text: '*❌ Chatbot has been disabled for this group*\n\nI will now only respond when mentioned or replied to.',
+                text: '*❌ Chatbot has been disabled for this group*\n',
                 quoted: message
             });
         }
