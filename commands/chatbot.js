@@ -9,8 +9,7 @@ const DATA_FILE = path.join(__dirname, '../Database/userGroupData.json');
 
 // Initialize default data structure
 const defaultData = {
-    chatbot: {},        // Group chatbot settings
-    chatbotPM: true,    // PM chatbot setting (enabled by default)
+    chatbot: {},
     settings: {},
     users: {},
     groups: {}
@@ -34,14 +33,7 @@ function loadUserGroupData() {
 
         // Read and parse file
         const data = fs.readFileSync(DATA_FILE, 'utf8');
-        const parsedData = JSON.parse(data);
-        
-        // Ensure chatbotPM property exists (for backward compatibility)
-        if (parsedData.chatbotPM === undefined) {
-            parsedData.chatbotPM = true;
-        }
-        
-        return parsedData;
+        return JSON.parse(data);
     } catch (error) {
         return { ...defaultData };
     }
@@ -333,6 +325,14 @@ function cleanMessageText(message, botId) {
 // ==================== CHATBOT COMMAND HANDLER ====================
 
 async function handleChatbotCommand(sock, chatId, message, match) {
+    if (!match) {
+        await showTyping(sock, chatId);
+        return sock.sendMessage(chatId, {
+            text: `*CHATBOT SETUP*\n\n*.chatbot on*\nEnable chatbot\n\n*.chatbot off*\nDisable chatbot in this group`,
+            quoted: message
+        });
+    }
+
     const data = loadUserGroupData();
     
     // Get bot's number
@@ -350,131 +350,93 @@ async function handleChatbotCommand(sock, chatId, message, match) {
     const cleanSenderId = senderId.split('@')[0];
     const isOwner = cleanSenderId === cleanBotNumber;
 
-    // Handle PM/DM commands
-    if (isDirectMessage(chatId)) {
-        if (!match) {
-            const status = data.chatbotPM ? '✅ ENABLED' : '❌ DISABLED';
-            await showTyping(sock, chatId);
-            return sock.sendMessage(chatId, {
-                text: `*CHATBOT SETTINGS (PRIVATE CHAT)*\n\nCurrent Status: ${status}\n\n*.chatbot on* - Enable chatbot in PM\n*.chatbot off* - Disable chatbot in PM\n\nWhen enabled, I'll respond to all your messages here. When disabled, I'll stay silent.`,
-                quoted: message
-            });
-        }
+    // For groups, check if user is admin
+    let isAdmin = false;
+    if (chatId.endsWith('@g.us')) {
+        isAdmin = await isUserAdmin(sock, chatId, senderId);
+    }
 
-        if (match === 'on') {
-            await showTyping(sock, chatId);
-            if (data.chatbotPM) {
-                return sock.sendMessage(chatId, { 
-                    text: '*Chatbot is already enabled in private chat*',
-                    quoted: message
-                });
-            }
-            data.chatbotPM = true;
-            saveUserGroupData(data);
-            return sock.sendMessage(chatId, { 
-                text: '*✅ Chatbot has been enabled in private chat*\n\nI will now respond to all your messages here!',
-                quoted: message
-            });
-        }
-
-        if (match === 'off') {
-            await showTyping(sock, chatId);
-            if (!data.chatbotPM) {
-                return sock.sendMessage(chatId, { 
-                    text: '*Chatbot is already disabled in private chat*',
-                    quoted: message
-                });
-            }
-            data.chatbotPM = false;
-            saveUserGroupData(data);
-            return sock.sendMessage(chatId, { 
-                text: '*❌ Chatbot has been disabled in private chat*\n\nI will now stay silent unless you use commands.',
-                quoted: message
-            });
-        }
-
+    // Allow access if user is owner OR admin
+    if (!isOwner && !isAdmin) {
         await showTyping(sock, chatId);
-        return sock.sendMessage(chatId, { 
-            text: '*Invalid command. Use .chatbot to see usage*',
+        return sock.sendMessage(chatId, {
+            text: '❌ Only group admins or the bot owner can use this command.',
             quoted: message
         });
     }
-    
-    // Handle GROUP commands
-    else {
-        // For groups, check if user is admin
-        let isAdmin = false;
-        if (chatId.endsWith('@g.us')) {
-            isAdmin = await isUserAdmin(sock, chatId, senderId);
-        }
 
-        // Allow access if user is owner OR admin
-        if (!isOwner && !isAdmin) {
-            await showTyping(sock, chatId);
-            return sock.sendMessage(chatId, {
-                text: '❌ Only group admins or the bot owner can use this command.',
-                quoted: message
-            });
-        }
-
-        if (!match) {
-            const status = data.chatbot[chatId] ? '✅ ENABLED' : '❌ DISABLED';
-            await showTyping(sock, chatId);
-            return sock.sendMessage(chatId, {
-                text: `*CHATBOT SETTINGS (GROUP)*\n\nCurrent Status: ${status}\n\n*.chatbot on* - Enable chatbot in this group\n*.chatbot off* - Disable chatbot in this group\n\nWhen enabled, I'll respond when mentioned or replied to. When disabled, I'll only respond when mentioned.`,
-                quoted: message
-            });
-        }
-
-        if (match === 'on') {
-            await showTyping(sock, chatId);
-            if (data.chatbot[chatId]) {
-                return sock.sendMessage(chatId, { 
-                    text: '*Chatbot is already enabled for this group*',
-                    quoted: message
-                });
-            }
-            data.chatbot[chatId] = true;
-            saveUserGroupData(data);
-            setGroupConfig(chatId, 'chatbot', true);
-            return sock.sendMessage(chatId, { 
-                text: '*✅ Chatbot has been enabled for this group*\n',
-                quoted: message
-            });
-        }
-
-        if (match === 'off') {
-            await showTyping(sock, chatId);
-            if (!data.chatbot[chatId]) {
-                return sock.sendMessage(chatId, { 
-                    text: '*Chatbot is already disabled for this group*',
-                    quoted: message
-                });
-            }
-            data.chatbot[chatId] = false;
-            saveUserGroupData(data);
-            setGroupConfig(chatId, 'chatbot', false);
-            return sock.sendMessage(chatId, { 
-                text: '*❌ Chatbot has been disabled for this group*\n',
-                quoted: message
-            });
-        }
-
+    // Handle commands
+    if (match === 'on') {
         await showTyping(sock, chatId);
+        if (data.chatbot[chatId]) {
+            return sock.sendMessage(chatId, { 
+                text: '*Chatbot is already enabled for this group*',
+                quoted: message
+            });
+        }
+        data.chatbot[chatId] = true;
+        saveUserGroupData(data);
         return sock.sendMessage(chatId, { 
-            text: '*Invalid command. Use .chatbot to see usage*',
+            text: '*Chatbot has been enabled for this group*',
             quoted: message
         });
     }
+
+    if (match === 'off') {
+        await showTyping(sock, chatId);
+        if (!data.chatbot[chatId]) {
+            return sock.sendMessage(chatId, { 
+                text: '*Chatbot is already disabled for this group*',
+                quoted: message
+            });
+        }
+        data.chatbot[chatId] = false;
+        saveUserGroupData(data);
+        setGroupConfig(chatId, 'chatbot', false);
+        return sock.sendMessage(chatId, { 
+            text: '*Chatbot has been disabled for this group*',
+            quoted: message
+        });
+    }
+
+    await showTyping(sock, chatId);
+    return sock.sendMessage(chatId, { 
+        text: '*Invalid command. Use .chatbot to see usage*',
+        quoted: message
+    });
 }
 
 // ==================== CHATBOT RESPONSE HANDLER ====================
 
 async function handleChatbotResponse(sock, chatId, message, userMessage, senderId) {
     try {
-        // Load data
+        // Check if chatbot is enabled for this chat
         const data = loadUserGroupData();
+        const isChatbotEnabled = data.chatbot[chatId] || false;
         
+        // For groups, check if bot is mentioned or replied to
+        if (chatId.endsWith('@g.us')) {
+            const botId = sock.user.id;
+            const isMentioned = isBotMentioned(message, botId);
+            const isReplied = isReplyToBot(message, botId);
+            
+            // Only respond if:
+            // 1. Chatbot is enabled AND (bot is mentioned OR replied to)
+            // OR
+            // 2. It's a direct message (always respond in DMs)
+            if (!isChatbotEnabled && !isDirectMessage(chatId)) {
+                return;
+            }
+            
+            // If chatbot is disabled but bot is mentioned/replied to, still respond
+            // This allows occasional interactions even when disabled
+            if (!isChatbotEnabled && !isMentioned && !isReplied) {
+                return;
+            }
+        } else {
+            // Direct message - always respond
+        }
+
         // Don't respond to own messages
         const botId = sock.user.id;
         const botNumber = botId.split(':')[0];
@@ -488,35 +450,6 @@ async function handleChatbotResponse(sock, chatId, message, userMessage, senderI
         const cleanedMessage = cleanMessageText(message, botId);
         if (!cleanedMessage || cleanedMessage.trim().length === 0) {
             return;
-        }
-
-        // Handle based on chat type
-        if (isDirectMessage(chatId)) {
-            // PRIVATE CHAT LOGIC
-            const isPMEnabled = data.chatbotPM !== false; // Default to true if not set
-            
-            if (!isPMEnabled) {
-                return; // Don't respond if PM chatbot is disabled
-            }
-            
-            // Proceed with response for PM
-        } else {
-            // GROUP CHAT LOGIC
-            const isGroupEnabled = data.chatbot[chatId] || false;
-            const isMentioned = isBotMentioned(message, botId);
-            const isReplied = isReplyToBot(message, botId);
-            
-            // GROUP RESPONSE RULES:
-            // 1. If mentioned or replied to, ALWAYS respond (regardless of setting)
-            // 2. If NOT mentioned/replied to:
-            //    - If group chatbot is ENABLED: DON'T respond (prevents spam)
-            //    - If group chatbot is DISABLED: DON'T respond
-            
-            if (!isMentioned && !isReplied) {
-                return; // Never respond if not mentioned/replied to in groups
-            }
-            
-            // If we get here, bot was mentioned or replied to, so respond
         }
 
         // Store in memory
