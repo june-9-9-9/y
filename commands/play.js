@@ -2,125 +2,153 @@ const fs = require("fs");
 const axios = require("axios");
 const yts = require("yt-search");
 const path = require("path");
-const os = require("os");
 
-async function playCommand(sock, chatId, message) {
+const AXIOS_DEFAULTS = {
+    timeout: 60000,
+    headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*'
+    }
+};
+
+// Create fake contact for enhanced replies
+function createFakeContact(message) {
+    return {
+        key: {
+            participants: "0@s.whatsapp.net",
+            remoteJid: "status@broadcast",
+            fromMe: false,
+            id: "Smart project"
+        },
+        message: {
+            contactMessage: {
+                vcard: `BEGIN:VCARD\nVERSION:3.0\nN:Sy;Bot;;;\nFN: whatsapp bot\nitem1.TEL;waid=${message.key.participant?.split('@')[0] || message.key.remoteJid.split('@')[0]}:${message.key.participant?.split('@')[0] || message.key.remoteJid.split('@')[0]}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`
+            }
+        },
+        participant: "0@s.whatsapp.net"
+    };
+}
+
+async function tryRequest(getter, attempts = 2) {
+    let lastError;
+    for (let i = 1; i <= attempts; i++) {
+        try {
+            return await getter();
+        } catch (err) {
+            lastError = err;
+            if (i < attempts) await new Promise(r => setTimeout(r, 1500));
+        }
+    }
+    throw lastError;
+}
+
+async function getAudioDownload(youtubeUrl) {
+    const apis = [
+        `https://apiskeith.top/download/audio?url=${encodeURIComponent(youtubeUrl)}`,
+        `https://apiskeith.top/download/ytmp3?url=${encodeURIComponent(youtubeUrl)}`,
+    ];
+
+    let lastError;
+    for (const apiUrl of apis) {
+        try {
+            const res = await tryRequest(() => axios.get(apiUrl, AXIOS_DEFAULTS));
+            if (!res?.data) continue;
+
+            const data = res.data;
+            const result = data.result || data;
+            const url = (typeof result === 'string' && result.startsWith('http')) ? result :
+                result?.download || result?.url || result?.downloadUrl || result?.link || null;
+
+            if (url) {
+                return {
+                    download: url,
+                    title: result?.title || data?.title || 'YouTube Audio'
+                };
+            }
+        } catch (err) {
+            lastError = err;
+            continue;
+        }
+    }
+    throw lastError || new Error('All audio APIs failed');
+}
+
+async function playCommand(sock, chatId, message, fkontak) {
     try {
-        // React to command
         await sock.sendMessage(chatId, { react: { text: "🎼", key: message.key } });
 
-        // Prepare temp directory
-        const tempDir = path.join(os.tmpdir(), "june-x-temp");
-        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+        const tempDir = path.join(__dirname, "temp");
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
-        // Extract query
-        const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
-        const query = text?.split(" ").slice(1).join(" ").trim();
+        const text =
+            message.message?.conversation ||
+            message.message?.extendedTextMessage?.text ||
+            "";
 
-        if (!query) {
-            return sock.sendMessage(chatId, {
-                text: "🎵 Provide a song name!\nExample: .play Not Like Us"
-            }, { quoted: message });
-        }
+        const parts = text.split(" ");
+        const query = parts.slice(1).join(" ").trim();
 
-        if (query.length > 100) {
-            return sock.sendMessage(chatId, {
-                text: "📝 Song name too long! Max 100 chars."
-            }, { quoted: message });
-        }
+        // Use fkontak if provided, otherwise create fake contact
+        const quoted = fkontak || createFakeContact(message);
 
-        // Search YouTube
-        const searchResult = (await yts(query + " official")).videos[0];
-        if (!searchResult) {
-            return sock.sendMessage(chatId, {
-                text: "😕 Couldn't find that song. Try another one!"
-            }, { quoted: message });
-        }
+        if (!query)
+            return sock.sendMessage(chatId, { text: "🎵 Provide a song name!\nExample: .play Not Like Us" }, { quoted });
 
-        const video = searchResult;
+        if (query.length > 100)
+            return sock.sendMessage(chatId, { text: "📝 Song name too long! Max 100 chars." }, { quoted });
 
-        // API fallbacks
-        const apis = [
-            {
-                url: `https://apiskeith.top/download/audio?url=${encodeURIComponent(video.url)}`,
-                parse: (data) => data?.status ? { url: data.result, title: data.result.title } : null
-            },
-            {
-                url: `https://apiskeith.top/download/audio?url=${encodeURIComponent(video.url)}`,
-                parse: (data) => (data?.status && data?.result) ? { url: data.result, title: data.title } : null
-            },
-            {
-                url: `https://api.giftedtech.co.ke/api/download/ytmp3?apikey=gifted&url=${encodeURIComponent(video.url)}`,
-                parse: (data) => (data?.status && data?.result?.download_url) ? { url: data.result.download_url, title: data.result.title } : null
-            }
-        ];
+        const search = await yts(`${query} official`);
+        const video = search.videos[0];
 
-        let downloadUrl, videoTitle;
-        for (const api of apis) {
-            try {
-                const response = await axios.get(api.url, { timeout: 30000 });
-                const result = api.parse(response.data);
-                if (result) {
-                    downloadUrl = result.url;
-                    videoTitle = result.title || video.title;
-                    break;
-                }
-            } catch {
-                continue;
-            }
-        }
+        if (!video)
+            return sock.sendMessage(chatId, { text: "😕 Couldn't find that song. Try another one!" }, { quoted });
 
-        if (!downloadUrl) throw new Error("API failed to fetch track!");
+        const audio = await getAudioDownload(video.url);
+        const downloadUrl = audio.download;
+        const songTitle = audio.title || video.title;
 
-        // File setup
-        const fileName = `audio_${Date.now()}.mp3`;
+        const timestamp = Date.now();
+        const fileName = `audio_${timestamp}.mp3`;
         const filePath = path.join(tempDir, fileName);
 
-        // Download MP3
-        const audioResponse = await axios({
+        const audioStream = await axios({
             method: "get",
             url: downloadUrl,
             responseType: "stream",
-            timeout: 900000, // 15 minutes
-            maxContentLength: Infinity,
-            maxBodyLength: Infinity,
-            headers: { "User-Agent": "Mozilla/5.0" }
+            timeout: 600000
         });
 
         const writer = fs.createWriteStream(filePath);
-        audioResponse.data.pipe(writer);
+        audioStream.data.pipe(writer);
 
         await new Promise((resolve, reject) => {
             writer.on("finish", resolve);
-            writer.on("error", (err) => {
-                if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-                reject(err);
-            });
+            writer.on("error", reject);
         });
 
-        if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
+        if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0)
             throw new Error("Download failed or empty file!");
-        }
 
-        // Notify user
-        const title = (videoTitle || video.title).substring(0, 100);
-        await sock.sendMessage(chatId, { text: `_🎶 Track ready:_\n_${title}_` });
+        await sock.sendMessage(chatId, { text: `Playing: \n ${songTitle}` }, { quoted });
 
-        // Send audio as document
-        await sock.sendMessage(chatId, {
-            document: { url: filePath },
-            mimetype: "audio/mpeg",
-            fileName: `${title}.mp3`
-        }, { quoted: message });
+        await sock.sendMessage(
+            chatId,
+            {
+                document: { url: filePath },
+                mimetype: "audio/mpeg",
+                fileName: `${songTitle.substring(0, 100)}.mp3`
+            },
+            { quoted }
+        );
 
-        // Cleanup
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        fs.unlinkSync(filePath);
 
     } catch (error) {
         console.error("Play command error:", error);
-        return sock.sendMessage(chatId, {
-            text: `🚫 Error: ${error.message}`
-        }, { quoted: message });
+        
+        // Use fkontak or create fake contact for error messages too
+        const quoted = fkontak || createFakeContact(message);
+        await sock.sendMessage(chatId, { text: `🚫 Error: ${error.message}` }, { quoted });
     }
 }
 
