@@ -144,7 +144,7 @@ async function playCommand(sock, chatId, message, fkontak) {
 
         // Send info message
         await sock.sendMessage(chatId, { 
-            text: `🎵 *Found:* ${songTitle}\n⏱️ *Duration:* ${video.timestamp || 'N/A'}\n📥 *Downloading...*` 
+            text: `_🎵 *Track found:* ${songTitle}_\n_⏱️ *Duration:* ${video.timestamp || 'N/A'}_*` 
         }, { quoted });
 
         const timestamp = Date.now();
