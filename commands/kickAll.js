@@ -1,3 +1,5 @@
+const isAdmin = require('../lib/isAdmin');
+
 async function kickAllCommand(sock, chatId, message, senderId) {
     try {
         const isGroup = chatId.endsWith('@g.us');
@@ -7,22 +9,18 @@ async function kickAllCommand(sock, chatId, message, senderId) {
             return;
         }
 
-        // --- Fetch group metadata for admin checks ---
+        // --- Fetch group metadata ---
         const metadata = await sock.groupMetadata(chatId);
         const participants = metadata.participants || [];
 
         // Get bot's full JID
-        const botJid = sock.user.id.includes(':') ? sock.user.id.split(':')[0] + '@s.whatsapp.net' : sock.user.id;
-        
-        // Find sender and bot in participants
-        const senderParticipant = participants.find(p => p.id === senderId);
-        const botParticipant = participants.find(p => p.id === botJid || p.id === sock.user.id);
+        const botJid = sock.user.id.includes(':') 
+            ? sock.user.id.split(':')[0] + '@s.whatsapp.net' 
+            : sock.user.id;
 
-        // Check if sender is admin
-        const isSenderAdmin = senderParticipant?.admin === 'admin' || senderParticipant?.admin === 'superadmin';
-        
-        // Check if bot is admin
-        const isBotAdmin = botParticipant?.admin === 'admin' || botParticipant?.admin === 'superadmin';
+        // Use helper for admin checks
+        const isSenderAdmin = isAdmin(participants, senderId);
+        const isBotAdmin = isAdmin(participants, botJid);
 
         if (!isBotAdmin) {
             await sock.sendMessage(chatId, { text: '🚫 I need to be an admin to kick members.' }, { quoted: message });
@@ -36,15 +34,9 @@ async function kickAllCommand(sock, chatId, message, senderId) {
             return;
         }
 
-        // --- Build list of targets (exclude bot + sender + other admins) ---
+        // --- Build list of targets (exclude bot + sender + admins) ---
         const targets = participants
-            .filter(p => {
-                // Keep if not bot, not sender, and not an admin
-                return p.id !== botJid && 
-                       p.id !== sock.user.id && 
-                       p.id !== senderId && 
-                       !p.admin; // Exclude other admins
-            })
+            .filter(p => p.id !== botJid && p.id !== sock.user.id && p.id !== senderId && !isAdmin(participants, p.id))
             .map(p => p.id);
 
         if (targets.length === 0) {
@@ -54,9 +46,7 @@ async function kickAllCommand(sock, chatId, message, senderId) {
         }
 
         // Send processing message
-        await sock.sendMessage(chatId, { 
-            text: `🔄 Attempting to kick ${targets.length} member(s)...` 
-        }, { quoted: message });
+        await sock.sendMessage(chatId, { text: `🔄 Attempting to kick ${targets.length} member(s)...` }, { quoted: message });
 
         let kickedCount = 0;
         let failedCount = 0;
@@ -65,26 +55,21 @@ async function kickAllCommand(sock, chatId, message, senderId) {
             try {
                 await sock.groupParticipantsUpdate(chatId, [target], 'remove');
                 kickedCount++;
-                
-                // Add delay to avoid rate limiting
-                await new Promise(resolve => setTimeout(resolve, 800));
+                await new Promise(resolve => setTimeout(resolve, 800)); // delay
             } catch (err) {
                 console.error(`⚠️ Failed to kick ${target}:`, err);
                 failedCount++;
             }
         }
 
-        if (kickedCount > 0) {
-            const resultMessage = failedCount > 0 
+        const resultMessage = kickedCount > 0
+            ? failedCount > 0 
                 ? `✅ Kicked ${kickedCount} member(s)\n❌ Failed to kick ${failedCount} member(s)`
-                : `✅ Successfully kicked ${kickedCount} member(s) from the group.`;
-                
-            await sock.sendMessage(chatId, { text: resultMessage }, { quoted: message });
-            await sock.sendMessage(chatId, { react: { text: '✅', key: message.key } });
-        } else {
-            await sock.sendMessage(chatId, { text: '⚠️ Could not kick any members.' }, { quoted: message });
-            await sock.sendMessage(chatId, { react: { text: '❌', key: message.key } });
-        }
+                : `✅ Successfully kicked ${kickedCount} member(s) from the group.`
+            : '⚠️ Could not kick any members.';
+
+        await sock.sendMessage(chatId, { text: resultMessage }, { quoted: message });
+        await sock.sendMessage(chatId, { react: { text: kickedCount > 0 ? '✅' : '❌', key: message.key } });
 
     } catch (err) {
         console.error('❌ Error in kickAllCommand:', err);
