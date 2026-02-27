@@ -42,9 +42,27 @@ async function tryRequest(getter, attempts = 2) {
     throw lastError;
 }
 
-async function getAudioDownload(youtubeUrl) {
+async function searchYouTube(query) {
+    try {
+        // Search for the video with 'official' to get better results
+        const searchResults = await yts(`${query} official audio`);
+        
+        if (!searchResults.videos || searchResults.videos.length === 0) {
+            // Try without 'official' if no results
+            const fallbackResults = await yts(query);
+            return fallbackResults.videos[0] || null;
+        }
+        
+        return searchResults.videos[0];
+    } catch (error) {
+        console.error("YouTube search error:", error);
+        throw new Error("Failed to search YouTube");
+    }
+}
+
+async function getAudioDownload(youtubeUrl, title) {
     const apis = [
-        `https://apiskeith.top/download/audio?url=${encodeURIComponent(youtubeUrl)}`,
+        `https://api.giftedtech.co.ke/api/download/yta?apikey=gifted&url=${encodeURIComponent(youtubeUrl)}`,
         `https://apiskeith.top/download/ytmp3?url=${encodeURIComponent(youtubeUrl)}`,
     ];
 
@@ -57,12 +75,12 @@ async function getAudioDownload(youtubeUrl) {
             const data = res.data;
             const result = data.result || data;
             const url = (typeof result === 'string' && result.startsWith('http')) ? result :
-                result?.download || result?.url || result?.downloadUrl || result?.link || null;
+                result?.download_url || result?.url || result?.downloadUrl || null;
 
             if (url) {
                 return {
                     download: url,
-                    title: result?.title || data?.title || 'YouTube Audio'
+                    title: title || result?.title || data?.title || 'YouTube Audio'
                 };
             }
         } catch (err) {
@@ -97,20 +115,33 @@ async function playCommand(sock, chatId, message, fkontak) {
         if (query.length > 100)
             return sock.sendMessage(chatId, { text: "📝 Song name too long! Max 100 chars." }, { quoted });
 
-        const search = await yts(`${query} official`);
-        const video = search.videos[0];
+        // Search for the video using yt-search
+        const video = await searchYouTube(query);
 
-        if (!video)
-            return sock.sendMessage(chatId, { text: "😕 Couldn't find that song. Try another one!" }, { quoted });
+        if (!video) {
+            return sock.sendMessage(chatId, { 
+                text: "😕 Couldn't find that song. Try another one!" 
+            }, { quoted });
+        }
 
-        const audio = await getAudioDownload(video.url);
+        // Log the found video info (optional, for debugging)
+        console.log(`Found video: ${video.title} (${video.url})`);
+
+        // Get audio download using the video URL and title
+        const audio = await getAudioDownload(video.url, video.title);
         const downloadUrl = audio.download;
         const songTitle = audio.title || video.title;
+
+        // Send info message
+        await sock.sendMessage(chatId, { 
+            text: `🎵 *Found:* ${songTitle}\n⏱️ *Duration:* ${video.timestamp || 'N/A'}\n📥 *Downloading...*` 
+        }, { quoted });
 
         const timestamp = Date.now();
         const fileName = `audio_${timestamp}.mp3`;
         const filePath = path.join(tempDir, fileName);
 
+        // Download the audio
         const audioStream = await axios({
             method: "get",
             url: downloadUrl,
@@ -126,21 +157,23 @@ async function playCommand(sock, chatId, message, fkontak) {
             writer.on("error", reject);
         });
 
-        if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0)
+        if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
             throw new Error("Download failed or empty file!");
+        }
 
-        await sock.sendMessage(chatId, { text: `Playing: \n ${songTitle}` }, { quoted });
-
+        // Send the audio file
         await sock.sendMessage(
             chatId,
             {
-                document: { url: filePath },
+                document: fs.readFileSync(filePath),
                 mimetype: "audio/mpeg",
-                fileName: `${songTitle.substring(0, 100)}.mp3`
+                fileName: `${songTitle.substring(0, 100)}.mp3`,
+                caption: `🎵 *${songTitle}*`
             },
             { quoted }
         );
 
+        // Clean up
         fs.unlinkSync(filePath);
 
     } catch (error) {
@@ -148,7 +181,9 @@ async function playCommand(sock, chatId, message, fkontak) {
         
         // Use fkontak or create fake contact for error messages too
         const quoted = fkontak || createFakeContact(message);
-        await sock.sendMessage(chatId, { text: `🚫 Error: ${error.message}` }, { quoted });
+        await sock.sendMessage(chatId, { 
+            text: `🚫 Error: ${error.message}` 
+        }, { quoted });
     }
 }
 
