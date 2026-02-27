@@ -2,6 +2,7 @@ const fs = require("fs");
 const axios = require("axios");
 const yts = require("yt-search");
 const path = require("path");
+const os = require("os"); // Add this for temp directory
 
 const AXIOS_DEFAULTS = {
     timeout: 60000,
@@ -75,7 +76,7 @@ async function getAudioDownload(youtubeUrl, title) {
             const data = res.data;
             const result = data.result || data;
             const url = (typeof result === 'string' && result.startsWith('http')) ? result :
-                result?.download_url || result?.url || result?.downloadUrl || null;
+                result?.download_url || result?.url || result?.downloadUrl || result?.link || null;
 
             if (url) {
                 return {
@@ -92,11 +93,20 @@ async function getAudioDownload(youtubeUrl, title) {
 }
 
 async function playCommand(sock, chatId, message, fkontak) {
+    // Create a writable stream for the file
+    let writer = null;
+    let filePath = null;
+    
     try {
         await sock.sendMessage(chatId, { react: { text: "🎼", key: message.key } });
 
-        const tempDir = path.join(__dirname, "temp");
-        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+        // FIXED: Use the system's temp directory instead of a relative path
+        const tempDir = path.join(os.tmpdir(), "whatsapp-bot-audio");
+        
+        // Create the directory if it doesn't exist
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
 
         const text =
             message.message?.conversation ||
@@ -138,8 +148,10 @@ async function playCommand(sock, chatId, message, fkontak) {
         }, { quoted });
 
         const timestamp = Date.now();
-        const fileName = `audio_${timestamp}.mp3`;
-        const filePath = path.join(tempDir, fileName);
+        // Sanitize filename - remove invalid characters
+        const safeTitle = songTitle.replace(/[^\w\s]/gi, '').substring(0, 50);
+        const fileName = `audio_${timestamp}_${safeTitle}.mp3`;
+        filePath = path.join(tempDir, fileName);
 
         // Download the audio
         const audioStream = await axios({
@@ -149,7 +161,7 @@ async function playCommand(sock, chatId, message, fkontak) {
             timeout: 600000
         });
 
-        const writer = fs.createWriteStream(filePath);
+        writer = fs.createWriteStream(filePath);
         audioStream.data.pipe(writer);
 
         await new Promise((resolve, reject) => {
@@ -157,24 +169,27 @@ async function playCommand(sock, chatId, message, fkontak) {
             writer.on("error", reject);
         });
 
-        if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
-            throw new Error("Download failed or empty file!");
+        // Check if file exists and has content
+        if (!fs.existsSync(filePath)) {
+            throw new Error("File was not created");
+        }
+        
+        const stats = fs.statSync(filePath);
+        if (stats.size === 0) {
+            throw new Error("Downloaded file is empty");
         }
 
         // Send the audio file
         await sock.sendMessage(
             chatId,
             {
-                document: fs.readFileSync(filePath),
+                document: { url: filePath },  // Fixed: Use url property for document
                 mimetype: "audio/mpeg",
                 fileName: `${songTitle.substring(0, 100)}.mp3`,
                 caption: `🎵 *${songTitle}*`
             },
             { quoted }
         );
-
-        // Clean up
-        fs.unlinkSync(filePath);
 
     } catch (error) {
         console.error("Play command error:", error);
@@ -184,6 +199,21 @@ async function playCommand(sock, chatId, message, fkontak) {
         await sock.sendMessage(chatId, { 
             text: `🚫 Error: ${error.message}` 
         }, { quoted });
+    } finally {
+        // Clean up: Close writer if it exists
+        if (writer && !writer.closed) {
+            writer.end();
+        }
+        
+        // Clean up: Delete the file if it exists
+        if (filePath && fs.existsSync(filePath)) {
+            try {
+                fs.unlinkSync(filePath);
+                console.log(`Deleted temp file: ${filePath}`);
+            } catch (unlinkError) {
+                console.error("Error deleting temp file:", unlinkError);
+            }
+        }
     }
 }
 
