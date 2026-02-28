@@ -4,115 +4,85 @@ const yts = require("yt-search");
 const path = require("path");
 const os = require("os");
 
-// fakeQuoted function
-function createFakeContact(message) {
-    return {
-        key: {
-            participants: "0@s.whatsapp.net",
-            remoteJid: "status@broadcast",
-            fromMe: false,
-            id: "JUNE-X"
-        },
-        message: {
-            contactMessage: {
-                vcard: `BEGIN:VCARD\nVERSION:3.0\nN:Sy;Bot;;;\nFN:JUNE MD\nitem1.TEL;waid=${message.key.participant?.split('@')[0] || message.key.remoteJid.split('@')[0]}:${message.key.participant?.split('@')[0] || message.key.remoteJid.split('@')[0]}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`
-            }
-        },
-        participant: "0@s.whatsapp.net"
-    };
-}
-
-// API fallbacks method
-async function fetchAudioFromAPIs(videoUrl, videoTitle) {
-    const apis = [
-        {
-            url: `https://api.giftedtech.co.ke/api/download/ytmp3?apikey=gifted&url=${encodeURIComponent(videoUrl)}`,
-            parse: (data) => data?.status ? { url: data.result.download_url, title: data.result.title } : null
-        },
-        {
-            url: `https://apiskeith2-5378c363b20b.herokuapp.com/download/ytmp3?url=${encodeURIComponent(videoUrl)}`,
-            parse: (data) => (data?.status && data?.result) ? { url: data.result, title: data.title } : null
-        },
-        {
-            url: `https://api.giftedtech.co.ke/api/download/ytmp3?apikey=gifted&url=${encodeURIComponent(videoUrl)}`,
-            parse: (data) => (data?.status && data?.result?.download_url) ? { url: data.result.download_url, title: data.result.title } : null
-        }
-    ];
-
-    for (const api of apis) {
-        try {
-            const response = await axios.get(api.url, { timeout: 30000 });
-            const result = api.parse(response.data);
-            if (result) {
-                return {
-                    downloadUrl: result.url,
-                    videoTitle: result.title || videoTitle
-                };
-            }
-        } catch {
-            continue;
-        }
-    }
-    
-    return null;
-}
-
-// Download file method
-async function downloadFile(downloadUrl, filePath) {
-    const audioResponse = await axios({
-        method: "get",
-        url: downloadUrl,
-        responseType: "stream",
-        timeout: 900000, // 15 minutes
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity,
-        headers: { "User-Agent": "Mozilla/5.0" }
-    });
-
-    const writer = fs.createWriteStream(filePath);
-    audioResponse.data.pipe(writer);
-
-    await new Promise((resolve, reject) => {
-        writer.on("finish", resolve);
-        writer.on("error", (err) => {
-            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-            reject(err);
-        });
-    });
-
-    if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
-        throw new Error("Download failed or empty file!");
-    }
-    
-    return true;
-}
-
 async function songCommand(sock, chatId, message) {
     try {
-        // Create fake quoted contact
-        const fake = createFakeContact(message);
+        await sock.sendMessage(chatId, {
+            react: { text: "🎼", key: message.key }
+        });
 
-        // React to command
-        await sock.sendMessage(chatId, { react: { text: "🎶", key: message.key } });
+        // Define sender with fallback chain
+        const sender = message.key || message.key?.fromMe || message;
+        
+        // Create fake contact for enhanced replies
+        function createFakeContact(sender) {
+            return {
+                key: {
+                    participants: "0@s.whatsapp.net",
+                    remoteJid: "status@broadcast",
+                    fromMe: false,
+                    id: "JUNE-X-MENU"
+                },
+                message: {
+                    contactMessage: {
+                        displayName: "JUNE X",
+                        vcard: `BEGIN:VCARD\nVERSION:3.0\nN:;JUNE X;;;\nFN:JUNE X\nORG:JUNE X Bot\nTEL;type=CELL;type=VOICE;waid=${sender.split('@')[0]}:${sender.split('@')[0]}\nEND:VCARD`
+                    }
+                },
+                participant: "0@s.whatsapp.net"
+            };
+        }
 
-        // Prepare temp directory
+        const fakeQuoted = createFakeContact(message.key?.participant || chatId);
+
+        // Use system temp directory to avoid ENOTDIR errors
         const tempDir = path.join(os.tmpdir(), "june-x-temp");
         if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
-        // Extract query
-        const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
-        const query = text?.split(" ").slice(1).join(" ").trim();
+        // Extract query from direct text or quoted message
+        let text = message.message?.conversation || message.message?.extendedTextMessage?.text;
+        let query = null;
+
+        if (text) {
+            const parts = text.split(" ");
+            query = parts.slice(1).join(" ").trim();
+        }
+
+        // Check quoted message
+        const quoted = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+        if (!query && quoted) {
+            if (quoted.conversation) {
+                query = quoted.conversation.trim();
+            } else if (quoted.extendedTextMessage?.text) {
+                query = quoted.extendedTextMessage.text.trim();
+            } else if (quoted.audioMessage) {
+                return await sock.sendMessage(chatId, {
+                    audio: quoted.audioMessage,
+                    mimetype: "audio/mpeg",
+                    fileName: "quoted_audio.mp3"
+                }, { quoted: fakeQuoted });
+            } else if (quoted.videoMessage) {
+                const caption = quoted.videoMessage.caption || "";
+                if (caption) query = caption.trim();
+                else {
+                    return await sock.sendMessage(chatId, {
+                        video: quoted.videoMessage,
+                        mimetype: "video/mp4",
+                        fileName: "quoted_video.mp4"
+                    }, { quoted: fakeQuoted });
+                }
+            }
+        }
 
         if (!query) {
-            return sock.sendMessage(chatId, {
-                text: "🎵 Provide a song name!\nExample: .song Not Like Us"
-            }, { quoted: fake });
+            return await sock.sendMessage(chatId, {
+                text: "🎵 Provide a song name or reply to a message with .song\nExample: .song Not Like Us"
+            }, { quoted: fakeQuoted });
         }
 
         if (query.length > 100) {
-            return sock.sendMessage(chatId, {
+            return await sock.sendMessage(chatId, {
                 text: "📝 Song name too long! Max 100 chars."
-            }, { quoted: fake });
+            }, { quoted: fakeQuoted });
         }
 
         // Search YouTube
@@ -120,48 +90,109 @@ async function songCommand(sock, chatId, message) {
         if (!searchResult) {
             return sock.sendMessage(chatId, {
                 text: "😕 Couldn't find that song. Try another one!"
-            }, { quoted: fake });
+            }, { quoted: fakeQuoted });
         }
 
         const video = searchResult;
+        
+        // Try multiple APIs with fallbacks for large files
+        let downloadUrl;
+        let videoTitle;
+        
+        const apis = [
+            `https://apis.xwolf.space/download/yta3?url=${encodeURIComponent(video.url)}`,
+            `https://api.ryzendesu.vip/api/downloader/ytmp3?url=${encodeURIComponent(video.url)}`,
+            `https://api.giftedtech.co.ke/api/download/ytmp3?apikey=gifted&url=${encodeURIComponent(video.url)}`
+        ];
+        
+        for (const api of apis) {
+            try {
+                const response = await axios.get(api, { timeout: 30000 });
+                
+                if (api.includes('wolf')) {
+                    if (response.data && response.data?.success) {
+                        downloadUrl = response.data.downloadUrl;
+                        videoTitle = response.data.title || video.title;
+                        break;
+                    }
+                } else if (api.includes('ryzendesu')) {
+                    if (response.data?.status && response.data?.url) {
+                        downloadUrl = response.data.url;
+                        videoTitle = response.data.title || video.title;
+                        break;
+                    }
+                } else if (api.includes('gifted')) {
+                    if (response.data?.status && response.data?.result?.download_url) {
+                        downloadUrl = response.data.result.download_url;
+                        videoTitle = response.data.result.title || video.title;
+                        break;
+                    }
+                }
+            } catch (e) {
+                continue;
+            }
+        }
+        
+        if (!downloadUrl) throw new Error("API failed to fetch track!");
 
-        // Fetch audio using API fallbacks
-        const audioData = await fetchAudioFromAPIs(video.url, video.title);
-        if (!audioData) throw new Error("API failed to fetch track!");
-
-        // File setup
-        const fileName = `audio_${Date.now()}.mp3`;
+        const timestamp = Date.now();
+        const fileName = `audio_${timestamp}.mp3`;
         const filePath = path.join(tempDir, fileName);
 
-        // Download MP3
-        await downloadFile(audioData.downloadUrl, filePath);
+        // Download MP3 with support for files over 100MB
+        const audioResponse = await axios({
+            method: "get",
+            url: downloadUrl,
+            responseType: "stream",
+            timeout: 900000, // 15 minutes for large files
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+        });
+        
+        const writer = fs.createWriteStream(filePath);
+        audioResponse.data.pipe(writer);
+        await new Promise((resolve, reject) => {
+            writer.on("finish", resolve);
+            writer.on("error", (err) => {
+                if (fs.existsSync(filePath)) fs.unlinkSync(filePath); // cleanup partial file
+                reject(err);
+            });
+        });
 
-        // Notify user
-        const title = (audioData.videoTitle || video.title).substring(0, 100);
-        await sock.sendMessage(chatId, { text: `_🎶 Track ready:_\n_${title}_` }, { quoted: fake });
+        if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
+            throw new Error("Download failed or empty file!");
+        }
 
-        // Send audio format
+        await sock.sendMessage(chatId, {
+            text: `_🎶 Playing:_\n_${videoTitle || video.title}_`
+        }, { quoted: fakeQuoted });
+
+        // Send audio
         await sock.sendMessage(chatId, {
             audio: { url: filePath },
             mimetype: "audio/mpeg",
-            fileName: `${title}.mp3`
-        }, { quoted: fake });
+            fileName: `${video.title}.mp3`,
+            ptt: false
+        }, { quoted: fakeQuoted });
 
-        // Send document format
+        // Send as document too
         await sock.sendMessage(chatId, {
             document: { url: filePath },
             mimetype: "audio/mpeg",
-            fileName: `${title}.mp3`
-        }, { quoted: fake });
+            fileName: `${(videoTitle || video.title).substring(0, 100)}.mp3`
+        }, { quoted: fakeQuoted });
 
         // Cleanup
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
     } catch (error) {
         console.error("Song command error:", error);
-        return sock.sendMessage(chatId, {
+        return await sock.sendMessage(chatId, {
             text: `🚫 Error: ${error.message}`
-        }, { quoted: createFakeContact(message) }); // Fallback to function call if fake not in scope
+        }, { quoted: message.key?.fromMe ? createFakeContact(message.key?.participant || chatId) : message });
     }
 }
 
