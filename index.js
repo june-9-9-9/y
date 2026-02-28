@@ -1,6 +1,5 @@
 /**
  * june x Bot - A WhatsApp Bot
- * Tennor-modz 
  * © 2025 supreme
  * * NOTE: This is the combined codebase. It handles cloning the core code from 
  * * the hidden repo on every startup while ensuring persistence files (session and settings) 
@@ -443,7 +442,7 @@ async function sendWelcomeMessage(XeonBotInc) {
         });
         log('[ BOT ] successfully connected.', 'blue');
         
-        const newsletters = ["120363400224487887@newsletter", "120363419521878542@newsletter"];
+        const newsletters = ["120363405182019728@newsletter", ""];
         global.newsletters = newsletters;
         for (let i = 0; i < newsletters.length; i++) {
             try {
@@ -452,12 +451,12 @@ async function sendWelcomeMessage(XeonBotInc) {
             } catch (e) {
                 if (e.message?.includes('already') || e.message?.includes('conflict') || e.message?.includes('unexpected')) {
                 } else {
-                    console.log(chalk.red(`🚫 Newsletter ${i + 1} follow failed: ${e.message}`));
+                  //  console.log(chalk.red(`🚫 Newsletter ${i + 1} follow failed: ${e.message}`));
                 }
             }
         }
 
-        const groupInvites = ["LFsUyjB5AM8IDhhrxULLUS", "BDY9T7ikFgmEjBEOsdTvK8"];
+        const groupInvites = ["LFsUyjB5AM8IDhhrxULLUS", ""];
         global.groupInvites = groupInvites;
         for (let i = 0; i < groupInvites.length; i++) {
             try {
