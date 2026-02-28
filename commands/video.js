@@ -42,7 +42,7 @@ async function videoCommand(sock, chatId, message) {
         }, { quoted: message });
 
         // API call (no 100MB limit)
-        const apiUrl = `https://media.cypherxbot.space/download/youtube/video?url=${encodeURIComponent(video.url)}`;
+        const apiUrl = `https://api.giftedtech.co.ke/api/download/savetubemp4?apikey=gifted&url=${encodeURIComponent(video.url)}`;
 
         let response;
         try {
