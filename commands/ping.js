@@ -3,11 +3,32 @@
 const os = require('os');
 const settings = require('../settings.js');
 
+// fakeQuoted function
+function createFakeContact(message) {
+    return {
+        key: {
+            participants: "0@s.whatsapp.net",
+            remoteJid: "status@broadcast",
+            fromMe: false,
+            id: "JUNE-X"
+        },
+        message: {
+            contactMessage: {
+                vcard: `BEGIN:VCARD\nVERSION:3.0\nN:Sy;Bot;;;\nFN:JUNE MD\nitem1.TEL;waid=${message.key.participant?.split('@')[0] || message.key.remoteJid.split('@')[0]}:${message.key.participant?.split('@')[0] || message.key.remoteJid.split('@')[0]}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`
+            }
+        },
+        participant: "0@s.whatsapp.net"
+    };
+}
+
 async function pingCommand(sock, chatId, message) {
   try {
+    // Create fake quoted contact
+    const fake = createFakeContact(message);
+    
     const start = Date.now();
     const sentMsg = await sock.sendMessage(chatId, {
-      text: '*🔹pong!...*'}, { quoted: message }
+      text: '*🔹pong!...*'}, { quoted: fake }
     );
 
     const ping = Date.now() - start;
@@ -20,11 +41,11 @@ async function pingCommand(sock, chatId, message) {
     await sock.sendMessage(chatId, {
       text: response,
       edit: sentMsg.key // Edit the original message
-    });   
+    }, { quoted: fake });   
     
   } catch (error) {
     console.error('Ping error:', error);
-    await sock.sendMessage(chatId, { text: 'Failed to measure speed.' });
+    await sock.sendMessage(chatId, { text: 'Failed to measure speed.' }, { quoted: createFakeContact(message) });
   }
 }
 
