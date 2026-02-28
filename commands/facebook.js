@@ -50,7 +50,7 @@ async function facebookCommand(sock, chatId, message) {
             );
             const data = apiResponse.data;
 
-            if (data && data.status && data.result && data.result.hd_video && data.result.media.sd_video) {
+            if (data && data.success && data.result && data.result.hd_video && data.result.sd_video) {
                 const videoUrl = data.result.hd_video || data.result.sd_video;
                 const caption = "JUNE-X";
 
