@@ -50,9 +50,9 @@ async function facebookCommand(sock, chatId, message) {
             );
             const data = apiResponse.data;
 
-            if (data && data.success && data.result && data.result.hd_video && data.result.sd_video) {
+            if (data && data.status && data.result && data.result.hd_video && data.result.sd_video) {
                 const videoUrl = data.result.hd_video || data.result.sd_video;
-                const caption = "JUNE-X";
+                const caption = `${data.result.title}\nJUNE-X`;
 
                 await sock.sendMessage(chatId, {
                     video: { url: videoUrl },
