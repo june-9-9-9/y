@@ -46,12 +46,12 @@ async function facebookCommand(sock, chatId, message) {
         try {
             // ✅ Facebook download API
             const apiResponse = await axios.get(
-                `https://apiskeith.top/download/fbdown?url=${encodeURIComponent(url)}`
+                `https://api.giftedtech.co.ke/api/download/facebook?apikey=gifted&url=${encodeURIComponent(url)}`
             );
             const data = apiResponse.data;
 
-            if (data && data.status && data.result && data.result.media.sd && data.result.media.hd) {
-                const videoUrl = data.result.media.hd || data.result.media.sd;
+            if (data && data.status && data.result && data.result.hd_video && data.result.media.sd_video) {
+                const videoUrl = data.result.hd_video || data.result.sd_video;
                 const caption = "JUNE-X";
 
                 await sock.sendMessage(chatId, {
