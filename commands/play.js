@@ -2,218 +2,162 @@ const fs = require("fs");
 const axios = require("axios");
 const yts = require("yt-search");
 const path = require("path");
-const os = require("os"); // Add this for temp directory
+const os = require("os");
 
-const AXIOS_DEFAULTS = {
-    timeout: 60000,
-    headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*'
-    }
-};
-
-// Create fake contact for enhanced replies
 function createFakeContact(message) {
     return {
         key: {
             participants: "0@s.whatsapp.net",
             remoteJid: "status@broadcast",
             fromMe: false,
-            id: "Smart project"
+            id: "JUNE-X-MENU"
         },
         message: {
             contactMessage: {
-                vcard: `BEGIN:VCARD\nVERSION:3.0\nN:Sy;Bot;;;\nFN: whatsapp bot\nitem1.TEL;waid=${message.key.participant?.split('@')[0] || message.key.remoteJid.split('@')[0]}:${message.key.participant?.split('@')[0] || message.key.remoteJid.split('@')[0]}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`
+                vcard: `BEGIN:VCARD\nVERSION:3.0\nN:Sy;Bot;;;\nFN:JUNE X\nitem1.TEL;waid=${message.key.participant?.split('@')[0] || message.key.remoteJid?.split('@')[0]}:${message.key.participant?.split('@')[0] || message.key.remoteJid?.split('@')[0]}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`
             }
         },
         participant: "0@s.whatsapp.net"
     };
 }
 
-async function tryRequest(getter, attempts = 2) {
-    let lastError;
-    for (let i = 1; i <= attempts; i++) {
-        try {
-            return await getter();
-        } catch (err) {
-            lastError = err;
-            if (i < attempts) await new Promise(r => setTimeout(r, 1500));
-        }
-    }
-    throw lastError;
-}
-
-async function searchYouTube(query) {
+async function playCommand(sock, chatId, message) {
     try {
-        // Search for the video with 'official' to get better results
-        const searchResults = await yts(`${query} official audio`);
-        
-        if (!searchResults.videos || searchResults.videos.length === 0) {
-            // Try without 'official' if no results
-            const fallbackResults = await yts(query);
-            return fallbackResults.videos[0] || null;
+        // Create fake contact once
+        const fakekontak = createFakeContact(message);
+
+        await sock.sendMessage(chatId, {
+            react: { text: "🎼", key: message.key }
+        });
+
+        // Use system temp directory to avoid ENOTDIR errors
+        const tempDir = path.join(os.tmpdir(), "june-x-temp");
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+
+        // Extract query
+        let text = message.message?.conversation || message.message?.extendedTextMessage?.text;
+        let query = null;
+
+        if (text) {
+            const parts = text.split(" ");
+            query = parts.slice(1).join(" ").trim();
         }
-        
-        return searchResults.videos[0];
-    } catch (error) {
-        console.error("YouTube search error:", error);
-        throw new Error("Failed to search YouTube");
-    }
-}
 
-async function getAudioDownload(youtubeUrl, title) {
-    const apis = [
-        `https://api.giftedtech.co.ke/api/download/yta?apikey=gifted&url=${encodeURIComponent(youtubeUrl)}`,
-        `https://apiskeith.top/download/ytmp3?url=${encodeURIComponent(youtubeUrl)}`,
-    ];
+        if (!query) {
+            return await sock.sendMessage(chatId, {
+                text: "🎵 Provide a song name!\nExample: .play Not Like Us"
+            }, { quoted: fakekontak });
+        }
 
-    let lastError;
-    for (const apiUrl of apis) {
-        try {
-            const res = await tryRequest(() => axios.get(apiUrl, AXIOS_DEFAULTS));
-            if (!res?.data) continue;
+        if (query.length > 100) {
+            return await sock.sendMessage(chatId, {
+                text: "📝 Song name too long! Max 100 chars."
+            }, { quoted: fakekontak });
+        }
 
-            const data = res.data;
-            const result = data.result || data;
-            const url = (typeof result === 'string' && result.startsWith('http')) ? result :
-                result?.download_url || result?.url || result?.downloadUrl || result?.link || null;
+        // Search YouTube
+        const searchResult = (await yts(query + " official")).videos[0];
+        if (!searchResult) {
+            return sock.sendMessage(chatId, {
+                text: "😕 Couldn't find that song. Try another one!"
+            }, { quoted: fakekontak });
+        }
 
-            if (url) {
-                return {
-                    download: url,
-                    title: title || result?.title || data?.title || 'YouTube Audio'
-                };
+        const video = searchResult;
+
+        // Try multiple APIs with fallbacks
+        let downloadUrl;
+        let videoTitle;
+
+        const apis = [
+            `https://apis.xwolf.space/download/yta3?url=${encodeURIComponent(video.url)}`,
+            `https://api.ryzendesu.vip/api/downloader/ytmp3?url=${encodeURIComponent(video.url)}`,
+            `https://api.giftedtech.co.ke/api/download/ytmp3?apikey=gifted&url=${encodeURIComponent(video.url)}`
+        ];
+
+        for (const api of apis) {
+            try {
+                const response = await axios.get(api, { timeout: 30000 });
+
+                if (api.includes("wolf")) {
+                    if (response.data?.success) {
+                        downloadUrl = response.data.downloadUrl;
+                        videoTitle = response.data.title || video.title;
+                        break;
+                    }
+                } else if (api.includes("ryzendesu")) {
+                    if (response.data?.status && response.data?.url) {
+                        downloadUrl = response.data.url;
+                        videoTitle = response.data.title || video.title;
+                        break;
+                    }
+                } else if (api.includes("gifted")) {
+                    if (response.data?.status && response.data?.result?.download_url) {
+                        downloadUrl = response.data.result.download_url;
+                        videoTitle = response.data.result.title || video.title;
+                        break;
+                    }
+                }
+            } catch (e) {
+                continue;
             }
-        } catch (err) {
-            lastError = err;
-            continue;
-        }
-    }
-    throw lastError || new Error('All audio APIs failed');
-}
-
-async function playCommand(sock, chatId, message, fkontak) {
-    // Create a writable stream for the file
-    let writer = null;
-    let filePath = null;
-    
-    try {
-        await sock.sendMessage(chatId, { react: { text: "🎼", key: message.key } });
-
-        // FIXED: Use the system's temp directory instead of a relative path
-        const tempDir = path.join(os.tmpdir(), "whatsapp-bot-audio");
-        
-        // Create the directory if it doesn't exist
-        if (!fs.existsSync(tempDir)) {
-            fs.mkdirSync(tempDir, { recursive: true });
         }
 
-        const text =
-            message.message?.conversation ||
-            message.message?.extendedTextMessage?.text ||
-            "";
-
-        const parts = text.split(" ");
-        const query = parts.slice(1).join(" ").trim();
-
-        // Use fkontak if provided, otherwise create fake contact
-        const quoted = fkontak || createFakeContact(message);
-
-        if (!query)
-            return sock.sendMessage(chatId, { text: "🎵 Provide a song name!\nExample: .play Not Like Us" }, { quoted });
-
-        if (query.length > 100)
-            return sock.sendMessage(chatId, { text: "📝 Song name too long! Max 100 chars." }, { quoted });
-
-        // Search for the video using yt-search
-        const video = await searchYouTube(query);
-
-        if (!video) {
-            return sock.sendMessage(chatId, { 
-                text: "😕 Couldn't find that song. Try another one!" 
-            }, { quoted });
-        }
-
-        // Log the found video info (optional, for debugging)
-        console.log(`Found video: ${video.title} (${video.url})`);
-
-        // Get audio download using the video URL and title
-        const audio = await getAudioDownload(video.url, video.title);
-        const downloadUrl = audio.download;
-        const songTitle = audio.title || video.title;
-
-        // Send info message
-        await sock.sendMessage(chatId, { 
-            text: `_🎵 *Track found:* ${songTitle}_\n_⏱️ *Duration:* ${video.timestamp || 'N/A'}_*` 
-        }, { quoted });
+        if (!downloadUrl) throw new Error("API failed to fetch track!");
 
         const timestamp = Date.now();
-        // Sanitize filename - remove invalid characters
-        const safeTitle = songTitle.replace(/[^\w\s]/gi, '').substring(0, 50);
-        const fileName = `audio_${timestamp}_${safeTitle}.mp3`;
-        filePath = path.join(tempDir, fileName);
+        const fileName = `audio_${timestamp}.mp3`;
+        const filePath = path.join(tempDir, fileName);
 
-        // Download the audio
-        const audioStream = await axios({
+        // Download MP3 with large file support
+        const audioResponse = await axios({
             method: "get",
             url: downloadUrl,
             responseType: "stream",
-            timeout: 600000
+            timeout: 900000, // 15 minutes
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
         });
 
-        writer = fs.createWriteStream(filePath);
-        audioStream.data.pipe(writer);
+        const writer = fs.createWriteStream(filePath);
+        audioResponse.data.pipe(writer);
 
         await new Promise((resolve, reject) => {
             writer.on("finish", resolve);
-            writer.on("error", reject);
+            writer.on("error", (err) => {
+                if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+                reject(err);
+            });
         });
 
-        // Check if file exists and has content
-        if (!fs.existsSync(filePath)) {
-            throw new Error("File was not created");
-        }
-        
-        const stats = fs.statSync(filePath);
-        if (stats.size === 0) {
-            throw new Error("Downloaded file is empty");
+        if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
+            throw new Error("Download failed or empty file!");
         }
 
-        // Send the audio file
-        await sock.sendMessage(
-            chatId,
-            {
-                document: { url: filePath },  // Fixed: Use url property for document
-                mimetype: "audio/mpeg",
-                fileName: `${songTitle.substring(0, 100)}.mp3`,
-                caption: `🎵 *${songTitle}*`
-            },
-            { quoted }
-        );
+        // Notify user
+        const title = (videoTitle || video.title).substring(0, 100);
+        await sock.sendMessage(chatId, {
+            text: `_🎶 Track ready:_\n_${title}_`
+        }, { quoted: fakekontak });
+
+        // Send audio file with fake contact quoted
+        await sock.sendMessage(chatId, {
+            document: { url: filePath },
+            mimetype: "audio/mpeg",
+            fileName: `${title}.mp3`
+        }, { quoted: fakekontak });
+
+        // Cleanup
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
     } catch (error) {
         console.error("Play command error:", error);
-        
-        // Use fkontak or create fake contact for error messages too
-        const quoted = fkontak || createFakeContact(message);
-        await sock.sendMessage(chatId, { 
-            text: `🚫 Error: ${error.message}` 
-        }, { quoted });
-    } finally {
-        // Clean up: Close writer if it exists
-        if (writer && !writer.closed) {
-            writer.end();
-        }
-        
-        // Clean up: Delete the file if it exists
-        if (filePath && fs.existsSync(filePath)) {
-            try {
-                fs.unlinkSync(filePath);
-                console.log(`Deleted temp file: ${filePath}`);
-            } catch (unlinkError) {
-                console.error("Error deleting temp file:", unlinkError);
-            }
-        }
+        return await sock.sendMessage(chatId, {
+            text: `🚫 Error: ${error.message}`
+        }, { quoted: createFakeContact(message) });
     }
 }
 
