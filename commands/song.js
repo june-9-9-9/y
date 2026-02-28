@@ -30,7 +30,7 @@ async function fetchAudioFromAPIs(videoUrl, videoTitle) {
             parse: (data) => data?.status ? { url: data.result.download_url, title: data.result.title } : null
         },
         {
-            url: `https://apiskeith.top/download/audio?url=${encodeURIComponent(videoUrl)}`,
+            url: `https://apiskeith2-5378c363b20b.herokuapp.com/download/ytmp3?url=${encodeURIComponent(videoUrl)}`,
             parse: (data) => (data?.status && data?.result) ? { url: data.result, title: data.title } : null
         },
         {
